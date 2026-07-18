@@ -86,7 +86,13 @@ function comparatorFor(sort: MarketSort) {
   }
 }
 
-export function MarketProvider({ children }: { children: React.ReactNode }) {
+export function MarketProvider({
+  children,
+  initialMarkets,
+}: {
+  children: React.ReactNode
+  initialMarkets?: ClimateMarket[]
+}) {
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
   const [selectedMarket, setSelectedMarket] = useState<ClimateMarket | null>(
     null,
@@ -111,18 +117,27 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     return () => window.cancelAnimationFrame(frame)
   }, [])
 
+  // Server-generated markets (Gemini) when provided; otherwise bundled samples.
+  const markets = useMemo(
+    () =>
+      initialMarkets && initialMarkets.length > 0
+        ? initialMarkets
+        : demoMarkets,
+    [initialMarkets],
+  )
+
   // Deferring search keeps the input responsive while the globe and large
   // market grid recompute off the debounced value.
   const deferredSearch = useDeferredValue(search)
 
   const visibleMarkets = useMemo(
     () =>
-      demoMarkets.filter(
+      markets.filter(
         (market) =>
           matchesSearch(market, deferredSearch) &&
           (category === "all" || market.category === category),
       ),
-    [category, deferredSearch],
+    [category, deferredSearch, markets],
   )
 
   const boardMarkets = useMemo(() => {
@@ -159,7 +174,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<MarketContextValue>(
     () => ({
-      markets: demoMarkets,
+      markets,
       visibleMarkets,
       boardMarkets,
       selectedRegion,
@@ -186,6 +201,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       closeDrawer,
       isDrawerOpen,
       isLoading,
+      markets,
       now,
       search,
       selectedMarket,

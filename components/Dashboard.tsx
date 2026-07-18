@@ -15,6 +15,7 @@ import {
 import { PositionProvider } from "@/components/providers/PositionProvider"
 import SolanaProvider from "@/components/providers/SolanaProvider"
 import { CONTINENTS } from "@/lib/geo/regions"
+import type { ClimateMarket } from "@/lib/markets/types"
 import { formatCompact, formatProbability, formatSol } from "@/lib/utils/format"
 
 function DashboardContent() {
@@ -271,10 +272,14 @@ function DashboardContent() {
   )
 }
 
-export default function Dashboard() {
+export default function Dashboard({
+  initialMarkets,
+}: {
+  initialMarkets?: ClimateMarket[]
+}) {
   return (
     <SolanaProvider>
-      <MarketProvider>
+      <MarketProvider initialMarkets={initialMarkets}>
         <PositionProvider>
           <GlobeLinkProvider>
             <DashboardContent />

@@ -39,7 +39,7 @@ interface HistoryOptions {
   cadenceDays?: number
 }
 
-const buildHistory = ({
+export const buildHistory = ({
   start,
   yesProbabilities,
   baseLiquidity,
@@ -76,7 +76,7 @@ type DemoTradeInput = readonly [
   timestamp: string,
 ]
 
-const buildTrades = (
+export const buildTrades = (
   marketId: string,
   inputs: readonly DemoTradeInput[],
 ): MarketTrade[] =>

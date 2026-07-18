@@ -10,7 +10,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./tests/setup.ts"],
-    include: ["tests/**/*.test.{ts,tsx}"],
+    include: ["tests/**/*.test.{ts,tsx}", "lib/**/*.test.{ts,tsx}"],
     coverage: {
       reporter: ["text", "html"],
       exclude: ["app/layout.tsx", "next-env.d.ts"],

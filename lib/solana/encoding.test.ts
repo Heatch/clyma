@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest"
 
 import { marketIdToU64, solToLamports, u64ToBuffer } from "./encoding"
