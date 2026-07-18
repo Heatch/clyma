@@ -56,7 +56,7 @@ non-canvas navigation fallback.
 | Solana client   | `@solana/web3.js`, Anchor instruction encoding, deterministic PDAs      |
 | Program         | Anchor 0.30.1 Rust program under `programs/climate_market`              |
 | Validation      | Zod schemas for market metadata, query parameters, and indexing input   |
-| Data            | Typed in-memory repository seeded with clearly labelled demo records    |
+| Data            | Gemini-generated or bundled, clearly labelled fictional demo markets    |
 | Tests           | Vitest/Testing Library plus an Anchor local-validator integration suite |
 
 Important paths:
@@ -154,6 +154,9 @@ NEXT_PUBLIC_SOLANA_NETWORK=devnet
 NEXT_PUBLIC_SOLANA_RPC_URL=
 NEXT_PUBLIC_PROGRAM_ID=
 DATABASE_URL=
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MARKET_COUNT=24
 ```
 
 - `NEXT_PUBLIC_SOLANA_NETWORK` must remain `devnet` for this prototype.
@@ -162,6 +165,13 @@ DATABASE_URL=
   empty or invalid value keeps purchase and settlement controls disabled.
 - `DATABASE_URL` is reserved for a future persistent repository and is not read
   by the current in-memory implementation.
+- `GEMINI_API_KEY` is optional and server-only. When set, the home page requests
+  fictional climate-market metadata from Gemini and caches validated results in
+  the operating system's temporary directory. If the key is absent or generation
+  fails, TerraForm falls back to the bundled sample catalogue.
+- `GEMINI_MODEL` selects the server-side generation model.
+- `GEMINI_MARKET_COUNT` controls the requested catalogue size and is capped at
+  40; it defaults to 24.
 
 Never put a private key, seed phrase, or wallet JSON in an environment variable
 or committed file. Only public addresses and RPC URLs belong in browser-exposed
@@ -320,8 +330,8 @@ source of truth for balances, status, outcomes, or claims.
 - Only native Devnet SOL and the Phantom adapter are currently wired into the
   UI.
 - Resolution is permissioned and has no oracle or dispute process.
-- Market metadata and charts are fictional seeded records, not live climate
-  observations.
+- Market metadata and charts are fictional generated or seeded records, not live
+  climate observations.
 - The pooled model has no order book, limit orders, fees, or liquidity-provider
   shares. Integer settlement can leave vault dust.
 - Anchor integration tests require Rust, Solana CLI, Anchor CLI, and a local

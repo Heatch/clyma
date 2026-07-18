@@ -13,6 +13,7 @@ import {
 } from "@/components/providers/MarketProvider"
 import { PositionProvider } from "@/components/providers/PositionProvider"
 import SolanaProvider from "@/components/providers/SolanaProvider"
+import type { ClimateMarket } from "@/lib/markets/types"
 
 function DashboardContent() {
   const { search, setSearch, closeDrawer } = useMarkets()
@@ -46,10 +47,14 @@ function DashboardContent() {
   )
 }
 
-export default function Dashboard() {
+export default function Dashboard({
+  initialMarkets,
+}: {
+  initialMarkets?: ClimateMarket[]
+}) {
   return (
     <SolanaProvider>
-      <MarketProvider>
+      <MarketProvider initialMarkets={initialMarkets}>
         <PositionProvider>
           <GlobeLinkProvider>
             <DashboardContent />

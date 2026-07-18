@@ -105,10 +105,22 @@ async function hashMarketQuestion(question: string): Promise<Buffer> {
   )
 }
 
-export function MarketProvider({ children }: { children: React.ReactNode }) {
+export function MarketProvider({
+  children,
+  initialMarkets,
+}: {
+  children: React.ReactNode
+  initialMarkets?: ClimateMarket[]
+}) {
   const { connection } = useSolanaWallet()
+  // Treat the server payload as initial state. Keeping this catalog stable lets
+  // on-chain refreshes enrich the same market set without restarting whenever
+  // a parent happens to pass a newly allocated array.
+  const [marketCatalog] = useState<ClimateMarket[]>(() =>
+    initialMarkets && initialMarkets.length > 0 ? initialMarkets : demoMarkets,
+  )
   const [markets, setMarkets] = useState<ClimateMarket[]>(() =>
-    demoMarkets.map((market) => ({
+    marketCatalog.map((market) => ({
       ...market,
       chainState: SOLANA_PROGRAM_ID ? "loading" : "demo-only",
     })),
@@ -134,7 +146,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     if (!programId) {
       if (requestId !== refreshRequestRef.current) return
       setMarkets(
-        demoMarkets.map((market) => ({
+        marketCatalog.map((market) => ({
           ...market,
           chainState: "demo-only" as const,
         })),
@@ -142,7 +154,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const addresses = demoMarkets.map(
+    const addresses = marketCatalog.map(
       (market) => deriveMarketPda(programId, market.onchainMarketId)[0],
     )
     const [protocolAddress] = deriveProtocolConfigPda(programId)
@@ -151,12 +163,12 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       const [accounts, expectedQuestionHashes] = await Promise.all([
         connection.getMultipleAccountsInfo(addresses, SOLANA_COMMITMENT),
         Promise.all(
-          demoMarkets.map((market) => hashMarketQuestion(market.question)),
+          marketCatalog.map((market) => hashMarketQuestion(market.question)),
         ),
       ])
       if (requestId !== refreshRequestRef.current) return
       setMarkets(
-        demoMarkets.map((market, index) => {
+        marketCatalog.map((market, index) => {
           const account = accounts[index]
           const expectedQuestionHash = expectedQuestionHashes[index]
           if (!account) return { ...market, chainState: "missing" as const }
@@ -220,7 +232,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
         current.map((market) => ({ ...market, chainState: "error" })),
       )
     }
-  }, [connection])
+  }, [connection, marketCatalog])
 
   // Flip off after the first client commit so board/card skeletons show during
   // hydration and swap seamlessly to content (and stay ready for async data).

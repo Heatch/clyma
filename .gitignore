@@ -12,3 +12,8 @@ test-ledger/
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# Local Gemini API test scratch (not part of the app)
+.venv/
+/test.py
+/geminitest.py
