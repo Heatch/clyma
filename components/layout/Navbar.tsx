@@ -1,5 +1,7 @@
 "use client"
 
+import { useMarkets } from "@/components/providers/MarketProvider"
+import { useSolanaWallet } from "@/components/providers/SolanaProvider"
 import WalletBalance from "@/components/wallet/WalletBalance"
 import WalletConnectButton from "@/components/wallet/WalletConnectButton"
 
@@ -9,6 +11,8 @@ interface NavbarProps {
 }
 
 export default function Navbar({ search, onSearchChange }: NavbarProps) {
+  const { showPortfolio } = useMarkets()
+  const { connected } = useSolanaWallet()
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-gradient-to-b from-black/90 via-black/65 to-transparent px-4 pb-4 pt-[max(0.875rem,env(safe-area-inset-top))] backdrop-blur-md sm:px-6 lg:px-8">
       <div className="mx-auto flex h-10 max-w-[1800px] items-center gap-3">
@@ -57,6 +61,15 @@ export default function Navbar({ search, onSearchChange }: NavbarProps) {
         </div>
 
         <div className="pointer-events-auto ml-auto flex shrink-0 items-center gap-2.5">
+          {connected && (
+            <button
+              type="button"
+              onClick={showPortfolio}
+              className="rounded-full border border-white/20 bg-white/[0.08] px-4 py-2 text-xs font-semibold text-white transition hover:border-white/40 hover:bg-white/15"
+            >
+              My Positions
+            </button>
+          )}
           <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.14em] text-white/55 lg:flex">
             <span className="soft-pulse size-1.5 rounded-full bg-emerald-400" />
             Devnet · Sample data

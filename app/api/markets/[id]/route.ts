@@ -1,33 +1,20 @@
 import { apiError, apiSuccess } from "@/app/api/_shared/responses"
-import { getMarketById } from "@/lib/markets/repository"
-import {
-  formatZodIssues,
-  marketIdentifierSchema,
-} from "@/lib/validation/marketSchemas"
+import { initDb } from "@/lib/db/init"
+import { getMarketById } from "@/lib/db/repositories/markets"
 
-interface MarketRouteContext {
+interface MarketByIdContext {
   params: Promise<{ id: string }>
 }
 
-export async function GET(_request: Request, context: MarketRouteContext) {
-  const params = marketIdentifierSchema.safeParse(await context.params)
-  if (!params.success) {
-    return apiError(
-      "VALIDATION_ERROR",
-      "The market identifier is invalid.",
-      400,
-      formatZodIssues(params.error),
-    )
-  }
+export async function GET(_request: Request, context: MarketByIdContext) {
+  await initDb()
 
-  const market = getMarketById(params.data.id)
+  const { id } = await context.params
+  const market = await getMarketById(id)
+
   if (!market) {
-    return apiError(
-      "MARKET_NOT_FOUND",
-      `Market '${params.data.id}' was not found.`,
-      404,
-    )
+    return apiError("MARKET_NOT_FOUND", "Market not found", 404)
   }
 
-  return apiSuccess({ market })
+  return apiSuccess(market)
 }

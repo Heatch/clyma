@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import MarketDetails from "@/components/markets/MarketDetails"
 import MarketFilters from "@/components/markets/MarketFilters"
 import MarketListItem from "@/components/markets/MarketListItem"
+import PortfolioPanel from "@/components/portfolio/PortfolioPanel"
 import { useMarkets } from "@/components/providers/MarketProvider"
 import type { MarketCategory } from "@/lib/markets/types"
 
@@ -14,6 +15,7 @@ export default function RegionalMarketDrawer() {
     selectedRegion,
     selectedMarket,
     isDrawerOpen,
+    isPortfolioMode,
     selectMarket,
     showRegionMarkets,
     closeDrawer,
@@ -52,11 +54,14 @@ export default function RegionalMarketDrawer() {
     )
   }, [category, markets, search, selectedRegion])
 
-  if (!isDrawerOpen || !selectedRegion) return null
+  if (!isDrawerOpen) return null
+  if (!isPortfolioMode && !selectedRegion) return null
 
-  const activeCount = markets.filter(
-    (market) => market.continent === selectedRegion && market.status === "open",
-  ).length
+  const activeCount = selectedRegion
+    ? markets.filter(
+        (market) => market.continent === selectedRegion && market.status === "open",
+      ).length
+    : 0
 
   return (
     <>
@@ -90,11 +95,16 @@ export default function RegionalMarketDrawer() {
               />
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold">
-                  {selectedMarket ? selectedMarket.region : selectedRegion}
+                  {isPortfolioMode
+                    ? "My Positions"
+                    : selectedMarket
+                      ? selectedMarket.region
+                      : selectedRegion}
                 </p>
                 <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-neutral-400">
-                  {activeCount} active demo market{activeCount === 1 ? "" : "s"}{" "}
-                  · Devnet
+                  {isPortfolioMode
+                    ? "Your Devnet holdings"
+                    : `${activeCount} active demo market${activeCount === 1 ? "" : "s"} · Devnet`}
                 </p>
               </div>
             </div>
@@ -110,7 +120,9 @@ export default function RegionalMarketDrawer() {
           </div>
 
           <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
-            {selectedMarket ? (
+            {isPortfolioMode ? (
+              <PortfolioPanel />
+            ) : selectedMarket ? (
               <MarketDetails
                 market={selectedMarket}
                 onBack={showRegionMarkets}

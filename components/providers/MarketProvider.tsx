@@ -27,6 +27,7 @@ type MarketContextValue = {
   selectedRegion: string | null
   selectedMarket: ClimateMarket | null
   isDrawerOpen: boolean
+  isPortfolioMode: boolean
   isLoading: boolean
   now: number
   search: string
@@ -40,6 +41,7 @@ type MarketContextValue = {
   selectRegion: (region: string) => void
   selectMarket: (market: ClimateMarket) => void
   showRegionMarkets: () => void
+  showPortfolio: () => void
   closeDrawer: () => void
 }
 
@@ -92,6 +94,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     null,
   )
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [isPortfolioMode, setIsPortfolioMode] = useState(false)
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState<MarketCategory | "all">("all")
   const [status, setStatus] = useState<StatusFilter>("all")
@@ -154,11 +157,20 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     setIsDrawerOpen(true)
   }, [])
 
-  const showRegionMarkets = useCallback(() => setSelectedMarket(null), [])
+  const showRegionMarkets = useCallback(() => {
+    setSelectedMarket(null)
+    setIsPortfolioMode(false)
+  }, [])
+  const showPortfolio = useCallback(() => {
+    setSelectedMarket(null)
+    setIsPortfolioMode(true)
+    setIsDrawerOpen(true)
+  }, [])
   const closeDrawer = useCallback(() => {
     setIsDrawerOpen(false)
     setSelectedMarket(null)
     setSelectedRegion(null)
+    setIsPortfolioMode(false)
   }, [])
 
   const value = useMemo<MarketContextValue>(
@@ -169,6 +181,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       selectedRegion,
       selectedMarket,
       isDrawerOpen,
+      isPortfolioMode,
       isLoading,
       now,
       search,
@@ -182,6 +195,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       selectRegion,
       selectMarket,
       showRegionMarkets,
+      showPortfolio,
       closeDrawer,
     }),
     [
@@ -189,6 +203,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       category,
       closeDrawer,
       isDrawerOpen,
+      isPortfolioMode,
       isLoading,
       now,
       search,
@@ -197,6 +212,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       selectMarket,
       selectRegion,
       showRegionMarkets,
+      showPortfolio,
       sort,
       status,
       visibleMarkets,

@@ -1,37 +1,20 @@
 import { apiError, apiSuccess } from "@/app/api/_shared/responses"
-import { queryMarkets } from "@/lib/markets/repository"
-import {
-  MARKET_CATEGORIES,
-  MARKET_CONTINENTS,
-  MARKET_STATUSES,
-} from "@/lib/markets/types"
-import {
-  formatZodIssues,
-  marketListQuerySchema,
-  searchParamsToObject,
-} from "@/lib/validation/marketSchemas"
+import { initDb } from "@/lib/db/init"
+import { queryMarkets } from "@/lib/db/repositories/markets"
+import { marketListQuerySchema, formatZodIssues } from "@/lib/validation/marketSchemas"
 
 export async function GET(request: Request) {
-  const query = marketListQuerySchema.safeParse(
-    searchParamsToObject(new URL(request.url).searchParams),
-  )
+  await initDb()
 
-  if (!query.success) {
-    return apiError(
-      "VALIDATION_ERROR",
-      "The market query parameters are invalid.",
-      400,
-      formatZodIssues(query.error),
-    )
+  const { searchParams } = new URL(request.url)
+  const rawParams: Record<string, string> = {}
+  searchParams.forEach((v, k) => { rawParams[k] = v })
+
+  const parsed = marketListQuerySchema.safeParse(rawParams)
+  if (!parsed.success) {
+    return apiError("VALIDATION_ERROR", "Invalid query parameters", 400, formatZodIssues(parsed.error))
   }
 
-  const result = queryMarkets(query.data)
-  return apiSuccess({
-    ...result,
-    filters: {
-      categories: MARKET_CATEGORIES,
-      continents: MARKET_CONTINENTS,
-      statuses: MARKET_STATUSES,
-    },
-  })
+  const result = await queryMarkets(parsed.data)
+  return apiSuccess(result)
 }
