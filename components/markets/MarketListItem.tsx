@@ -4,6 +4,7 @@ import { MiniMarketChart } from "@/components/markets/MarketChart"
 import HazardIcon from "@/components/icons/HazardIcon"
 import { useGlobeLink } from "@/components/providers/GlobeLinkProvider"
 import { useMarkets } from "@/components/providers/MarketProvider"
+import { CATEGORY_LABELS } from "@/lib/markets/categories"
 import type { ClimateMarket } from "@/lib/markets/types"
 import {
   formatCompact,
@@ -60,7 +61,7 @@ export default function MarketListItem({
           ? "border-white/10 bg-white/[0.055] text-white hover:border-white/25 hover:bg-white/[0.09] hover:shadow-black/30"
           : "border-neutral-200 bg-white hover:border-neutral-400 hover:shadow-black/5"
       } ${compact ? "p-3.5" : "p-4"}`}
-      aria-label={`Open market: ${market.question}. YES ${yesProbability}, NO ${noProbability}.`}
+      aria-label={`Open market: ${market.question}. Hazard type ${CATEGORY_LABELS[market.category]}. YES ${yesProbability}, NO ${noProbability}.`}
     >
       <div className="flex items-start gap-3">
         <span
@@ -78,7 +79,7 @@ export default function MarketListItem({
             <span
               className={`eyebrow truncate ${isDark ? "!text-neutral-400" : ""}`}
             >
-              {market.region}
+              {market.region} · {CATEGORY_LABELS[market.category]}
             </span>
             <span
               className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${

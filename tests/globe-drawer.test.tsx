@@ -4,7 +4,9 @@ import userEvent from "@testing-library/user-event"
 import { vi } from "vitest"
 
 import ClimateGlobe from "@/components/globe/ClimateGlobe"
+import GlobeHero from "@/components/globe/GlobeHero"
 import RegionalMarketDrawer from "@/components/markets/RegionalMarketDrawer"
+import { GlobeLinkProvider } from "@/components/providers/GlobeLinkProvider"
 import {
   MarketProvider,
   useMarkets,
@@ -93,11 +95,44 @@ describe("geographic market workflow", () => {
       within(drawer).getByLabelText(/search within europe/i),
       "Paris",
     )
-    await user.click(
-      within(drawer).getByRole("button", { name: /open market:.*paris/i }),
-    )
+    const parisMarketButton = within(drawer).getByRole("button", {
+      name: /open market:.*paris/i,
+    })
+    expect(parisMarketButton).toHaveAccessibleName(/hazard type temperature/i)
+    await user.click(parisMarketButton)
     expect(within(drawer).getByTestId("selected-market")).toHaveTextContent(
       europeMarket!.question,
     )
+  })
+
+  it("reserves the drawer width in the globe viewport after selecting a market", async () => {
+    const user = userEvent.setup()
+    const market = demoMarkets.find((item) => item.status === "open")!
+
+    function Harness() {
+      const { selectMarket } = useMarkets()
+      return (
+        <>
+          <button type="button" onClick={() => selectMarket(market)}>
+            Select market
+          </button>
+          <GlobeHero />
+        </>
+      )
+    }
+
+    render(
+      <MarketProvider>
+        <GlobeLinkProvider>
+          <Harness />
+        </GlobeLinkProvider>
+      </MarketProvider>,
+    )
+
+    expect(screen.getByTestId("globe-viewport")).not.toHaveClass(
+      "lg:right-[484px]",
+    )
+    await user.click(screen.getByRole("button", { name: "Select market" }))
+    expect(screen.getByTestId("globe-viewport")).toHaveClass("lg:right-[484px]")
   })
 })

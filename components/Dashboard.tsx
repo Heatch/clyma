@@ -37,7 +37,7 @@ function DashboardContent() {
       />
       <main
         id="globe-workspace"
-        className="h-full min-h-0 min-w-0 overflow-hidden md:pl-64"
+        className="h-full min-h-0 min-w-0 overflow-hidden md:pl-52"
       >
         <GlobeHero />
       </main>

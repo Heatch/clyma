@@ -41,10 +41,9 @@ export default function GlobeHero() {
       className="relative h-full min-h-0 w-full overflow-hidden bg-[#030605]"
     >
       <div
+        data-testid="globe-viewport"
         className={`absolute inset-y-0 left-0 overflow-hidden ${
-          isDrawerOpen
-            ? "right-0 xl:right-[476px] 2xl:right-[484px]"
-            : "right-0"
+          isDrawerOpen ? "right-0 lg:right-[484px]" : "right-0"
         }`}
       >
         <div
@@ -132,7 +131,7 @@ export default function GlobeHero() {
                 className="text-white/42 flex items-center gap-2 text-[9px]"
               >
                 <span className="grid size-5 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-white/60">
-                  <HazardIcon category={item} className="size-3" />
+                  <HazardIcon category={item} className="size-4" />
                 </span>
                 {CATEGORY_LABELS[item]}
               </span>

@@ -15,7 +15,7 @@ import {
   isContinentName,
 } from "@/lib/geo/regions"
 import { CATEGORY_LABELS } from "@/lib/markets/categories"
-import type { ClimateMarket } from "@/lib/markets/types"
+import type { ClimateMarket, MarketCategory } from "@/lib/markets/types"
 import { clampProbability } from "@/lib/utils/likelihood"
 
 type Projection = d3.GeoProjection
@@ -33,6 +33,14 @@ type PointerState = {
   startY: number
 }
 
+type ViewportTransition = {
+  startedAt: number
+  fromCenter: [number, number]
+  toCenter: [number, number]
+  fromBaseRadius: number
+  toBaseRadius: number
+}
+
 interface ClimateGlobeProps {
   markets: ClimateMarket[]
   selectedRegion: string | null
@@ -47,7 +55,10 @@ const DEFAULT_ROTATION: [number, number, number] = [20, -12, 0]
 const MIN_ZOOM = 0.68
 const MAX_ZOOM = 2.35
 const IDLE_DELAY_MS = 3200
+const IDLE_ROTATION_DEGREES_PER_MS = 0.004
 const TARGET_FRAME_INTERVAL_MS = 1000 / 30
+const VIEWPORT_TRANSITION_MS = 520
+const VIEWPORT_TRANSITION_MIN_DELTA_PX = 48
 
 function makeLandFeature(): Feature<Geometry> {
   const topology = landTopology as unknown as Topology<
@@ -87,6 +98,147 @@ function createLandPattern(
   tileContext.arc(1.6, 1.6, 0.85, 0, Math.PI * 2)
   tileContext.fill()
   return context.createPattern(tile, "repeat")
+}
+
+function drawHazardGlyph(
+  context: CanvasRenderingContext2D,
+  category: MarketCategory,
+  x: number,
+  y: number,
+  color: string,
+) {
+  context.save()
+  context.translate(x, y)
+  context.scale(1.35, 1.35)
+  context.translate(-x, -y)
+  context.strokeStyle = color
+  context.fillStyle = color
+  context.lineWidth = 1.25
+  context.lineCap = "round"
+  context.lineJoin = "round"
+
+  switch (category) {
+    case "hurricane":
+      context.beginPath()
+      context.arc(x - 1.1, y - 0.5, 2.8, Math.PI * 0.15, Math.PI * 1.15)
+      context.stroke()
+      context.beginPath()
+      context.arc(x + 1.1, y + 0.5, 2.8, Math.PI * 1.15, Math.PI * 2.15)
+      context.stroke()
+      context.beginPath()
+      context.arc(x, y, 0.65, 0, Math.PI * 2)
+      context.fill()
+      break
+    case "drought":
+      context.beginPath()
+      context.moveTo(x - 3.8, y - 1.2)
+      context.lineTo(x + 3.8, y - 1.2)
+      context.moveTo(x - 1.5, y - 1.2)
+      context.lineTo(x, y + 0.5)
+      context.lineTo(x - 1, y + 2)
+      context.lineTo(x + 0.8, y + 3.6)
+      context.moveTo(x, y + 0.5)
+      context.lineTo(x + 2, y + 1.4)
+      context.stroke()
+      context.beginPath()
+      context.arc(x + 2.4, y - 3.2, 1.1, 0, Math.PI * 2)
+      context.stroke()
+      break
+    case "temperature":
+      context.beginPath()
+      context.moveTo(x, y - 3.8)
+      context.lineTo(x, y + 1.6)
+      context.moveTo(x + 1.6, y - 2.4)
+      context.lineTo(x + 3, y - 2.4)
+      context.stroke()
+      context.beginPath()
+      context.arc(x, y + 2.7, 1.55, 0, Math.PI * 2)
+      context.fill()
+      break
+    case "rainfall":
+      context.beginPath()
+      context.arc(x - 1.3, y - 0.8, 1.8, Math.PI, Math.PI * 2)
+      context.arc(x + 1.2, y - 1.2, 2.2, Math.PI, Math.PI * 2)
+      context.moveTo(x - 3.1, y - 0.7)
+      context.lineTo(x + 3.4, y - 0.7)
+      context.moveTo(x - 1.7, y + 1.1)
+      context.lineTo(x - 1.7, y + 3.4)
+      context.moveTo(x + 1.6, y + 1.1)
+      context.lineTo(x + 1.6, y + 3.4)
+      context.stroke()
+      break
+    case "flooding":
+      context.beginPath()
+      context.moveTo(x - 2.8, y - 1.4)
+      context.lineTo(x, y - 3.7)
+      context.lineTo(x + 2.8, y - 1.4)
+      context.moveTo(x - 1.8, y - 1.4)
+      context.lineTo(x - 1.8, y + 0.2)
+      context.moveTo(x - 3.8, y + 1.2)
+      context.lineTo(x - 2.4, y + 0.5)
+      context.lineTo(x - 1, y + 1.2)
+      context.lineTo(x + 0.4, y + 0.5)
+      context.lineTo(x + 1.8, y + 1.2)
+      context.lineTo(x + 3.2, y + 0.5)
+      context.moveTo(x - 3.8, y + 3.2)
+      context.lineTo(x - 2.4, y + 2.5)
+      context.lineTo(x - 1, y + 3.2)
+      context.lineTo(x + 0.4, y + 2.5)
+      context.lineTo(x + 1.8, y + 3.2)
+      context.lineTo(x + 3.2, y + 2.5)
+      context.stroke()
+      break
+    case "crop-yield":
+      context.beginPath()
+      context.moveTo(x, y - 3.8)
+      context.lineTo(x, y + 3.8)
+      context.moveTo(x, y - 1.8)
+      context.lineTo(x - 2.5, y - 3)
+      context.moveTo(x, y - 0.2)
+      context.lineTo(x + 2.5, y - 1.5)
+      context.moveTo(x, y + 1.4)
+      context.lineTo(x - 2.5, y + 0.2)
+      context.moveTo(x, y + 2.8)
+      context.lineTo(x + 2.3, y + 1.7)
+      context.stroke()
+      break
+    case "wildfire":
+      context.beginPath()
+      context.moveTo(x + 0.4, y - 4)
+      context.lineTo(x + 2.8, y - 1)
+      context.lineTo(x + 2.1, y + 2.5)
+      context.lineTo(x, y + 4)
+      context.lineTo(x - 2.5, y + 2.2)
+      context.lineTo(x - 2.9, y - 0.5)
+      context.lineTo(x - 1.1, y - 3)
+      context.lineTo(x - 0.9, y + 0.8)
+      context.lineTo(x + 0.7, y - 1)
+      context.closePath()
+      context.stroke()
+      context.beginPath()
+      context.moveTo(x - 0.6, y + 2)
+      context.lineTo(x, y + 0.2)
+      context.lineTo(x + 0.8, y + 1.7)
+      context.stroke()
+      break
+    case "other":
+      context.beginPath()
+      context.moveTo(x, y - 3.8)
+      context.lineTo(x + 3.7, y + 3.1)
+      context.lineTo(x - 3.7, y + 3.1)
+      context.closePath()
+      context.stroke()
+      context.beginPath()
+      context.moveTo(x, y - 1.4)
+      context.lineTo(x, y + 0.8)
+      context.stroke()
+      context.beginPath()
+      context.arc(x, y + 2, 0.55, 0, Math.PI * 2)
+      context.fill()
+      break
+  }
+
+  context.restore()
 }
 
 function isVisible(projection: Projection, coordinates: [number, number]) {
@@ -238,6 +390,7 @@ export default function ClimateGlobe({
     projectionRef.current = projection
     let width = 0
     let height = 0
+    let pixelRatio = 0
     let animationFrame = 0
     let lastFrame = performance.now()
     let lastTickAt = 0
@@ -250,36 +403,107 @@ export default function ClimateGlobe({
     ]
     let lastRenderedCanvasHover: string | null | undefined
     let lastRenderedLinkedHover: string | null | undefined
+    let renderedBaseRadius = baseRadiusRef.current
+    let viewportTransition: ViewportTransition | null = null
+
+    const sampleViewportTransition = (now: number): boolean => {
+      const transition = viewportTransition
+      if (!transition) return false
+
+      const progress = prefersReducedMotion.matches
+        ? 1
+        : Math.min(1, (now - transition.startedAt) / VIEWPORT_TRANSITION_MS)
+      const eased = easeInOut(progress)
+      renderedBaseRadius =
+        transition.fromBaseRadius +
+        (transition.toBaseRadius - transition.fromBaseRadius) * eased
+      projection
+        .translate([
+          transition.fromCenter[0] +
+            (transition.toCenter[0] - transition.fromCenter[0]) * eased,
+          transition.fromCenter[1] +
+            (transition.toCenter[1] - transition.fromCenter[1]) * eased,
+        ])
+        .scale(renderedBaseRadius * zoomRef.current)
+      if (progress >= 1) viewportTransition = null
+      return true
+    }
 
     const resize = () => {
+      const now = performance.now()
+      const hadActiveTransition = viewportTransition !== null
+      sampleViewportTransition(now)
+
       const rectangle = wrapper.getBoundingClientRect()
-      width = Math.max(280, rectangle.width)
-      height = Math.max(320, rectangle.height || 680)
-      const pixelRatio = Math.min(
-        window.devicePixelRatio || 1,
-        width * height > 1_000_000 ? 1.25 : 1.5,
+      const nextWidth = Math.max(280, rectangle.width)
+      const nextHeight = Math.max(320, rectangle.height || 680)
+      const nextBaseRadius = Math.max(
+        125,
+        Math.min(nextWidth * 0.43, nextHeight * 0.42),
       )
+      const targetCenter: [number, number] = [nextWidth / 2, nextHeight / 2]
+      const hasPreviousViewport = width > 0 && height > 0
+      const widthDelta = Math.abs(nextWidth - width)
+      const heightDelta = Math.abs(nextHeight - height)
+      const nextPixelRatio = Math.min(
+        window.devicePixelRatio || 1,
+        nextWidth * nextHeight > 1_000_000 ? 1.25 : 1.5,
+      )
+      const logicalSizeChanged = widthDelta >= 0.5 || heightDelta >= 0.5
+      const pixelRatioChanged = Math.abs(nextPixelRatio - pixelRatio) >= 0.01
+      if (hasPreviousViewport && !logicalSizeChanged && !pixelRatioChanged) {
+        return
+      }
+
+      const previousCenter = projection.translate() as [number, number]
+      const previousBaseRadius = renderedBaseRadius
+      const shouldAnimate =
+        hasPreviousViewport &&
+        logicalSizeChanged &&
+        !prefersReducedMotion.matches &&
+        (hadActiveTransition ||
+          widthDelta >= VIEWPORT_TRANSITION_MIN_DELTA_PX ||
+          heightDelta >= VIEWPORT_TRANSITION_MIN_DELTA_PX)
+
+      width = nextWidth
+      height = nextHeight
+      pixelRatio = nextPixelRatio
       canvas.width = Math.round(width * pixelRatio)
       canvas.height = Math.round(height * pixelRatio)
       canvas.style.width = `${width}px`
       canvas.style.height = `${height}px`
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
-      baseRadiusRef.current = Math.max(
-        125,
-        Math.min(width * 0.43, height * 0.42),
-      )
+      baseRadiusRef.current = nextBaseRadius
+
+      if (shouldAnimate) {
+        // The wrapper snaps to its final width so the canvas backing store is
+        // allocated once. Only the projection interpolates, keeping the
+        // drawer transition smooth without a ResizeObserver allocation loop.
+        viewportTransition = {
+          startedAt: now,
+          fromCenter: previousCenter,
+          toCenter: targetCenter,
+          fromBaseRadius: previousBaseRadius,
+          toBaseRadius: nextBaseRadius,
+        }
+      } else if (logicalSizeChanged || !hasPreviousViewport) {
+        viewportTransition = null
+        renderedBaseRadius = nextBaseRadius
+        projection.translate(targetCenter)
+      }
+
       projection
-        .translate([width / 2, height / 2])
-        .scale(baseRadiusRef.current * zoomRef.current)
         .rotate(rotationRef.current)
+        .scale(renderedBaseRadius * zoomRef.current)
       renderVersionRef.current += 1
+      draw()
     }
 
     const draw = () => {
       context.clearRect(0, 0, width, height)
       const radius = projection.scale()
       const center = projection.translate()
-      const scaleFactor = radius / Math.max(1, baseRadiusRef.current)
+      const scaleFactor = radius / Math.max(1, renderedBaseRadius)
       context.save()
       context.beginPath()
       context.arc(center[0], center[1], radius, 0, Math.PI * 2)
@@ -368,15 +592,32 @@ export default function ClimateGlobe({
             (market) => market.id === selectedMarketIdRef.current,
           ) ?? cluster.markets[0]
         if (!markerMarket) continue
-        const markerRadius = cluster.markets.length > 1 ? 8 : 7
+        let glyphCategory = markerMarket.category
+        if (!selected && cluster.markets.length > 1) {
+          const categoryCounts = new Map<MarketCategory, number>()
+          for (const market of cluster.markets) {
+            categoryCounts.set(
+              market.category,
+              (categoryCounts.get(market.category) ?? 0) + 1,
+            )
+          }
+          let highestCategoryCount = 0
+          for (const [category, count] of categoryCounts) {
+            if (count > highestCategoryCount) {
+              glyphCategory = category
+              highestCategoryCount = count
+            }
+          }
+        }
+        const markerRadius = cluster.markets.length > 1 ? 10 : 9
         const hovered = cluster.markets.some(
           (market) =>
             market.id === hoveredMarketIdRef.current ||
             market.id === hoveredCanvasMarketIdRef.current,
         )
 
-        // Small monochrome nodes keep the globe legible as a live instrument;
-        // category and probability remain available in the hover label.
+        // Shape, rather than color, identifies the hazard. Mixed clusters show
+        // their dominant category while the numeric badge signals aggregation.
         context.beginPath()
         context.arc(
           cluster.x,
@@ -415,10 +656,13 @@ export default function ClimateGlobe({
         context.lineWidth = selected ? 1.5 : 1
         context.stroke()
 
-        context.beginPath()
-        context.arc(cluster.x, cluster.y, 1.55, 0, Math.PI * 2)
-        context.fillStyle = selected ? "#050807" : "rgba(255, 255, 255, 0.96)"
-        context.fill()
+        drawHazardGlyph(
+          context,
+          glyphCategory,
+          cluster.x,
+          cluster.y,
+          selected ? "#050807" : "rgba(255, 255, 255, 0.96)",
+        )
 
         if (cluster.markets.length > 1) {
           const badgeX = cluster.x + markerRadius
@@ -467,11 +711,18 @@ export default function ClimateGlobe({
         now > idleUntilRef.current
       ) {
         rotationRef.current[0] =
-          (rotationRef.current[0] + elapsed * 0.0032) % 360
+          (rotationRef.current[0] + elapsed * IDLE_ROTATION_DEGREES_PER_MS) %
+          360
+      }
+
+      const isViewportAnimating = sampleViewportTransition(now)
+      if (!isViewportAnimating) {
+        renderedBaseRadius = baseRadiusRef.current
+        projection.translate([width / 2, height / 2])
       }
       projection
         .rotate(rotationRef.current)
-        .scale(baseRadiusRef.current * zoomRef.current)
+        .scale(renderedBaseRadius * zoomRef.current)
 
       const rotation = rotationRef.current
       const linkedHover = hoveredMarketIdRef.current
@@ -483,7 +734,8 @@ export default function ClimateGlobe({
         rotation[1] !== lastRenderedRotation[1] ||
         rotation[2] !== lastRenderedRotation[2] ||
         canvasHover !== lastRenderedCanvasHover ||
-        linkedHover !== lastRenderedLinkedHover
+        linkedHover !== lastRenderedLinkedHover ||
+        isViewportAnimating
 
       if (shouldDraw) {
         draw()

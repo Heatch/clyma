@@ -38,7 +38,7 @@ describe("TerraForm navigation rail", () => {
       name: /terraform climate atlas home/i,
     })
 
-    expect(navigation).toHaveClass("md:w-64")
+    expect(navigation).toHaveClass("md:w-52")
     expect(homeLink).toHaveClass("md:mt-auto")
     expect(within(homeLink).getByTestId("terraform-mark")).toBeInTheDocument()
     expect(within(homeLink).getByText("TerraForm")).toBeInTheDocument()

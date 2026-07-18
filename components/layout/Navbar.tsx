@@ -21,22 +21,22 @@ export default function Navbar({
   return (
     <nav
       aria-label="Primary navigation"
-      className="pointer-events-none absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-gradient-to-b from-black/95 via-black/75 to-transparent px-4 pb-4 pt-[max(0.875rem,env(safe-area-inset-top))] sm:px-6 md:inset-y-0 md:left-0 md:right-auto md:w-64 md:border-b-0 md:border-r md:bg-[#040706]/95 md:bg-none md:px-5 md:pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pt-[max(1.25rem,env(safe-area-inset-top))]"
+      className="pointer-events-none absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-gradient-to-b from-black/95 via-black/75 to-transparent px-4 pb-4 pt-[max(0.875rem,env(safe-area-inset-top))] sm:px-6 md:inset-y-0 md:left-0 md:right-auto md:w-52 md:border-b-0 md:border-r md:bg-[#040706]/95 md:bg-none md:px-4 md:pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-[max(1rem,env(safe-area-inset-top))]"
     >
-      <div className="flex h-10 items-center gap-3 md:h-full md:w-full md:flex-col md:items-stretch md:gap-4">
+      <div className="flex h-10 items-center gap-3 md:h-full md:w-full md:flex-col md:items-stretch md:gap-3">
         <a
           href="#top"
-          className="group pointer-events-auto order-1 flex shrink-0 items-center gap-2.5 md:order-3 md:mt-auto md:w-full md:border-t md:border-white/10 md:pt-5"
+          className="group pointer-events-auto order-1 flex shrink-0 items-center gap-2.5 md:order-3 md:mt-auto md:w-full md:border-t md:border-white/10 md:pt-4"
           aria-label="TerraForm climate atlas home"
         >
-          <span className="grid size-9 place-items-center text-white/85 transition-colors group-hover:text-white md:size-11">
+          <span className="grid size-9 place-items-center text-white/85 transition-colors group-hover:text-white">
             <TerraFormMark data-testid="terraform-mark" className="size-full" />
           </span>
           <span>
-            <span className="block text-sm font-semibold leading-none tracking-[-0.02em] text-white md:text-base">
+            <span className="block text-sm font-semibold leading-none tracking-[-0.02em] text-white">
               TerraForm
             </span>
-            <span className="mt-1 block font-mono text-[8px] uppercase tracking-[0.18em] text-white/40">
+            <span className="mt-1 block font-mono text-[7px] uppercase tracking-[0.16em] text-white/40">
               Climate signal atlas
             </span>
           </span>
@@ -49,7 +49,7 @@ export default function Navbar({
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
-            className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/35"
+            className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/35"
             fill="none"
             stroke="currentColor"
             strokeWidth="1.7"
@@ -63,13 +63,13 @@ export default function Navbar({
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Search place, hazard, or market"
-            className="h-11 w-full rounded-xl border border-white/15 bg-white/[0.07] pl-10 pr-4 text-xs text-white outline-none transition-[border-color,background-color,box-shadow] placeholder:text-white/30 hover:border-white/30 hover:bg-white/10 focus:border-white/50 focus:bg-black/75 focus:ring-2 focus:ring-white/15"
+            className="h-10 w-full rounded-xl border border-white/15 bg-white/[0.07] pl-9 pr-3 text-[11px] text-white outline-none transition-[border-color,background-color,box-shadow] placeholder:text-white/30 hover:border-white/30 hover:bg-white/10 focus:border-white/50 focus:bg-black/75 focus:ring-2 focus:ring-white/15"
           />
         </div>
 
-        <div className="pointer-events-auto order-3 ml-auto flex shrink-0 items-center gap-2.5 md:order-2 md:ml-0 md:w-full md:flex-col md:items-stretch md:gap-3">
+        <div className="pointer-events-auto order-3 ml-auto flex shrink-0 items-center gap-2.5 md:order-2 md:ml-0 md:w-full md:flex-col md:items-stretch md:gap-2">
           <div
-            className="hidden w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-center font-mono text-[9px] uppercase tracking-[0.14em] text-white/60 md:flex"
+            className="hidden w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-center font-mono text-[9px] uppercase tracking-[0.1em] text-white/60 md:flex"
             title={
               SOLANA_CONFIG_WARNING ??
               (SOLANA_PROGRAM_ID
@@ -91,7 +91,7 @@ export default function Navbar({
             aria-haspopup="dialog"
             aria-controls="market-desk-dialog"
             aria-expanded={isMarketDeskOpen}
-            className="group grid size-10 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.06] text-white/70 transition hover:border-white/35 hover:bg-white/10 hover:text-white md:flex md:size-auto md:w-full md:justify-start md:gap-2.5 md:px-3 md:py-2.5"
+            className="group grid size-10 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.06] text-white/70 transition hover:border-white/35 hover:bg-white/10 hover:text-white md:flex md:size-auto md:w-full md:justify-start md:gap-2.5 md:px-2.5 md:py-2"
           >
             <svg
               viewBox="0 0 20 20"
@@ -116,7 +116,7 @@ export default function Navbar({
             <span className="sr-only md:hidden">Open market desk</span>
           </button>
           <div className="hidden lg:block">
-            <WalletBalance className="block w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-center font-mono text-[9px] text-white/60" />
+            <WalletBalance className="block w-full rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-center font-mono text-[9px] text-white/60" />
           </div>
           <WalletConnectButton className="md:w-full" />
         </div>
