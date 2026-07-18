@@ -38,6 +38,9 @@ describe("geographic market workflow", () => {
     expect(
       screen.getByRole("button", { name: /reset globe view/i }),
     ).toBeEnabled()
+    expect(
+      screen.queryByRole("button", { name: /likelihood heat map/i }),
+    ).not.toBeInTheDocument()
   })
 
   it("filters markets by selected continent and opens an individual market", async () => {

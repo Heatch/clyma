@@ -20,11 +20,7 @@ import {
   CATEGORY_SYMBOLS,
 } from "@/lib/markets/categories"
 import type { ClimateMarket } from "@/lib/markets/types"
-import {
-  LIKELIHOOD_GRADIENT,
-  clampProbability,
-  likelihoodColor,
-} from "@/lib/utils/likelihood"
+import { clampProbability, likelihoodColor } from "@/lib/utils/likelihood"
 
 type Projection = d3.GeoProjection
 
@@ -133,7 +129,6 @@ export default function ClimateGlobe({
   const marketsRef = useRef(markets)
   const selectedRegionRef = useRef(selectedRegion)
   const selectedMarketIdRef = useRef(selectedMarketId)
-  const heatmapEnabledRef = useRef(true)
   const idleUntilRef = useRef(0)
   const focusAnimationRef = useRef<{
     startedAt: number
@@ -146,16 +141,13 @@ export default function ClimateGlobe({
   const callbacksRef = useRef({ onRegionSelect, onMarketSelect })
   const [isReady, setIsReady] = useState(false)
   const [hoverLabel, setHoverLabel] = useState<string | null>(null)
-  const [heatmapEnabled, setHeatmapEnabled] = useState(true)
 
   useEffect(() => {
     marketsRef.current = markets
     selectedRegionRef.current = selectedRegion
     selectedMarketIdRef.current = selectedMarketId
-    heatmapEnabledRef.current = heatmapEnabled
     callbacksRef.current = { onRegionSelect, onMarketSelect }
   }, [
-    heatmapEnabled,
     markets,
     onMarketSelect,
     onRegionSelect,
@@ -313,50 +305,6 @@ export default function ClimateGlobe({
         context.beginPath()
         context.arc(point[0], point[1], dotRadius, 0, Math.PI * 2)
         context.fill()
-      }
-
-      if (heatmapEnabledRef.current) {
-        const heatRadiusBase = Math.max(26, 46 * scaleFactor)
-        context.save()
-        context.globalCompositeOperation = "lighter"
-        for (const market of marketsRef.current) {
-          if (market.status !== "open") continue
-          const coordinates: [number, number] = [
-            market.longitude,
-            market.latitude,
-          ]
-          if (!isVisible(projection, coordinates)) continue
-          const point = projection(coordinates)
-          if (!point) continue
-
-          const probability = clampProbability(market.yesPrice)
-          const heatColor = d3.color(likelihoodColor(probability))
-          if (!heatColor) continue
-
-          // More likely events glow larger and brighter.
-          const radius = heatRadiusBase * (0.7 + probability * 0.7)
-          const peakOpacity = 0.3 + probability * 0.4
-          const gradient = context.createRadialGradient(
-            point[0],
-            point[1],
-            0,
-            point[0],
-            point[1],
-            radius,
-          )
-          heatColor.opacity = peakOpacity
-          gradient.addColorStop(0, heatColor.toString())
-          heatColor.opacity = peakOpacity * 0.45
-          gradient.addColorStop(0.55, heatColor.toString())
-          heatColor.opacity = 0
-          gradient.addColorStop(1, heatColor.toString())
-
-          context.beginPath()
-          context.arc(point[0], point[1], radius, 0, Math.PI * 2)
-          context.fillStyle = gradient
-          context.fill()
-        }
-        context.restore()
       }
 
       const projectedMarkets = marketsRef.current
@@ -758,25 +706,10 @@ export default function ClimateGlobe({
             {hoverLabel}
           </div>
         )}
-        {heatmapEnabled && (
-          <div className="pointer-events-none absolute bottom-24 right-4 z-20 hidden items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur lg:flex">
-            <span className="font-mono text-[8px] uppercase tracking-wider text-white/35">
-              Lower
-            </span>
-            <span
-              aria-hidden="true"
-              className="h-1 w-14 rounded-full"
-              style={{ backgroundImage: LIKELIHOOD_GRADIENT }}
-            />
-            <span className="font-mono text-[8px] uppercase tracking-wider text-white/35">
-              Higher likelihood
-            </span>
-          </div>
-        )}
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-3">
-        <div className="pointer-events-auto flex w-full max-w-[560px] items-center gap-1.5 rounded-2xl border border-white/15 bg-black/75 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.4)] backdrop-blur-xl sm:rounded-full">
+        <div className="pointer-events-auto flex w-full max-w-[430px] items-center gap-1.5 rounded-2xl border border-white/15 bg-black/75 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.4)] backdrop-blur-xl sm:rounded-full">
           <label htmlFor="globe-region" className="sr-only">
             Explore markets by region
           </label>
@@ -800,19 +733,6 @@ export default function ClimateGlobe({
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => setHeatmapEnabled((value) => !value)}
-            aria-pressed={heatmapEnabled}
-            aria-label="Toggle likelihood heat map"
-            className={`shrink-0 rounded-xl border px-3 py-2.5 font-mono text-[9px] uppercase tracking-[0.08em] transition sm:rounded-full ${
-              heatmapEnabled
-                ? "border-white/35 bg-white text-black"
-                : "border-white/10 bg-white/[0.04] text-white/60 hover:bg-white/10"
-            }`}
-          >
-            <span className="hidden sm:inline">Likelihood </span>Glow
-          </button>
           <button
             type="button"
             onClick={resetView}
