@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { usePositions } from "@/components/providers/PositionProvider"
 import { useSolanaWallet } from "@/components/providers/SolanaProvider"
@@ -27,14 +27,37 @@ export default function PredictionForm({
   tone = "light",
 }: PredictionFormProps) {
   const { connected, publicKey } = useSolanaWallet()
-  const { recordPurchase } = usePositions()
+  const { positions, recordPurchase } = usePositions()
   const { buy, balanceLamports, state, isPending, isConfigured, reset } =
     useMarketProgram(market)
   const [side, setSide] = useState<TradeSide>("yes")
   const [amount, setAmount] = useState("0.1")
   const [isReviewOpen, setIsReviewOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState<number | null>(null)
+  const reviewDialogRef = useRef<HTMLDivElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+  const isPendingRef = useRef(isPending)
   const isDark = tone === "dark"
+
+  useEffect(() => {
+    isPendingRef.current = isPending
+  }, [isPending])
+
+  const marketPositions = useMemo(
+    () => positions.filter((position) => position.marketId === market.id),
+    [market.id, positions],
+  )
+  const indexedPositionSummary = useMemo(
+    () =>
+      marketPositions.reduce(
+        (summary, position) => {
+          summary[position.side] += position.amountSol
+          return summary
+        },
+        { yes: 0, no: 0 },
+      ),
+    [marketPositions],
+  )
 
   useEffect(() => {
     const updateCurrentTime = () => setCurrentTime(Date.now())
@@ -42,6 +65,67 @@ export default function PredictionForm({
     const timer = window.setInterval(updateCurrentTime, 30_000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (!isReviewOpen) return
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    const frame = window.requestAnimationFrame(() => {
+      const firstFocusable =
+        reviewDialogRef.current?.querySelector<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        )
+      firstFocusable?.focus({ preventScroll: true })
+    })
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isPendingRef.current) {
+        event.preventDefault()
+        setIsReviewOpen(false)
+        return
+      }
+      if (event.key !== "Tab" || !reviewDialogRef.current) return
+
+      const focusable = [
+        ...reviewDialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ]
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener("keydown", handleKeyDown)
+      previousFocusRef.current?.focus({ preventScroll: true })
+    }
+  }, [isReviewOpen])
+
+  useEffect(() => {
+    if (!isReviewOpen) return
+    const frame = window.requestAnimationFrame(() => {
+      const dialog = reviewDialogRef.current
+      if (!dialog || dialog.contains(document.activeElement)) return
+      dialog
+        .querySelector<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        )
+        ?.focus({ preventScroll: true })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [isReviewOpen, state.status])
 
   const amountSol = parseAmount(amount)
   const balanceSol =
@@ -76,6 +160,14 @@ export default function PredictionForm({
       return "Connect a Solana wallet to purchase a position."
     if (!isConfigured)
       return "Deploy the program and set NEXT_PUBLIC_PROGRAM_ID before trading."
+    if (market.chainState === "loading")
+      return "Checking this market's Devnet account…"
+    if (market.chainState === "missing")
+      return "This demo market has not been created on Devnet."
+    if (market.chainState === "error")
+      return "This market's Devnet account could not be verified."
+    if (isConfigured && market.chainState !== "synced")
+      return "This market is not bound to a verified Devnet account."
     if (market.status !== "open")
       return `This market is ${market.status}; purchases are unavailable.`
     if (
@@ -101,6 +193,7 @@ export default function PredictionForm({
     currentTime,
     isConfigured,
     market.closeTime,
+    market.chainState,
     market.status,
     publicKey,
   ])
@@ -348,6 +441,38 @@ export default function PredictionForm({
         </div>
       </dl>
 
+      {marketPositions.length > 0 && (
+        <div
+          className={`mt-3 rounded-xl border px-3 py-2.5 text-[10px] ${
+            isDark
+              ? "border-white/[0.12] bg-white/[0.04] text-white/60"
+              : "border-neutral-200 bg-neutral-50 text-neutral-600"
+          }`}
+          aria-live="polite"
+        >
+          <p className="font-bold uppercase tracking-[0.12em]">
+            Your indexed position
+          </p>
+          <p className="tabular mt-1">
+            {indexedPositionSummary.yes > 0
+              ? `${formatSol(indexedPositionSummary.yes, 4)} YES`
+              : ""}
+            {indexedPositionSummary.yes > 0 && indexedPositionSummary.no > 0
+              ? " · "
+              : ""}
+            {indexedPositionSummary.no > 0
+              ? `${formatSol(indexedPositionSummary.no, 4)} NO`
+              : ""}
+          </p>
+          <p
+            className={`mt-1 ${isDark ? "text-white/35" : "text-neutral-500"}`}
+          >
+            Reconciled with program accounts when a Devnet deployment is
+            configured.
+          </p>
+        </div>
+      )}
+
       {quote.priceImpact >= 5 && amountSol > 0 && (
         <p
           className={`mt-3 rounded-lg border px-3 py-2 text-[10px] font-semibold ${
@@ -404,8 +529,14 @@ export default function PredictionForm({
         <div
           className="fixed inset-0 z-[70] grid place-items-end bg-black/35 p-0 backdrop-blur-sm sm:place-items-center sm:p-4"
           role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isPending) {
+              setIsReviewOpen(false)
+            }
+          }}
         >
           <div
+            ref={reviewDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="review-heading"

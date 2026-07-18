@@ -24,7 +24,10 @@ vi.mock("@/components/providers/SolanaProvider", () => ({
 }))
 
 vi.mock("@/components/providers/PositionProvider", () => ({
-  usePositions: () => ({ recordPurchase: controls.recordPurchase }),
+  usePositions: () => ({
+    positions: [],
+    recordPurchase: controls.recordPurchase,
+  }),
 }))
 
 vi.mock("@/hooks/useMarketProgram", async () => {
@@ -103,6 +106,7 @@ const openMarket = {
   status: "open" as const,
   outcome: "unresolved" as const,
   closeTime: "2099-12-31T23:59:59.000Z",
+  chainState: "synced" as const,
 }
 
 describe("prediction purchase controls", () => {

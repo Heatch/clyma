@@ -11,6 +11,12 @@ import {
 } from "@/components/providers/MarketProvider"
 import { demoMarkets } from "@/lib/markets/data"
 
+const { mockConnection } = vi.hoisted(() => ({ mockConnection: {} }))
+
+vi.mock("@/components/providers/SolanaProvider", () => ({
+  useSolanaWallet: () => ({ connection: mockConnection }),
+}))
+
 vi.mock("@/components/markets/MarketDetails", () => ({
   default: ({ market }: { market: { question: string } }) => (
     <div data-testid="selected-market">{market.question}</div>
@@ -41,6 +47,10 @@ describe("geographic market workflow", () => {
     expect(
       screen.queryByRole("button", { name: /likelihood heat map/i }),
     ).not.toBeInTheDocument()
+    expect(screen.queryByText(/live simulation/i)).not.toBeInTheDocument()
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      /transparent globe showing the faint far hemisphere/i,
+    )
   })
 
   it("filters markets by selected continent and opens an individual market", async () => {

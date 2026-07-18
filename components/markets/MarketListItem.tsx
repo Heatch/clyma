@@ -1,9 +1,9 @@
 "use client"
 
 import { MiniMarketChart } from "@/components/markets/MarketChart"
+import HazardIcon from "@/components/icons/HazardIcon"
 import { useGlobeLink } from "@/components/providers/GlobeLinkProvider"
 import { useMarkets } from "@/components/providers/MarketProvider"
-import { CATEGORY_SYMBOLS } from "@/lib/markets/categories"
 import type { ClimateMarket } from "@/lib/markets/types"
 import {
   formatCompact,
@@ -64,14 +64,14 @@ export default function MarketListItem({
     >
       <div className="flex items-start gap-3">
         <span
-          className={`grid size-9 shrink-0 place-items-center rounded-full border text-lg font-medium ${
+          className={`grid size-9 shrink-0 place-items-center rounded-full border ${
             isDark
-              ? "border-white/15 bg-white/[0.07] text-white"
-              : "border-neutral-200 bg-neutral-50"
+              ? "border-white/15 bg-white/[0.05] text-white/70"
+              : "border-neutral-200 bg-neutral-50 text-neutral-600"
           }`}
           aria-hidden="true"
         >
-          {CATEGORY_SYMBOLS[market.category]}
+          <HazardIcon category={market.category} className="size-[18px]" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 overflow-hidden">

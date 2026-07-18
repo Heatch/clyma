@@ -155,15 +155,17 @@ export default function PortfolioPanel() {
                     <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 font-semibold text-neutral-600">
                       {position.status}
                     </span>
-                    <a
-                      href={getExplorerTransactionUrl(position.signature)}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label="View transaction in Solana Explorer"
-                      className="font-semibold underline decoration-neutral-300 underline-offset-2"
-                    >
-                      Explorer ↗
-                    </a>
+                    {position.signature && (
+                      <a
+                        href={getExplorerTransactionUrl(position.signature)}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="View transaction in Solana Explorer"
+                        className="font-semibold underline decoration-neutral-300 underline-offset-2"
+                      >
+                        Explorer ↗
+                      </a>
+                    )}
                   </div>
                 </div>
               )

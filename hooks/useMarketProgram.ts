@@ -10,6 +10,7 @@ import {
 
 import { useSolanaWallet } from "@/components/providers/SolanaProvider"
 import type { MarketStatus, TradeSide } from "@/lib/markets/types"
+import { CLIMATE_MARKET_ACCOUNT_SIZES } from "@/lib/solana/accounts"
 import {
   getExplorerTransactionUrl,
   SOLANA_COMMITMENT,
@@ -80,6 +81,11 @@ const PENDING_STATUSES: readonly MarketTransactionStatus[] = [
   "awaiting_signature",
   "confirming",
 ]
+
+interface RentAccountSpec {
+  instructionAccountIndex: number
+  space: number
+}
 
 function ensureMarketCanTrade(market: MarketProgramReference): void {
   if (market.status && market.status !== "open") {
@@ -186,6 +192,7 @@ export function useMarketProgram(market: MarketProgramReference) {
       action: MarketProgramAction,
       createInstruction: () => TransactionInstruction,
       debitLamports = 0n,
+      rentAccountSpecs: readonly RentAccountSpec[] = [],
     ): Promise<MarketTransactionResult> => {
       if (submissionLockRef.current) {
         throw new MarketProgramClientError(
@@ -228,14 +235,47 @@ export function useMarketProgram(market: MarketProgramReference) {
         )
         const feeLamports = feeResponse.value
 
-        if (debitLamports > 0n) {
+        let accountRentLamports = 0n
+        if (rentAccountSpecs.length > 0) {
+          const rentAddresses = rentAccountSpecs.map((spec) => {
+            const account = instruction.keys[spec.instructionAccountIndex]
+            if (!account) {
+              throw new MarketProgramClientError(
+                "configuration",
+                "The market instruction is missing a required account.",
+              )
+            }
+            return account.pubkey
+          })
+          const [rentAccounts, ...rentMinimums] = await Promise.all([
+            connection.getMultipleAccountsInfo(
+              rentAddresses,
+              SOLANA_COMMITMENT,
+            ),
+            ...rentAccountSpecs.map((spec) =>
+              connection.getMinimumBalanceForRentExemption(
+                spec.space,
+                SOLANA_COMMITMENT,
+              ),
+            ),
+          ])
+
+          accountRentLamports = rentAccounts.reduce(
+            (total, account, index) =>
+              account ? total : total + BigInt(rentMinimums[index] ?? 0),
+            0n,
+          )
+        }
+
+        if (debitLamports > 0n || accountRentLamports > 0n) {
           const currentBalance = await refreshBalance()
-          const requiredLamports = debitLamports + BigInt(feeLamports ?? 0)
+          const requiredLamports =
+            debitLamports + accountRentLamports + BigInt(feeLamports ?? 0)
 
           if (currentBalance !== null && currentBalance < requiredLamports) {
             throw new MarketProgramClientError(
               "insufficient_balance",
-              "The wallet does not have enough Devnet SOL for this position and its network fee.",
+              "The wallet does not have enough Devnet SOL for this action, its account rent, and the network fee.",
             )
           }
         }
@@ -310,6 +350,9 @@ export function useMarketProgram(market: MarketProgramReference) {
         })
 
         void refreshBalance().catch(() => undefined)
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("terraform:market-state-changed"))
+        }
 
         return { signature, explorerUrl, feeLamports }
       } catch (error) {
@@ -365,6 +408,16 @@ export function useMarketProgram(market: MarketProgramReference) {
           })
         },
         amountLamports,
+        [
+          {
+            instructionAccountIndex: 3,
+            space: CLIMATE_MARKET_ACCOUNT_SIZES.position,
+          },
+          {
+            instructionAccountIndex: 4,
+            space: CLIMATE_MARKET_ACCOUNT_SIZES.position,
+          },
+        ],
       )
     },
     [execute, market, marketId, wallet.publicKey],
@@ -378,19 +431,29 @@ export function useMarketProgram(market: MarketProgramReference) {
       )
     }
 
-    return execute("claim", () => {
-      if (!wallet.publicKey) {
-        throw new MarketProgramClientError(
-          "wallet_not_connected",
-          "Connect a Solana wallet before claiming winnings.",
-        )
-      }
+    return execute(
+      "claim",
+      () => {
+        if (!wallet.publicKey) {
+          throw new MarketProgramClientError(
+            "wallet_not_connected",
+            "Connect a Solana wallet before claiming winnings.",
+          )
+        }
 
-      return buildClaimWinningsInstruction({
-        marketId: marketId(),
-        owner: wallet.publicKey,
-      })
-    })
+        return buildClaimWinningsInstruction({
+          marketId: marketId(),
+          owner: wallet.publicKey,
+        })
+      },
+      0n,
+      [
+        {
+          instructionAccountIndex: 5,
+          space: CLIMATE_MARKET_ACCOUNT_SIZES.claimRecord,
+        },
+      ],
+    )
   }, [execute, market.status, marketId, wallet.publicKey])
 
   const refund = useCallback(async (): Promise<MarketTransactionResult> => {
@@ -401,19 +464,29 @@ export function useMarketProgram(market: MarketProgramReference) {
       )
     }
 
-    return execute("refund", () => {
-      if (!wallet.publicKey) {
-        throw new MarketProgramClientError(
-          "wallet_not_connected",
-          "Connect a Solana wallet before requesting a refund.",
-        )
-      }
+    return execute(
+      "refund",
+      () => {
+        if (!wallet.publicKey) {
+          throw new MarketProgramClientError(
+            "wallet_not_connected",
+            "Connect a Solana wallet before requesting a refund.",
+          )
+        }
 
-      return buildRefundCancelledInstruction({
-        marketId: marketId(),
-        owner: wallet.publicKey,
-      })
-    })
+        return buildRefundCancelledInstruction({
+          marketId: marketId(),
+          owner: wallet.publicKey,
+        })
+      },
+      0n,
+      [
+        {
+          instructionAccountIndex: 5,
+          space: CLIMATE_MARKET_ACCOUNT_SIZES.claimRecord,
+        },
+      ],
+    )
   }, [execute, market.status, marketId, wallet.publicKey])
 
   const reset = useCallback(() => {

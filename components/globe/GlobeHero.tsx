@@ -1,9 +1,10 @@
 "use client"
 
 import ClimateGlobe from "@/components/globe/ClimateGlobe"
+import HazardIcon from "@/components/icons/HazardIcon"
 import MarketFilters from "@/components/markets/MarketFilters"
 import { useMarkets } from "@/components/providers/MarketProvider"
-import { CATEGORY_LABELS, CATEGORY_SYMBOLS } from "@/lib/markets/categories"
+import { CATEGORY_LABELS } from "@/lib/markets/categories"
 import type { MarketCategory } from "@/lib/markets/types"
 
 const LEGEND_CATEGORIES: MarketCategory[] = [
@@ -40,8 +41,10 @@ export default function GlobeHero() {
       className="relative h-full min-h-0 w-full overflow-hidden bg-[#030605]"
     >
       <div
-        className={`absolute inset-y-0 left-0 overflow-hidden transition-[right] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          isDrawerOpen ? "right-0 md:right-[476px] lg:right-[484px]" : "right-0"
+        className={`absolute inset-y-0 left-0 overflow-hidden ${
+          isDrawerOpen
+            ? "right-0 xl:right-[476px] 2xl:right-[484px]"
+            : "right-0"
         }`}
       >
         <div
@@ -86,14 +89,14 @@ export default function GlobeHero() {
             </span>
             <span>
               <strong className="mr-1 text-sm font-medium text-white/90">
-                24/7
+                Devnet
               </strong>
-              simulation
+              sample
             </span>
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 top-[76px] z-30 flex justify-center px-3 sm:top-[80px] sm:px-6">
+        <div className="pointer-events-none absolute inset-x-0 top-[76px] z-30 flex justify-center px-3 sm:top-[80px] sm:px-6 md:top-4">
           <div className="pointer-events-auto max-w-[min(100%,760px)] overflow-hidden rounded-full border border-white/10 bg-black/55 px-1.5 py-1 shadow-[0_18px_55px_rgba(0,0,0,0.28)] backdrop-blur-xl">
             <MarketFilters
               compact
@@ -128,8 +131,8 @@ export default function GlobeHero() {
                 key={item}
                 className="text-white/42 flex items-center gap-2 text-[9px]"
               >
-                <span className="grid size-5 place-items-center rounded-md border border-white/10 bg-white/[0.05] text-[11px]">
-                  {CATEGORY_SYMBOLS[item]}
+                <span className="grid size-5 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-white/60">
+                  <HazardIcon category={item} className="size-3" />
                 </span>
                 {CATEGORY_LABELS[item]}
               </span>

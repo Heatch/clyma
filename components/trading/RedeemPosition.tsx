@@ -10,7 +10,7 @@ import { formatSol } from "@/lib/utils/format"
 
 export default function RedeemPosition({ market }: { market: ClimateMarket }) {
   const { connected } = useSolanaWallet()
-  const { positions, updatePositionStatus } = usePositions()
+  const { positions, updateMarketSettlement } = usePositions()
   const { claim, refund, state, isPending, isConfigured } =
     useMarketProgram(market)
   const marketPositions = useMemo(
@@ -19,8 +19,19 @@ export default function RedeemPosition({ market }: { market: ClimateMarket }) {
   )
   const eligiblePosition = marketPositions.find((position) => {
     if (["claimed", "refunded"].includes(position.status)) return false
-    if (market.status === "cancelled") return true
-    return market.status === "resolved" && market.outcome === position.side
+    if (isConfigured && position.source !== "onchain") return false
+    if (market.status === "cancelled") {
+      return isConfigured
+        ? position.status === "refundable"
+        : position.status === "refundable" || position.status === "open"
+    }
+    return (
+      market.status === "resolved" &&
+      market.outcome === position.side &&
+      (isConfigured
+        ? position.status === "claimable"
+        : position.status === "claimable" || position.status === "open")
+    )
   })
 
   if (market.status !== "resolved" && market.status !== "cancelled") return null
@@ -29,14 +40,18 @@ export default function RedeemPosition({ market }: { market: ClimateMarket }) {
   const actionLabel = isRefund
     ? "Refund cancelled position"
     : "Claim winning payout"
+  const chainUnavailable = isConfigured && market.chainState !== "synced"
 
   const redeem = async () => {
     if (!eligiblePosition || isPending) return
     try {
       const result = isRefund ? await refund() : await claim()
-      updatePositionStatus(
-        eligiblePosition.id,
-        isRefund ? "refunded" : "claimed",
+      updateMarketSettlement(
+        market.id,
+        isRefund ? "refund" : "claim",
+        market.outcome === "yes" || market.outcome === "no"
+          ? market.outcome
+          : null,
         result.signature,
       )
     } catch {
@@ -65,16 +80,26 @@ export default function RedeemPosition({ market }: { market: ClimateMarket }) {
           <button
             type="button"
             onClick={() => void redeem()}
-            disabled={!connected || !isConfigured || isPending}
+            disabled={
+              !connected || !isConfigured || chainUnavailable || isPending
+            }
             className="mt-3 h-10 w-full rounded-full bg-ink px-4 text-xs font-bold text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-neutral-500"
           >
             {isPending ? "Submitting settlement…" : actionLabel}
           </button>
+          {chainUnavailable && (
+            <p className="mt-2 text-[10px] text-neutral-500" role="status">
+              Settlement stays disabled until this market account is verified on
+              Devnet.
+            </p>
+          )}
         </>
       ) : (
         <p className="mt-2 text-xs leading-5 text-neutral-600">
           {connected
-            ? "No eligible locally indexed position was found for this wallet."
+            ? isConfigured
+              ? "No eligible position was verified in this wallet's program accounts."
+              : "No eligible locally indexed position was found for this wallet."
             : "Connect the wallet that owns the position to continue."}
         </p>
       )}

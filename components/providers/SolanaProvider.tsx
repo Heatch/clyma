@@ -27,7 +27,8 @@ import {
 
 import { SOLANA_COMMITMENT, SOLANA_RPC_URL } from "@/lib/solana/config"
 
-const SELECTED_WALLET_STORAGE_KEY = "klashi:devnet:selected-wallet"
+const SELECTED_WALLET_STORAGE_KEY = "terraform:devnet:selected-wallet"
+const LEGACY_SELECTED_WALLET_STORAGE_KEY = "klashi:devnet:selected-wallet"
 
 type SupportedTransaction = Transaction | VersionedTransaction
 type SupportedWalletAdapter = PhantomWalletAdapter
@@ -136,9 +137,12 @@ export function SolanaProvider({
   )
 
   useEffect(() => {
-    const storedName = window.localStorage.getItem(SELECTED_WALLET_STORAGE_KEY)
+    const storedName =
+      window.localStorage.getItem(SELECTED_WALLET_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_SELECTED_WALLET_STORAGE_KEY)
     if (storedName && adapters.some((adapter) => adapter.name === storedName)) {
       setSelectedWalletName(storedName)
+      window.localStorage.setItem(SELECTED_WALLET_STORAGE_KEY, storedName)
     }
     setStorageReady(true)
   }, [adapters])

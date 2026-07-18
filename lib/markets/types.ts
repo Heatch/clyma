@@ -39,6 +39,9 @@ export type TradeSide = "yes" | "no"
 
 export type DemoDataLabel = "SAMPLE DATA"
 
+export type MarketChainState =
+  "demo-only" | "loading" | "synced" | "missing" | "error"
+
 export interface MarketHistoryPoint {
   timestamp: string
   yesProbability: number
@@ -135,6 +138,12 @@ export interface ClimateMarket {
   isDemo: true
   dataLabel: DemoDataLabel
   dataDisclaimer: string
+  /** Client-only status for the matching Devnet market PDA. */
+  chainState?: MarketChainState
+  /** Exact client-only pool values read from the Devnet market account. */
+  chainYesLamports?: string
+  chainNoLamports?: string
+  chainTotalLamports?: string
 }
 
 export type PositionStatus =

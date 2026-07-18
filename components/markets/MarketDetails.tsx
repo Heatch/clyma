@@ -2,14 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react"
 
+import HazardIcon from "@/components/icons/HazardIcon"
 import MarketChart from "@/components/markets/MarketChart"
 import PredictionForm from "@/components/trading/PredictionForm"
 import RedeemPosition from "@/components/trading/RedeemPosition"
-import {
-  CATEGORY_ACCENTS,
-  CATEGORY_LABELS,
-  CATEGORY_SYMBOLS,
-} from "@/lib/markets/categories"
+import { CATEGORY_LABELS } from "@/lib/markets/categories"
 import type { ClimateMarket } from "@/lib/markets/types"
 import {
   formatCompact,
@@ -40,8 +37,6 @@ export default function MarketDetails({ market, onBack }: MarketDetailsProps) {
   }, [currentProbability, market.history])
   const totalLiquidity = market.yesLiquidity + market.noLiquidity
   const displayQuestion = market.question.replace(/^\[DEMO\]\s*/i, "")
-  const accent = CATEGORY_ACCENTS[market.category]
-
   return (
     <article aria-labelledby="market-question" className="pb-8 text-white">
       <div className="flex items-center justify-between gap-3">
@@ -65,11 +60,10 @@ export default function MarketDetails({ market, onBack }: MarketDetailsProps) {
 
       <div className="mt-5 flex items-start gap-3">
         <span
-          className="grid size-10 shrink-0 place-items-center rounded-xl border bg-black/40 text-lg shadow-[0_0_24px_rgba(255,255,255,0.06)]"
-          style={{ borderColor: `${accent}66` }}
+          className="grid size-10 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.035] text-white/70"
           aria-hidden="true"
         >
-          {CATEGORY_SYMBOLS[market.category]}
+          <HazardIcon category={market.category} className="size-5" />
         </span>
         <div className="min-w-0">
           <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">
@@ -88,6 +82,31 @@ export default function MarketDetails({ market, onBack }: MarketDetailsProps) {
       >
         {displayQuestion}
       </h2>
+      <p className="mt-3 text-[11px] leading-5 text-white/55">
+        {market.description}
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-[8px] uppercase tracking-[0.12em]">
+        <span
+          className={`rounded-full border px-2.5 py-1 ${
+            market.chainState === "synced"
+              ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+              : market.chainState === "missing" || market.chainState === "error"
+                ? "border-amber-300/25 bg-amber-300/10 text-amber-100"
+                : "border-white/10 bg-white/[0.04] text-white/45"
+          }`}
+        >
+          {market.chainState === "synced"
+            ? "Devnet account verified"
+            : market.chainState === "loading"
+              ? "Checking Devnet account"
+              : market.chainState === "missing"
+                ? "Demo market not on-chain"
+                : market.chainState === "error"
+                  ? "Devnet state unavailable"
+                  : "Demo metadata only"}
+        </span>
+      </div>
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 border-y border-white/10 py-4">
         <div>

@@ -16,6 +16,9 @@ const VAULT_SEED = Buffer.from("vault")
 const YES_POSITION_SEED = Buffer.from("yes_position")
 const NO_POSITION_SEED = Buffer.from("no_position")
 const CLAIM_SEED = Buffer.from("claim")
+const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
+  "BPFLoaderUpgradeab1e11111111111111111111111",
+)
 
 const MARKET_STATUS_OFFSET = 160
 const MARKET_OUTCOME_OFFSET = 161
@@ -313,10 +316,17 @@ describe("climate_market", () => {
   }, 60_000)
 
   it("initializes the protocol configuration", async () => {
+    const programData = PublicKey.findProgramAddressSync(
+      [program.programId.toBuffer()],
+      BPF_LOADER_UPGRADEABLE_PROGRAM_ID,
+    )[0]
+
     await program.methods.initializeProtocol!(resolver.publicKey)
       .accountsStrict({
         protocol,
         authority,
+        program: program.programId,
+        programData,
         systemProgram: SystemProgram.programId,
       })
       .rpc()

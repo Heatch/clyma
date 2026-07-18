@@ -1,5 +1,5 @@
 {
-  "name": "klashi-climate-markets",
+  "name": "terraform-climate-markets",
   "version": "0.1.0",
   "private": true,
   "description": "Experimental Solana Devnet climate prediction market prototype",

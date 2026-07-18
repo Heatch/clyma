@@ -24,6 +24,8 @@ export const CLIMATE_MARKET_IDL: Idl = {
       accounts: [
         { name: "protocol", writable: true },
         { name: "authority", writable: true, signer: true },
+        { name: "program" },
+        { name: "programData" },
         { name: "systemProgram" },
       ],
       args: [{ name: "resolver", type: "pubkey" }],

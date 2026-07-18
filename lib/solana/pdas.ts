@@ -5,6 +5,10 @@ import { marketIdToU64, u64ToBuffer, type U64Input } from "./encoding"
 
 export type MarketSide = "yes" | "no"
 
+export const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
+  "BPFLoaderUpgradeab1e11111111111111111111111",
+)
+
 export const PDA_SEEDS = {
   protocol: Buffer.from("protocol", "utf8"),
   market: Buffer.from("market", "utf8"),
@@ -18,6 +22,20 @@ export function deriveProtocolConfigPda(
   programId: PublicKey,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([PDA_SEEDS.protocol], programId)
+}
+
+/**
+ * Derives the account that stores upgrade metadata for an upgradeable Solana
+ * program. The protocol initializer uses this account to prove that its signer
+ * is the program's upgrade authority.
+ */
+export function deriveProgramDataPda(
+  programId: PublicKey,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [programId.toBuffer()],
+    BPF_LOADER_UPGRADEABLE_PROGRAM_ID,
+  )
 }
 
 export function deriveMarketPda(

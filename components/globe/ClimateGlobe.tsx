@@ -5,6 +5,7 @@ import * as d3 from "d3"
 import type { Feature, Geometry } from "geojson"
 import { feature } from "topojson-client"
 import type { GeometryObject, Objects, Topology } from "topojson-specification"
+import countriesTopology from "world-atlas/countries-110m.json"
 import landTopology from "world-atlas/land-110m.json"
 
 import { useGlobeLink } from "@/components/providers/GlobeLinkProvider"
@@ -14,13 +15,9 @@ import {
   closestContinent,
   isContinentName,
 } from "@/lib/geo/regions"
-import {
-  CATEGORY_ACCENTS,
-  CATEGORY_LABELS,
-  CATEGORY_SYMBOLS,
-} from "@/lib/markets/categories"
+import { CATEGORY_LABELS } from "@/lib/markets/categories"
 import type { ClimateMarket } from "@/lib/markets/types"
-import { clampProbability, likelihoodColor } from "@/lib/utils/likelihood"
+import { clampProbability } from "@/lib/utils/likelihood"
 
 type Projection = d3.GeoProjection
 
@@ -51,6 +48,7 @@ const DEFAULT_ROTATION: [number, number, number] = [20, -12, 0]
 const MIN_ZOOM = 0.68
 const MAX_ZOOM = 2.35
 const IDLE_DELAY_MS = 3200
+const TARGET_FRAME_INTERVAL_MS = 1000 / 30
 
 function makeLandFeature(): Feature<Geometry> {
   const topology = landTopology as unknown as Topology<
@@ -73,27 +71,30 @@ function makeLandFeature(): Feature<Geometry> {
   return converted as Feature<Geometry>
 }
 
-const LAND = makeLandFeature()
-
-function createLandDots(): Array<[number, number]> {
-  const dots: Array<[number, number]> = []
-  // This preserves the supplied globe's halftone-land technique while keeping
-  // Natural Earth data local, so the core interface does not depend on GitHub.
-  for (let latitude = -84; latitude <= 84; latitude += 3) {
-    const longitudeOffset = Math.abs(latitude % 6) === 3 ? 1.5 : 0
-    for (
-      let longitude = -180 + longitudeOffset;
-      longitude < 180;
-      longitude += 3
-    ) {
-      if (d3.geoContains(LAND, [longitude, latitude]))
-        dots.push([longitude, latitude])
+function makeCountriesFeature(): Feature<Geometry> {
+  const topology = countriesTopology as unknown as Topology<
+    Objects<Record<string, never>>
+  >
+  const geometry = topology.objects.countries as GeometryObject<
+    Record<string, never>
+  >
+  const converted = feature(topology, geometry)
+  if (converted.type === "FeatureCollection") {
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "GeometryCollection",
+        geometries: converted.features.map((item) => item.geometry),
+      },
     }
   }
-  return dots
+  return converted as Feature<Geometry>
 }
 
-const LAND_DOTS = createLandDots()
+const LAND = makeLandFeature()
+const COUNTRIES = makeCountriesFeature()
+const GRATICULE = d3.geoGraticule10()
 
 function isVisible(projection: Projection, coordinates: [number, number]) {
   const [rotateLongitude, rotateLatitude] = projection.rotate()
@@ -107,6 +108,14 @@ function easeInOut(value: number) {
   return value < 0.5
     ? 4 * value * value * value
     : 1 - Math.pow(-2 * value + 2, 3) / 2
+}
+
+function prefersReducedMotion() {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  )
 }
 
 export default function ClimateGlobe({
@@ -126,6 +135,8 @@ export default function ClimateGlobe({
   const baseRadiusRef = useRef(200)
   const zoomRef = useRef(1)
   const clustersRef = useRef<RenderedCluster[]>([])
+  const hoveredCanvasMarketIdRef = useRef<string | null>(null)
+  const renderVersionRef = useRef(0)
   const marketsRef = useRef(markets)
   const selectedRegionRef = useRef(selectedRegion)
   const selectedMarketIdRef = useRef(selectedMarketId)
@@ -147,6 +158,7 @@ export default function ClimateGlobe({
     selectedRegionRef.current = selectedRegion
     selectedMarketIdRef.current = selectedMarketId
     callbacksRef.current = { onRegionSelect, onMarketSelect }
+    renderVersionRef.current += 1
   }, [
     markets,
     onMarketSelect,
@@ -175,12 +187,20 @@ export default function ClimateGlobe({
 
   const focusCoordinates = useCallback(
     (longitude: number, latitude: number) => {
-      focusAnimationRef.current = {
-        startedAt: performance.now(),
-        from: [...rotationRef.current],
-        to: [-longitude, -latitude, 0],
+      const destination: [number, number, number] = [-longitude, -latitude, 0]
+      const now = performance.now()
+      if (prefersReducedMotion()) {
+        rotationRef.current = destination
+        focusAnimationRef.current = null
+        idleUntilRef.current = now + IDLE_DELAY_MS
+        return
       }
-      idleUntilRef.current = performance.now() + IDLE_DELAY_MS + 900
+      focusAnimationRef.current = {
+        startedAt: now,
+        from: [...rotationRef.current],
+        to: destination,
+      }
+      idleUntilRef.current = now + IDLE_DELAY_MS + 900
     },
     [],
   )
@@ -210,24 +230,46 @@ export default function ClimateGlobe({
     const wrapper = wrapperRef.current
     if (!canvas || !wrapper) return
 
-    const context = canvas.getContext("2d")
+    const context = canvas.getContext("2d", {
+      alpha: true,
+      desynchronized: true,
+    })
     if (!context) return
 
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     )
-    const projection = d3.geoOrthographic().clipAngle(90).precision(0.3)
+    const projection = d3.geoOrthographic().clipAngle(90).precision(0.65)
+    const backProjection = d3
+      .geoOrthographic()
+      .clipAngle(179.999)
+      .precision(0.8)
+    const path = d3.geoPath(projection, context)
+    const backPath = d3.geoPath(backProjection, context)
     projectionRef.current = projection
     let width = 0
     let height = 0
     let animationFrame = 0
     let lastFrame = performance.now()
+    let lastTickAt = 0
+    let lastRenderedVersion = -1
+    let lastRenderedZoom = Number.NaN
+    let lastRenderedRotation: [number, number, number] = [
+      Number.NaN,
+      Number.NaN,
+      Number.NaN,
+    ]
+    let lastRenderedCanvasHover: string | null | undefined
+    let lastRenderedLinkedHover: string | null | undefined
 
     const resize = () => {
       const rectangle = wrapper.getBoundingClientRect()
       width = Math.max(280, rectangle.width)
       height = Math.max(320, rectangle.height || 680)
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+      const pixelRatio = Math.min(
+        window.devicePixelRatio || 1,
+        width * height > 1_000_000 ? 1.25 : 1.5,
+      )
       canvas.width = Math.round(width * pixelRatio)
       canvas.height = Math.round(height * pixelRatio)
       canvas.style.width = `${width}px`
@@ -241,6 +283,11 @@ export default function ClimateGlobe({
         .translate([width / 2, height / 2])
         .scale(baseRadiusRef.current * zoomRef.current)
         .rotate(rotationRef.current)
+      backProjection
+        .translate([width / 2, height / 2])
+        .scale(baseRadiusRef.current * zoomRef.current)
+        .rotate(rotationRef.current)
+      renderVersionRef.current += 1
     }
 
     const draw = () => {
@@ -248,25 +295,34 @@ export default function ClimateGlobe({
       const radius = projection.scale()
       const center = projection.translate()
       const scaleFactor = radius / Math.max(1, baseRadiusRef.current)
-      const path = d3.geoPath(projection, context)
-
       context.save()
       context.beginPath()
       context.arc(center[0], center[1], radius, 0, Math.PI * 2)
-      context.fillStyle = "#070b0a"
-      context.shadowColor = "rgba(16, 185, 129, 0.12)"
-      context.shadowBlur = 54
-      context.shadowOffsetY = 10
+      context.fillStyle = "rgba(4, 8, 7, 0.36)"
       context.fill()
-      context.shadowColor = "transparent"
       context.strokeStyle = "rgba(255, 255, 255, 0.24)"
       context.lineWidth = Math.max(0.75, 1.1 * scaleFactor)
       context.stroke()
       context.clip()
 
+      // The full 180° projection is drawn first as a quiet wireframe. The
+      // clipped front hemisphere is layered over it below, which makes the
+      // sphere read as transparent without compromising foreground hit tests.
       context.beginPath()
-      path(d3.geoGraticule10())
-      context.strokeStyle = "rgba(167, 243, 208, 0.07)"
+      backPath(GRATICULE)
+      context.strokeStyle = "rgba(203, 213, 225, 0.035)"
+      context.lineWidth = Math.max(0.35, 0.5 * scaleFactor)
+      context.stroke()
+
+      context.beginPath()
+      backPath(COUNTRIES)
+      context.strokeStyle = "rgba(226, 232, 240, 0.11)"
+      context.lineWidth = Math.max(0.35, 0.55 * scaleFactor)
+      context.stroke()
+
+      context.beginPath()
+      path(GRATICULE)
+      context.strokeStyle = "rgba(226, 232, 240, 0.075)"
       context.lineWidth = Math.max(0.5, 0.65 * scaleFactor)
       context.stroke()
 
@@ -290,22 +346,17 @@ export default function ClimateGlobe({
 
       context.beginPath()
       path(LAND)
-      context.fillStyle = "rgba(255, 255, 255, 0.055)"
+      context.fillStyle = "rgba(255, 255, 255, 0.065)"
       context.fill()
-      context.strokeStyle = "rgba(255, 255, 255, 0.34)"
+      context.strokeStyle = "rgba(255, 255, 255, 0.38)"
       context.lineWidth = Math.max(0.45, 0.72 * scaleFactor)
       context.stroke()
 
-      context.fillStyle = "rgba(226, 232, 240, 0.45)"
-      const dotRadius = Math.max(0.62, Math.min(1.45, 0.82 * scaleFactor))
-      for (const coordinates of LAND_DOTS) {
-        if (!isVisible(projection, coordinates)) continue
-        const point = projection(coordinates)
-        if (!point) continue
-        context.beginPath()
-        context.arc(point[0], point[1], dotRadius, 0, Math.PI * 2)
-        context.fill()
-      }
+      context.beginPath()
+      path(COUNTRIES)
+      context.strokeStyle = "rgba(255, 255, 255, 0.27)"
+      context.lineWidth = Math.max(0.4, 0.6 * scaleFactor)
+      context.stroke()
 
       const projectedMarkets = marketsRef.current
         .filter((market) => market.status === "open")
@@ -352,82 +403,70 @@ export default function ClimateGlobe({
             (market) => market.id === selectedMarketIdRef.current,
           ) ?? cluster.markets[0]
         if (!markerMarket) continue
-        const clusterProbability = clampProbability(
-          Math.max(...cluster.markets.map((market) => market.yesPrice)),
-        )
-        const markerRadius = cluster.markets.length > 1 ? 15 : 14
-        const accent = CATEGORY_ACCENTS[markerMarket.category]
+        const markerRadius = cluster.markets.length > 1 ? 8 : 7
         const hovered = cluster.markets.some(
-          (market) => market.id === hoveredMarketIdRef.current,
+          (market) =>
+            market.id === hoveredMarketIdRef.current ||
+            market.id === hoveredCanvasMarketIdRef.current,
         )
 
-        // The outer ring carries probability while the central glyph carries
-        // hazard type, so meaning does not depend on colour alone.
+        // Small monochrome nodes keep the globe legible as a live instrument;
+        // category and probability remain available in the hover label.
         context.beginPath()
         context.arc(
           cluster.x,
           cluster.y,
-          markerRadius + (selected ? 7 : 4),
+          markerRadius + (selected ? 5 : 3),
           0,
           Math.PI * 2,
         )
         context.strokeStyle = selected
-          ? "rgba(255, 255, 255, 0.95)"
-          : likelihoodColor(clusterProbability)
-        context.lineWidth = selected ? 2.5 : 1.5
+          ? "rgba(255, 255, 255, 0.92)"
+          : "rgba(255, 255, 255, 0.28)"
+        context.lineWidth = selected ? 1.6 : 1
         context.stroke()
 
         if (selected || hovered) {
-          const pulse = (Math.sin(performance.now() / 260) + 1) / 2
           context.beginPath()
           context.arc(
             cluster.x,
             cluster.y,
-            markerRadius + 10 + pulse * 8,
+            markerRadius + (selected ? 9 : 7),
             0,
             Math.PI * 2,
           )
-          context.strokeStyle = `rgba(255, 255, 255, ${
-            selected ? 0.28 - pulse * 0.16 : 0.42 - pulse * 0.32
-          })`
-          context.lineWidth = 1.5
+          context.strokeStyle = selected
+            ? "rgba(255, 255, 255, 0.18)"
+            : "rgba(255, 255, 255, 0.14)"
+          context.lineWidth = 1
           context.stroke()
         }
 
         context.beginPath()
         context.arc(cluster.x, cluster.y, markerRadius, 0, Math.PI * 2)
-        context.fillStyle = selected ? "#f8fafc" : "rgba(3, 8, 7, 0.94)"
-        context.shadowColor = selected ? "rgba(255,255,255,0.32)" : accent
-        context.shadowBlur = selected ? 18 : 10
+        context.fillStyle = selected ? "#f8fafc" : "rgba(3, 8, 7, 0.9)"
         context.fill()
-        context.shadowColor = "transparent"
-        context.strokeStyle = selected ? "#ffffff" : accent
-        context.lineWidth = selected ? 2 : 1.25
+        context.strokeStyle = "rgba(255, 255, 255, 0.82)"
+        context.lineWidth = selected ? 1.5 : 1
         context.stroke()
 
-        context.font =
-          "13px Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif"
-        context.textAlign = "center"
-        context.textBaseline = "middle"
-        context.fillStyle = selected ? "#050807" : "#ffffff"
-        context.fillText(
-          CATEGORY_SYMBOLS[markerMarket.category],
-          cluster.x,
-          cluster.y + 0.5,
-        )
+        context.beginPath()
+        context.arc(cluster.x, cluster.y, 1.55, 0, Math.PI * 2)
+        context.fillStyle = selected ? "#050807" : "rgba(255, 255, 255, 0.96)"
+        context.fill()
 
         if (cluster.markets.length > 1) {
-          const badgeX = cluster.x + markerRadius - 1
-          const badgeY = cluster.y - markerRadius + 1
+          const badgeX = cluster.x + markerRadius
+          const badgeY = cluster.y - markerRadius
           context.beginPath()
-          context.arc(badgeX, badgeY, 7, 0, Math.PI * 2)
+          context.arc(badgeX, badgeY, 5.5, 0, Math.PI * 2)
           context.fillStyle = "#ffffff"
           context.fill()
           context.strokeStyle = "#050807"
-          context.lineWidth = 1.5
+          context.lineWidth = 1
           context.stroke()
           context.fillStyle = "#050807"
-          context.font = "700 8px Inter, system-ui, sans-serif"
+          context.font = "700 7px Inter, system-ui, sans-serif"
           context.textAlign = "center"
           context.textBaseline = "middle"
           context.fillText(String(cluster.markets.length), badgeX, badgeY + 0.5)
@@ -437,6 +476,12 @@ export default function ClimateGlobe({
     }
 
     const tick = (now: number) => {
+      const frameElapsed = now - lastTickAt
+      if (document.hidden || frameElapsed < TARGET_FRAME_INTERVAL_MS) {
+        animationFrame = window.requestAnimationFrame(tick)
+        return
+      }
+      lastTickAt = now - (frameElapsed % TARGET_FRAME_INTERVAL_MS)
       const elapsed = Math.min(50, now - lastFrame)
       lastFrame = now
       const focusAnimation = focusAnimationRef.current
@@ -462,7 +507,30 @@ export default function ClimateGlobe({
       projection
         .rotate(rotationRef.current)
         .scale(baseRadiusRef.current * zoomRef.current)
-      draw()
+      backProjection
+        .rotate(rotationRef.current)
+        .scale(baseRadiusRef.current * zoomRef.current)
+
+      const rotation = rotationRef.current
+      const linkedHover = hoveredMarketIdRef.current
+      const canvasHover = hoveredCanvasMarketIdRef.current
+      const shouldDraw =
+        renderVersionRef.current !== lastRenderedVersion ||
+        zoomRef.current !== lastRenderedZoom ||
+        rotation[0] !== lastRenderedRotation[0] ||
+        rotation[1] !== lastRenderedRotation[1] ||
+        rotation[2] !== lastRenderedRotation[2] ||
+        canvasHover !== lastRenderedCanvasHover ||
+        linkedHover !== lastRenderedLinkedHover
+
+      if (shouldDraw) {
+        draw()
+        lastRenderedVersion = renderVersionRef.current
+        lastRenderedZoom = zoomRef.current
+        lastRenderedRotation = [...rotation]
+        lastRenderedCanvasHover = canvasHover
+        lastRenderedLinkedHover = linkedHover
+      }
       animationFrame = window.requestAnimationFrame(tick)
     }
 
@@ -525,18 +593,21 @@ export default function ClimateGlobe({
       const target = findTarget(event.clientX, event.clientY)
       if (target?.type === "cluster") {
         const singleMarket = target.cluster.markets[0]
+        hoveredCanvasMarketIdRef.current = singleMarket?.id ?? null
         setHoverLabel(
           target.cluster.markets.length > 1
             ? `${target.cluster.markets.length} nearby hazard markets · select to explore`
             : singleMarket
-              ? `${CATEGORY_SYMBOLS[singleMarket.category]} ${CATEGORY_LABELS[singleMarket.category]} · ${singleMarket.region} · YES ${Math.round(
+              ? `${CATEGORY_LABELS[singleMarket.category]} · ${singleMarket.region} · YES ${Math.round(
                   clampProbability(singleMarket.yesPrice) * 100,
                 )}%`
               : null,
         )
       } else if (target?.type === "region") {
+        hoveredCanvasMarketIdRef.current = null
         setHoverLabel(`${target.region} · select region`)
       } else {
+        hoveredCanvasMarketIdRef.current = null
         setHoverLabel(null)
       }
       return
@@ -654,6 +725,13 @@ export default function ClimateGlobe({
   }
 
   const resetView = () => {
+    if (prefersReducedMotion()) {
+      rotationRef.current = [...DEFAULT_ROTATION]
+      focusAnimationRef.current = null
+      zoomRef.current = 1
+      pauseRotation()
+      return
+    }
     focusAnimationRef.current = {
       startedAt: performance.now(),
       from: [...rotationRef.current],
@@ -690,13 +768,16 @@ export default function ClimateGlobe({
         <canvas
           ref={canvasRef}
           className="block h-full w-full cursor-grab touch-none active:cursor-grabbing"
-          aria-label="Interactive globe with demo climate market markers. Drag or use arrow keys to rotate, scroll or use plus and minus keys to zoom."
+          aria-label="Interactive transparent globe showing the faint far hemisphere and demo climate market markers. Drag or use arrow keys to rotate, scroll or use plus and minus keys to zoom."
           role="img"
           tabIndex={0}
           onKeyDown={handleKeyDown}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
-          onPointerLeave={() => setHoverLabel(null)}
+          onPointerLeave={() => {
+            hoveredCanvasMarketIdRef.current = null
+            setHoverLabel(null)
+          }}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           onWheel={handleWheel}

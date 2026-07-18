@@ -7,15 +7,25 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 
+import { useSolanaWallet } from "@/components/providers/SolanaProvider"
+import { Buffer } from "buffer"
+import {
+  calculateImpliedProbabilities,
+  lamportsToSolNumber,
+} from "@/lib/markets/calculations"
 import { demoMarkets } from "@/lib/markets/data"
 import type {
   ClimateMarket,
   MarketCategory,
   MarketStatus,
 } from "@/lib/markets/types"
+import { decodeMarketAccount } from "@/lib/solana/accounts"
+import { SOLANA_COMMITMENT, SOLANA_PROGRAM_ID } from "@/lib/solana/config"
+import { deriveMarketPda, deriveProtocolConfigPda } from "@/lib/solana/pdas"
 
 export type MarketSort = "trending" | "volume" | "closing" | "yes" | "category"
 export type StatusFilter = MarketStatus | "all"
@@ -44,6 +54,7 @@ type MarketContextValue = {
 }
 
 const MarketContext = createContext<MarketContextValue | null>(null)
+const MARKET_REFRESH_EVENT = "terraform:market-state-changed"
 
 const STATUS_ORDER: Record<MarketStatus, number> = {
   open: 0,
@@ -86,7 +97,22 @@ function comparatorFor(sort: MarketSort) {
   }
 }
 
+async function hashMarketQuestion(question: string): Promise<Buffer> {
+  const subtle = globalThis.crypto?.subtle
+  if (!subtle) throw new Error("Web Crypto is unavailable.")
+  return Buffer.from(
+    await subtle.digest("SHA-256", new TextEncoder().encode(question)),
+  )
+}
+
 export function MarketProvider({ children }: { children: React.ReactNode }) {
+  const { connection } = useSolanaWallet()
+  const [markets, setMarkets] = useState<ClimateMarket[]>(() =>
+    demoMarkets.map((market) => ({
+      ...market,
+      chainState: SOLANA_PROGRAM_ID ? "loading" : "demo-only",
+    })),
+  )
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
   const [selectedMarket, setSelectedMarket] = useState<ClimateMarket | null>(
     null,
@@ -97,9 +123,104 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<StatusFilter>("all")
   const [sort, setSort] = useState<MarketSort>("trending")
   const [isLoading, setIsLoading] = useState(true)
+  const refreshRequestRef = useRef(0)
   // Reference "now" resolved after mount (never during render) so time-based
   // card tags like "Closing soon" stay pure and hydration-safe.
   const [now, setNow] = useState(0)
+
+  const refreshOnchainMarkets = useCallback(async () => {
+    const requestId = ++refreshRequestRef.current
+    const programId = SOLANA_PROGRAM_ID
+    if (!programId) {
+      if (requestId !== refreshRequestRef.current) return
+      setMarkets(
+        demoMarkets.map((market) => ({
+          ...market,
+          chainState: "demo-only" as const,
+        })),
+      )
+      return
+    }
+
+    const addresses = demoMarkets.map(
+      (market) => deriveMarketPda(programId, market.onchainMarketId)[0],
+    )
+    const [protocolAddress] = deriveProtocolConfigPda(programId)
+
+    try {
+      const [accounts, expectedQuestionHashes] = await Promise.all([
+        connection.getMultipleAccountsInfo(addresses, SOLANA_COMMITMENT),
+        Promise.all(
+          demoMarkets.map((market) => hashMarketQuestion(market.question)),
+        ),
+      ])
+      if (requestId !== refreshRequestRef.current) return
+      setMarkets(
+        demoMarkets.map((market, index) => {
+          const account = accounts[index]
+          const expectedQuestionHash = expectedQuestionHashes[index]
+          if (!account) return { ...market, chainState: "missing" as const }
+          if (!account.owner.equals(programId) || !expectedQuestionHash) {
+            return { ...market, chainState: "error" as const }
+          }
+
+          try {
+            const decoded = decodeMarketAccount(account.data)
+            if (
+              decoded.marketId !== BigInt(market.onchainMarketId) ||
+              !decoded.protocol.equals(protocolAddress) ||
+              !decoded.questionHash.equals(expectedQuestionHash) ||
+              decoded.totalYesAmount + decoded.totalNoAmount !==
+                decoded.totalPoolAmount ||
+              (decoded.status === "resolved" &&
+                decoded.outcome === "unresolved") ||
+              (decoded.status !== "resolved" &&
+                decoded.outcome !== "unresolved")
+            ) {
+              return { ...market, chainState: "error" as const }
+            }
+            const probabilities = calculateImpliedProbabilities(
+              decoded.totalYesAmount,
+              decoded.totalNoAmount,
+            )
+            const closeTime = new Date(
+              Number(decoded.closeTimestamp) * 1_000,
+            ).toISOString()
+            const resolutionTime = new Date(
+              Number(decoded.resolutionTimestamp) * 1_000,
+            ).toISOString()
+
+            return {
+              ...market,
+              closeTime,
+              resolutionTime,
+              status: decoded.status,
+              outcome:
+                decoded.status === "cancelled"
+                  ? ("cancelled" as const)
+                  : decoded.outcome,
+              yesPrice: probabilities.yes,
+              noPrice: probabilities.no,
+              yesLiquidity: lamportsToSolNumber(decoded.totalYesAmount),
+              noLiquidity: lamportsToSolNumber(decoded.totalNoAmount),
+              resolver: decoded.resolver.toBase58(),
+              chainState: "synced" as const,
+              chainYesLamports: decoded.totalYesAmount.toString(),
+              chainNoLamports: decoded.totalNoAmount.toString(),
+              chainTotalLamports: decoded.totalPoolAmount.toString(),
+            }
+          } catch {
+            return { ...market, chainState: "error" as const }
+          }
+        }),
+      )
+    } catch {
+      if (requestId !== refreshRequestRef.current) return
+      setMarkets((current) =>
+        current.map((market) => ({ ...market, chainState: "error" })),
+      )
+    }
+  }, [connection])
 
   // Flip off after the first client commit so board/card skeletons show during
   // hydration and swap seamlessly to content (and stay ready for async data).
@@ -111,18 +232,39 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     return () => window.cancelAnimationFrame(frame)
   }, [])
 
+  useEffect(() => {
+    void refreshOnchainMarkets()
+    if (!SOLANA_PROGRAM_ID) return
+
+    const refresh = () => void refreshOnchainMarkets()
+    const interval = window.setInterval(refresh, 30_000)
+    window.addEventListener(MARKET_REFRESH_EVENT, refresh)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener(MARKET_REFRESH_EVENT, refresh)
+    }
+  }, [refreshOnchainMarkets])
+
+  useEffect(() => {
+    setSelectedMarket((current) =>
+      current
+        ? (markets.find((market) => market.id === current.id) ?? current)
+        : null,
+    )
+  }, [markets])
+
   // Deferring search keeps the input responsive while the globe and large
   // market grid recompute off the debounced value.
   const deferredSearch = useDeferredValue(search)
 
   const visibleMarkets = useMemo(
     () =>
-      demoMarkets.filter(
+      markets.filter(
         (market) =>
           matchesSearch(market, deferredSearch) &&
           (category === "all" || market.category === category),
       ),
-    [category, deferredSearch],
+    [category, deferredSearch, markets],
   )
 
   const boardMarkets = useMemo(() => {
@@ -163,7 +305,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<MarketContextValue>(
     () => ({
-      markets: demoMarkets,
+      markets,
       visibleMarkets,
       boardMarkets,
       selectedRegion,
@@ -190,6 +332,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       closeDrawer,
       isDrawerOpen,
       isLoading,
+      markets,
       now,
       search,
       selectedMarket,

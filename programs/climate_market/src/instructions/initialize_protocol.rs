@@ -18,6 +18,17 @@ pub struct InitializeProtocol<'info> {
     pub protocol: Account<'info, ProtocolConfig>,
     #[account(mut)]
     pub authority: Signer<'info>,
+    #[account(
+        address = crate::ID,
+        constraint = program.programdata_address()? == Some(program_data.key())
+            @ ClimateMarketError::UnauthorizedAuthority
+    )]
+    pub program: Program<'info, crate::program::ClimateMarket>,
+    #[account(
+        constraint = program_data.upgrade_authority_address == Some(authority.key())
+            @ ClimateMarketError::UnauthorizedAuthority
+    )]
+    pub program_data: Account<'info, ProgramData>,
     pub system_program: Program<'info, System>,
 }
 
@@ -40,4 +51,3 @@ pub fn handler(ctx: Context<InitializeProtocol>, resolver: Pubkey) -> Result<()>
     });
     Ok(())
 }
-

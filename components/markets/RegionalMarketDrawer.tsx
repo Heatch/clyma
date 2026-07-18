@@ -20,18 +20,54 @@ export default function RegionalMarketDrawer() {
   } = useMarkets()
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState<MarketCategory | "all">("all")
+  const drawerRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!isDrawerOpen) return
-    if (window.matchMedia("(max-width: 767px)").matches) {
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    const frame = window.requestAnimationFrame(() => {
       closeButtonRef.current?.focus({ preventScroll: true })
-    }
+    })
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeDrawer()
+      if (event.key === "Escape") {
+        event.preventDefault()
+        closeDrawer()
+        return
+      }
+      if (event.key !== "Tab" || !drawerRef.current) return
+      const focusable = [
+        ...drawerRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((element) => !element.closest("[hidden]"))
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener("keydown", handleKeyDown)
+      if (previousFocusRef.current?.isConnected) {
+        previousFocusRef.current.focus({ preventScroll: true })
+      } else {
+        document
+          .querySelector<HTMLElement>('canvas[aria-label^="Interactive"]')
+          ?.focus({ preventScroll: true })
+      }
+    }
   }, [closeDrawer, isDrawerOpen])
 
   useEffect(() => {
@@ -67,13 +103,16 @@ export default function RegionalMarketDrawer() {
         onClick={closeDrawer}
       />
       <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
         aria-label={
           selectedMarket
             ? `Market details: ${selectedMarket.question}`
             : `${selectedRegion} markets`
         }
         data-testid="market-drawer"
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-hidden rounded-t-[1.75rem] border border-white/15 bg-[#0b0d0f]/95 text-white shadow-[0_24px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl md:inset-y-20 md:left-auto md:right-4 md:max-h-none md:w-[min(460px,calc(100vw-2rem))] md:rounded-[1.5rem] lg:right-6"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-hidden rounded-t-[1.75rem] border border-white/15 bg-[#0b0d0f]/95 text-white shadow-[0_24px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl md:inset-y-4 md:left-auto md:right-4 md:max-h-none md:w-[min(460px,calc(100vw-2rem))] md:rounded-[1.5rem] lg:right-6"
       >
         <div className="flex h-full min-h-0 flex-col">
           <div
