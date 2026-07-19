@@ -36,6 +36,10 @@ export interface MarketDoc {
   participants: number
   featured: boolean
   trendingScore: number
+  resolver: string
+  isDemo: boolean
+  dataLabel: string
+  dataDisclaimer: string
   openAt: Date
   closesAt: Date
   resolvesAt: Date

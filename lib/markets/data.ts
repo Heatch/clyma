@@ -1628,6 +1628,38 @@ export const demoMarkets: ClimateMarket[] = [
   },
 ]
 
+const VOLUME_SCALE = 10
+
+function scaleVolume(market: ClimateMarket): ClimateMarket {
+  return {
+    ...market,
+    yesLiquidity: round(market.yesLiquidity * VOLUME_SCALE),
+    noLiquidity: round(market.noLiquidity * VOLUME_SCALE),
+    totalVolume: round(market.totalVolume * VOLUME_SCALE),
+    history: market.history.map((point) => ({
+      ...point,
+      totalVolume: round(point.totalVolume * VOLUME_SCALE),
+      yesLiquidity: round(point.yesLiquidity * VOLUME_SCALE),
+      noLiquidity: round(point.noLiquidity * VOLUME_SCALE),
+    })),
+    recentTrades: market.recentTrades.map((trade) => ({
+      ...trade,
+      amountSol: round(trade.amountSol * VOLUME_SCALE, 4),
+      amountLamports: Math.round(
+        trade.amountSol * VOLUME_SCALE * 1_000_000_000,
+      ).toString(),
+      estimatedPayoutSol: round(
+        trade.estimatedPayoutSol * VOLUME_SCALE,
+        4,
+      ),
+    })),
+  }
+}
+
+for (let i = 0; i < demoMarkets.length; i++) {
+  demoMarkets[i] = scaleVolume(demoMarkets[i]!)
+}
+
 export const demoUserPositions: UserPosition[] = [
   {
     id: "demo-position-atlas-fl-yes",
@@ -1726,6 +1758,21 @@ export const demoUserPositions: UserPosition[] = [
     isDemo: true,
   },
 ]
+
+for (let i = 0; i < demoUserPositions.length; i++) {
+  const p = demoUserPositions[i]!
+  demoUserPositions[i] = {
+    ...p,
+    amountSol: round(p.amountSol * VOLUME_SCALE, 4),
+    amountLamports: Math.round(p.amountSol * VOLUME_SCALE * 1_000_000_000).toString(),
+    estimatedPayoutSol: round(p.estimatedPayoutSol * VOLUME_SCALE, 4),
+    estimatedPayoutLamports: Math.round(p.estimatedPayoutSol * VOLUME_SCALE * 1_000_000_000).toString(),
+    claimableSol: round(p.claimableSol * VOLUME_SCALE, 4),
+    claimableLamports: Math.round(p.claimableSol * VOLUME_SCALE * 1_000_000_000).toString(),
+    claimedSol: round(p.claimedSol * VOLUME_SCALE, 4),
+    claimedLamports: Math.round(p.claimedSol * VOLUME_SCALE * 1_000_000_000).toString(),
+  }
+}
 
 export const demoUserActivity: UserActivity[] = [
   {

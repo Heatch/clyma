@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { vi } from "vitest"
 
 import PredictionForm from "@/components/trading/PredictionForm"
-import { demoMarkets } from "@/lib/markets/data"
+import type { ClimateMarket } from "@/lib/markets/types"
 
 const controls = vi.hoisted(() => ({
   connected: true,
@@ -101,12 +101,45 @@ vi.mock("@/hooks/useMarketProgram", async () => {
   }
 })
 
-const openMarket = {
-  ...demoMarkets[0]!,
-  status: "open" as const,
-  outcome: "unresolved" as const,
+const openMarket: ClimateMarket = {
+  id: "test-market-1",
+  onchainMarketId: 1001,
+  question: "Will Florida record a Category 4+ hurricane landfall before October 31, 2026?",
+  slug: "fl-test",
+  description: "A test market.",
+  category: "hurricane",
+  continent: "North America",
+  country: "United States",
+  region: "Florida",
+  latitude: 27.6648,
+  longitude: -81.5158,
   closeTime: "2099-12-31T23:59:59.000Z",
-  chainState: "synced" as const,
+  resolutionTime: "2100-01-14T18:00:00.000Z",
+  status: "open",
+  outcome: "unresolved",
+  yesPrice: 0.43,
+  noPrice: 0.57,
+  yesLiquidity: 430,
+  noLiquidity: 570,
+  totalVolume: 2840,
+  participants: 184,
+  resolutionSource: "NOAA",
+  resolutionSourceUrl: "https://www.nhc.noaa.gov/",
+  resolutionRules: "Resolve YES if a Category 4+ hurricane makes landfall in Florida before the close time.",
+  resolver: "3mshx6HoZop71xQ483kLMdiUuXQ1UxDgBABuLnFkVfDV",
+  createdAt: "2026-05-01T14:00:00.000Z",
+  featured: true,
+  trendingScore: 96,
+  history: [],
+  evidence: [],
+  recentTrades: [],
+  network: "devnet",
+  settlementAsset: "SOL",
+  marketModel: "pooled-binary",
+  isDemo: false,
+  dataLabel: "",
+  dataDisclaimer: "",
+  chainState: "synced",
 }
 
 describe("prediction purchase controls", () => {

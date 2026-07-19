@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback } from "react"
 import { useMarkets } from "@/components/providers/MarketProvider"
 import { useSolanaWallet } from "@/components/providers/SolanaProvider"
 import WalletConnectButton from "@/components/wallet/WalletConnectButton"
@@ -9,11 +10,26 @@ import TerraFormMark from "@/components/ui/TerraFormMark"
 interface NavbarProps {
   search: string
   onSearchChange: (value: string) => void
+  isDemo?: boolean
 }
 
-export default function Navbar({ search, onSearchChange }: NavbarProps) {
+export default function Navbar({
+  search,
+  onSearchChange,
+  isDemo = false,
+}: NavbarProps) {
   const { showPortfolio } = useMarkets()
   const { connected } = useSolanaWallet()
+
+  const toggleDemo = useCallback(() => {
+    if (isDemo) {
+      document.cookie = "demo=;path=/;max-age=0"
+    } else {
+      document.cookie = "demo=1;path=/;max-age=31536000"
+    }
+    window.location.reload()
+  }, [isDemo])
+
   return (
     <nav
       aria-label="Primary navigation"
@@ -63,7 +79,23 @@ export default function Navbar({ search, onSearchChange }: NavbarProps) {
           />
         </div>
 
-        <div className="pointer-events-auto order-3 ml-auto flex shrink-0 items-center gap-2.5 md:order-2 md:ml-0 md:w-full md:flex-col md:items-stretch md:gap-2">
+        <div className="pointer-events-auto order-3 ml-auto flex shrink-0 items-center gap-2.5 md:order-2 md:ml-0 md:w-full md:flex-col md:items-stretch md:gap-3">
+          <button
+            type="button"
+            onClick={toggleDemo}
+            className={`hidden w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-center font-mono text-[9px] uppercase tracking-[0.14em] transition md:flex ${
+              isDemo
+                ? "border-amber-300/30 bg-amber-300/10 text-amber-200"
+                : "border-white/10 bg-white/[0.04] text-white/60"
+            }`}
+          >
+            <span
+              className={`size-1.5 rounded-full ${
+                isDemo ? "bg-amber-300" : "bg-emerald-400 soft-pulse"
+              }`}
+            />
+            {isDemo ? "Demo mode" : "Prod mode"}
+          </button>
           <div
             className="hidden w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-center font-mono text-[9px] uppercase tracking-[0.1em] text-white/60 md:flex"
             title={

@@ -12,12 +12,10 @@ import {
 } from "react"
 
 import { useSolanaWallet } from "@/components/providers/SolanaProvider"
-import { Buffer } from "buffer"
 import {
   calculateImpliedProbabilities,
   lamportsToSolNumber,
 } from "@/lib/markets/calculations"
-import { demoMarkets } from "@/lib/markets/data"
 import type {
   ClimateMarket,
   MarketCategory,
@@ -99,27 +97,21 @@ function comparatorFor(sort: MarketSort) {
   }
 }
 
-async function hashMarketQuestion(question: string): Promise<Buffer> {
-  const subtle = globalThis.crypto?.subtle
-  if (!subtle) throw new Error("Web Crypto is unavailable.")
-  return Buffer.from(
-    await subtle.digest("SHA-256", new TextEncoder().encode(question)),
-  )
-}
-
 export function MarketProvider({
   children,
   initialMarkets,
+  isDemo = false,
 }: {
   children: React.ReactNode
   initialMarkets?: ClimateMarket[]
+  isDemo?: boolean
 }) {
   const { connection } = useSolanaWallet()
   // Treat the server payload as initial state. Keeping this catalog stable lets
   // on-chain refreshes enrich the same market set without restarting whenever
   // a parent happens to pass a newly allocated array.
   const [marketCatalog] = useState<ClimateMarket[]>(() =>
-    initialMarkets && initialMarkets.length > 0 ? initialMarkets : demoMarkets,
+    initialMarkets && initialMarkets.length > 0 ? initialMarkets : [],
   )
   const [markets, setMarkets] = useState<ClimateMarket[]>(() =>
     marketCatalog.map((market) => ({
@@ -146,7 +138,7 @@ export function MarketProvider({
   const refreshOnchainMarkets = useCallback(async () => {
     const requestId = ++refreshRequestRef.current
     const programId = SOLANA_PROGRAM_ID
-    if (!programId) {
+    if (isDemo || !programId) {
       if (requestId !== refreshRequestRef.current) return
       setMarkets(
         marketCatalog.map((market) => ({
@@ -163,19 +155,13 @@ export function MarketProvider({
     const [protocolAddress] = deriveProtocolConfigPda(programId)
 
     try {
-      const [accounts, expectedQuestionHashes] = await Promise.all([
-        connection.getMultipleAccountsInfo(addresses, SOLANA_COMMITMENT),
-        Promise.all(
-          marketCatalog.map((market) => hashMarketQuestion(market.question)),
-        ),
-      ])
+      const accounts = await connection.getMultipleAccountsInfo(addresses, SOLANA_COMMITMENT)
       if (requestId !== refreshRequestRef.current) return
       setMarkets(
         marketCatalog.map((market, index) => {
           const account = accounts[index]
-          const expectedQuestionHash = expectedQuestionHashes[index]
           if (!account) return { ...market, chainState: "missing" as const }
-          if (!account.owner.equals(programId) || !expectedQuestionHash) {
+          if (!account.owner.equals(programId)) {
             return { ...market, chainState: "error" as const }
           }
 
@@ -184,7 +170,6 @@ export function MarketProvider({
             if (
               decoded.marketId !== BigInt(market.onchainMarketId) ||
               !decoded.protocol.equals(protocolAddress) ||
-              !decoded.questionHash.equals(expectedQuestionHash) ||
               decoded.totalYesAmount + decoded.totalNoAmount !==
                 decoded.totalPoolAmount ||
               (decoded.status === "resolved" &&
@@ -235,7 +220,7 @@ export function MarketProvider({
         current.map((market) => ({ ...market, chainState: "error" })),
       )
     }
-  }, [connection, marketCatalog])
+  }, [connection, marketCatalog, isDemo])
 
   // Flip off after the first client commit so board/card skeletons show during
   // hydration and swap seamlessly to content (and stay ready for async data).

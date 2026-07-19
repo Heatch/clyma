@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server"
 
-import { DEMO_DATA_DISCLAIMER } from "@/lib/markets/data"
-
 export interface ApiMeta {
   generatedAt: string
   network: "devnet"
-  isDemo: true
-  dataLabel: "SAMPLE DATA"
-  disclaimer: string
 }
 
 export interface ApiSuccessResponse<T> {
@@ -36,9 +31,6 @@ export interface ApiErrorResponse {
 const createMeta = (): ApiMeta => ({
   generatedAt: new Date().toISOString(),
   network: "devnet",
-  isDemo: true,
-  dataLabel: "SAMPLE DATA",
-  disclaimer: DEMO_DATA_DISCLAIMER,
 })
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const

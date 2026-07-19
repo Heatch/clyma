@@ -7,7 +7,7 @@ import MarketChart from "@/components/markets/MarketChart"
 import PredictionForm from "@/components/trading/PredictionForm"
 import RedeemPosition from "@/components/trading/RedeemPosition"
 import { useAIForecast } from "@/hooks/useAIForecast"
-import { CATEGORY_LABELS } from "@/lib/markets/categories"
+import { CATEGORY_ACCENTS, CATEGORY_LABELS } from "@/lib/markets/categories"
 import type { ClimateMarket } from "@/lib/markets/types"
 import {
   formatCompact,
@@ -55,7 +55,6 @@ export default function MarketDetails({ market, onBack }: MarketDetailsProps) {
   const openingProbability = effectiveHistory[0]?.yesProbability ?? currentProbability
   const probabilityChange = (currentProbability - openingProbability) * 100
   const totalLiquidity = market.yesLiquidity + market.noLiquidity
-  const displayQuestion = market.question.replace(/^\[DEMO\]\s*/i, "")
   const categoryAccent = CATEGORY_ACCENTS[market.category]
   return (
     <article aria-labelledby="market-question" className="pb-8 text-white">
@@ -105,7 +104,7 @@ export default function MarketDetails({ market, onBack }: MarketDetailsProps) {
         id="market-question"
         className="mt-4 text-[1.55rem] font-medium leading-[1.12] tracking-[-0.04em] text-white sm:text-[1.75rem]"
       >
-        {displayQuestion}
+        {market.question}
       </h2>
       <p className="mt-3 text-[11px] leading-5 text-white/55">
         {market.description}
@@ -296,11 +295,6 @@ export default function MarketDetails({ market, onBack }: MarketDetailsProps) {
           </div>
         </details>
       </div>
-
-      <p className="mt-5 border-t border-white/10 pt-4 text-[9px] leading-4 text-white/25">
-        Fictional Devnet demonstration data. Probabilities reflect each side’s
-        simulated share of a pooled binary market and are not climate forecasts.
-      </p>
     </article>
   )
 }

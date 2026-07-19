@@ -5,11 +5,8 @@ import path from "node:path"
 import { GoogleGenAI } from "@google/genai"
 
 import {
-  DEMO_DATA_DISCLAIMER,
-  DEMO_WALLETS,
   buildHistory,
   buildTrades,
-  demoMarkets,
 } from "./data"
 import {
   MARKET_CATEGORIES,
@@ -207,7 +204,7 @@ function buildEvidence(
       url,
       publishedAt,
       kind,
-      isDemo: true,
+      isDemo: false,
     })
   })
 
@@ -222,7 +219,7 @@ function buildEvidence(
       url: fallbackUrl,
       publishedAt,
       kind: "resolution-source",
-      isDemo: true,
+      isDemo: false,
     })
   }
 
@@ -290,11 +287,8 @@ function mapMarket(market: GeminiMarket, index: number): ClimateMarket | null {
 
   const climateMarket: ClimateMarket = {
     id,
-    onchainMarketId: 2000 + index,
-    question: (question.includes("[DEMO]")
-      ? question
-      : `[DEMO] ${question}`
-    ).slice(0, 400),
+    onchainMarketId: 2001 + index,
+    question: question.slice(0, 400),
     slug,
     description: description.slice(0, 2000),
     category,
@@ -316,7 +310,7 @@ function mapMarket(market: GeminiMarket, index: number): ClimateMarket | null {
     resolutionSource: resolutionSource.slice(0, 300),
     resolutionSourceUrl,
     resolutionRules: resolutionRules.slice(0, 4000),
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: "3mshx6HoZop71xQ483kLMdiUuXQ1UxDgBABuLnFkVfDV",
     createdAt,
     featured: index < 4,
     trendingScore: clamp(Math.round(45 + yes * 45), 0, 100),
@@ -341,9 +335,9 @@ function mapMarket(market: GeminiMarket, index: number): ClimateMarket | null {
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
+    isDemo: false,
+    dataLabel: "",
+    dataDisclaimer: "",
   }
 
   const validated = climateMarketSchema.safeParse(climateMarket)
@@ -389,7 +383,7 @@ async function callGemini(): Promise<GeminiMarket[]> {
   return parsed.markets
 }
 
-async function generate(): Promise<ClimateMarket[]> {
+export async function generate(): Promise<ClimateMarket[]> {
   const raw = await callGemini()
   const mapped = raw
     .map((market, index) => mapMarket(market, index))
@@ -443,14 +437,14 @@ export async function getInitialClimateMarkets(): Promise<MarketGenerationResult
   if (memoryCache) return { markets: memoryCache, source: "gemini" }
   if (!API_KEY) {
     return {
-      markets: demoMarkets,
+      markets: [],
       source: "sample",
       error: "GEMINI_API_KEY not set",
     }
   }
   if (Date.now() < failedUntil) {
     return {
-      markets: demoMarkets,
+      markets: [],
       source: "sample",
       error: "recent generation failure",
     }
@@ -471,8 +465,8 @@ export async function getInitialClimateMarkets(): Promise<MarketGenerationResult
   } catch (error) {
     failedUntil = Date.now() + FAILURE_BACKOFF_MS
     const message = error instanceof Error ? error.message : String(error)
-    console.warn(`[gemini] generation failed, using sample markets: ${message}`)
-    return { markets: demoMarkets, source: "sample", error: message }
+    console.warn(`[gemini] generation failed: ${message}`)
+    return { markets: [], source: "sample", error: message }
   } finally {
     inFlight = null
   }

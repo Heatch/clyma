@@ -48,9 +48,11 @@ vi.mock("@/lib/db/repositories/transactions", () => ({
   insertTransaction: dbMocks.insertTransaction,
 }))
 
+const DEMO_RESOLUTION_SIGNATURE = "aqcDTRNkJKwcprcwLbCSkXWyUKBXGmYA63iJrEwksaXg5zte76RQ6b2HEXNJp4QQ1tpqWVXaYGtYu2F9mjDuTRM"
+
 interface ErrorBody {
   error: { code: string; message: string }
-  meta: { isDemo: boolean; network: string; dataLabel: string }
+  meta: { network: string }
 }
 
 beforeEach(() => {
@@ -118,7 +120,7 @@ describe("market API routes", () => {
         markets: Array<{ category: string; status: string }>
         total: number
       }
-      meta: { isDemo: boolean; network: string; dataLabel: string }
+      meta: { network: string }
     }
 
     expect(response.status).toBe(200)
@@ -131,9 +133,7 @@ describe("market API routes", () => {
       })
     }
     expect(body.meta).toMatchObject({
-      isDemo: true,
       network: "devnet",
-      dataLabel: "SAMPLE DATA",
     })
     expect(dbMocks.initDb).toHaveBeenCalledOnce()
   })
@@ -146,7 +146,7 @@ describe("market API routes", () => {
 
     expect(response.status).toBe(400)
     expect(body.error.code).toBe("VALIDATION_ERROR")
-    expect(body.meta.isDemo).toBe(true)
+    expect(body.meta.network).toBe("devnet")
     expect(dbMocks.queryMarkets).not.toHaveBeenCalled()
   })
 
@@ -228,8 +228,8 @@ describe("wallet and transaction API routes", () => {
     expect(dbMocks.insertTransaction).not.toHaveBeenCalled()
   })
 
-  it("indexes valid metadata and exposes repository-backed wallet activity", async () => {
-    const signature = demoMarkets[8]!.resolution!.transactionSignature!
+  it("indexes valid metadata idempotently and exposes it in wallet activity", async () => {
+    const signature = DEMO_RESOLUTION_SIGNATURE
     const payload = {
       wallet: DEMO_WALLETS.boreal,
       marketId: "demo-fl-hurricane-2026",

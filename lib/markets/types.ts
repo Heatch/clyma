@@ -37,7 +37,7 @@ export type MarketContinent = (typeof MARKET_CONTINENTS)[number]
 
 export type TradeSide = "yes" | "no"
 
-export type DemoDataLabel = "SAMPLE DATA"
+
 
 export type MarketChainState =
   "demo-only" | "loading" | "synced" | "missing" | "error"
@@ -49,7 +49,7 @@ export interface MarketHistoryPoint {
   totalVolume: number
   yesLiquidity: number
   noLiquidity: number
-  dataLabel: DemoDataLabel
+  dataLabel: string
 }
 
 export type EvidenceKind =
@@ -67,7 +67,7 @@ export interface MarketEvidence {
   url: string
   publishedAt: string
   kind: EvidenceKind
-  isDemo: true
+  isDemo: boolean
 }
 
 export interface MarketTrade {
@@ -81,7 +81,7 @@ export interface MarketTrade {
   wallet: string
   timestamp: string
   transactionSignature?: string
-  isDemo: true
+  isDemo: boolean
 }
 
 export interface MarketResolution {
@@ -135,8 +135,8 @@ export interface ClimateMarket {
   network: "devnet"
   settlementAsset: "SOL"
   marketModel: "pooled-binary"
-  isDemo: true
-  dataLabel: DemoDataLabel
+  isDemo: boolean
+  dataLabel: string
   dataDisclaimer: string
   /** Client-only status for the matching Devnet market PDA. */
   chainState?: MarketChainState
@@ -171,7 +171,7 @@ export interface UserPosition {
   updatedAt: string
   transactionSignature?: string
   network: "devnet"
-  isDemo: true
+  isDemo: boolean
 }
 
 export const ACTIVITY_TYPES = [
@@ -203,7 +203,7 @@ export interface UserActivity {
   timestamp: string
   failureReason?: string
   network: "devnet"
-  isDemo: true
+  isDemo: boolean
 }
 
 export interface IndexedTransactionInput {
@@ -240,6 +240,6 @@ export interface MarketHistoryResult {
   marketId: string
   question: string
   history: MarketHistoryPoint[]
-  isDemo: true
-  dataLabel: DemoDataLabel
+  isDemo: boolean
+  dataLabel: string
 }
