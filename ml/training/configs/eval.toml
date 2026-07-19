@@ -1,0 +1,10 @@
+model = "Qwen/Qwen3.5-4B"
+thinking = false
+adapter = "flash-1784401363-86c3ace7" # This is the GRPO run ID. We can test this once GRPO finishes.
+
+[environment]
+id = "tech-s-cool/climate-market-env"
+
+[eval]
+split = "eval"
+batch_size = 8

@@ -19,3 +19,7 @@ test-ledger/
 /geminitest.py
 DEPLOY-PLAN.md
 diagnose.mjs
+*.txt
+fake_modules/
+ml/dataset/
+

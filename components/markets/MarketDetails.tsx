@@ -6,6 +6,7 @@ import HazardIcon from "@/components/icons/HazardIcon"
 import MarketChart from "@/components/markets/MarketChart"
 import PredictionForm from "@/components/trading/PredictionForm"
 import RedeemPosition from "@/components/trading/RedeemPosition"
+import { useAIForecast } from "@/hooks/useAIForecast"
 import { CATEGORY_LABELS } from "@/lib/markets/categories"
 import type { ClimateMarket } from "@/lib/markets/types"
 import {
@@ -30,11 +31,29 @@ export default function MarketDetails({ market, onBack }: MarketDetailsProps) {
     return () => window.clearInterval(timer)
   }, [])
 
+  const { probability: aiProb } = useAIForecast(
+    market.question,
+    market.resolutionRules
+  )
+
   const currentProbability = market.yesPrice
-  const probabilityChange = useMemo(() => {
-    const first = market.history[0]?.yesProbability ?? currentProbability
-    return (currentProbability - first) * 100
-  }, [currentProbability, market.history])
+
+  const effectiveHistory = useMemo(() => {
+    if (aiProb === null) return market.history
+    return market.history.map((point, index) => {
+      if (index === 0) {
+        return {
+          ...point,
+          yesProbability: aiProb,
+          noProbability: Number((1 - aiProb).toFixed(2)),
+        }
+      }
+      return point
+    })
+  }, [aiProb, market.history])
+
+  const openingProbability = effectiveHistory[0]?.yesProbability ?? currentProbability
+  const probabilityChange = (currentProbability - openingProbability) * 100
   const totalLiquidity = market.yesLiquidity + market.noLiquidity
   const displayQuestion = market.question.replace(/^\[DEMO\]\s*/i, "")
   return (
@@ -156,7 +175,7 @@ export default function MarketDetails({ market, onBack }: MarketDetailsProps) {
           </span>
         </div>
         <div className="mt-2">
-          <MarketChart history={market.history} tone="dark" />
+          <MarketChart history={effectiveHistory} tone="dark" />
         </div>
       </section>
 
