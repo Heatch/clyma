@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="content-type"/>
+<title>Outcome-based Reinforcement Learning to Predict the Future</title>
+<!--Generated on Mon Dec  1 18:10:01 2025 by LaTeXML (version 0.8.8) http://dlmf.nist.gov/LaTeXML/.-->
+<meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport"/>
+<link href="/static/browse/0.3.4/css/arxiv-html-papers-20250916.css" rel="stylesheet" type="text/css"/>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.3.3/html2canvas.min.js"></script>
+<script src="/static/browse/0.3.4/js/addons_new.js"></script>
+<script src="/static/browse/0.3.4/js/feedbackOverlay.js"></script>
+<base href="/html/2505.17989v4/"/></head>
+<body>
+<nav class="ltx_page_navbar">
+<nav class="ltx_TOC">
+<ol class="ltx_toclist">
+<li class="ltx_tocentry ltx_tocentry_section"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S1" title="In Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">1 </span>Introduction</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section">
+<a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2" title="In Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2 </span>Method</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS1" title="In 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.1 </span>Data and Preprocessing</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS2" title="In 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.2 </span>Model</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection">
+<a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS3" title="In 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.3 </span>Reward Design</span></a>
+<ol class="ltx_toclist ltx_toclist_subsection">
+<li class="ltx_tocentry ltx_tocentry_subsubsection">
+<a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS3.SSS1" title="In 2.3 Reward Design ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.3.1 </span>RL Algorithms and Updates</span></a>
+<ol class="ltx_toclist ltx_toclist_subsubsection">
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS3.SSS1.Px1" title="In 2.3.1 RL Algorithms and Updates ‣ 2.3 Reward Design ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title">GRPO</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS3.SSS1.Px2" title="In 2.3.1 RL Algorithms and Updates ‣ 2.3 Reward Design ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title">Modified GRPO</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS3.SSS1.Px3" title="In 2.3.1 RL Algorithms and Updates ‣ 2.3 Reward Design ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title">ReMax</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS3.SSS1.Px4" title="In 2.3.1 RL Algorithms and Updates ‣ 2.3 Reward Design ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title">DPO</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS3.SSS1.Px5" title="In 2.3.1 RL Algorithms and Updates ‣ 2.3 Reward Design ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title">General Remarks and Details</span></a></li>
+</ol>
+</li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_subsection">
+<a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS4" title="In 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.4 </span>Training Protocol and Stability Measures</span></a>
+<ol class="ltx_toclist ltx_toclist_subsection">
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS4.SSS0.Px1" title="In 2.4 Training Protocol and Stability Measures ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title">Online, single-pass training</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS4.SSS0.Px2" title="In 2.4 Training Protocol and Stability Measures ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title">Guard-rails and failure modes</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS4.SSS0.Px3" title="In 2.4 Training Protocol and Stability Measures ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title">Baselines</span></a></li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS5" title="In 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.5 </span>Failure Modes</span></a></li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_section">
+<a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S3" title="In Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3 </span>Results</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S3.SS1" title="In 3 Results ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.1 </span>Training Algorithm Comparisons</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S3.SS2" title="In 3 Results ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2 </span>Hypothetical Trading Evaluation</span></a></li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_section"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S4" title="In Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">4 </span>Conclusion</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S5" title="In Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5 </span>Broader Impact</span></a></li>
+</ol></nav>
+</nav>
+<div class="ltx_page_main">
+<div class="ltx_page_content">
+<article class="ltx_document ltx_authors_1line">
+<div class="ltx_para" id="p1">
+<span class="ltx_ERROR undefined">\CJKencfamily</span>
+<p class="ltx_p">UTF8mc<span class="ltx_ERROR undefined">\CJK@envStart</span>UTF8</p>
+</div>
+<h1 class="ltx_title ltx_title_document">Outcome-based Reinforcement Learning
+<br class="ltx_break"/>to Predict the Future</h1>
+<div class="ltx_authors">
+<span class="ltx_creator ltx_role_author">
+<span class="ltx_personname"><span class="ltx_text ltx_font_bold">Benjamin Turtel</span>
+</span><span class="ltx_author_notes">
+<span class="ltx_contact ltx_role_affiliation">
+</span></span></span>
+<span class="ltx_creator ltx_role_author">
+<span class="ltx_personname"> Danny Franklin
+</span><span class="ltx_author_notes">
+<span class="ltx_contact ltx_role_affiliation">
+</span></span></span>
+<span class="ltx_creator ltx_role_author">
+<span class="ltx_personname"> Kris Skotheim <span class="ltx_text ltx_font_italic" style="font-size:90%;">Lightning Rod Labs  ben@lightningrod.ai </span><span class="ltx_text ltx_font_bold">Luke Hewitt </span><span class="ltx_text ltx_font_italic" style="font-size:90%;">Stanford University  lbh@stanford.edu </span><span class="ltx_text ltx_font_bold">Philipp Schoenegger </span><span class="ltx_text ltx_font_italic" style="font-size:90%;">London School of Economics and Political Science</span>
+</span><span class="ltx_author_notes">
+<span class="ltx_contact ltx_role_affiliation">
+</span></span></span>
+</div>
+<div class="ltx_abstract">
+<h6 class="ltx_title ltx_title_abstract">Abstract</h6>
+<p class="ltx_p">Reinforcement Learning with Verifiable Rewards (RLVR) has been an effective approach for improving Large Language Models’ reasoning in domains such as coding and mathematics. Here, we apply RLVR methods towards forecasting future real-world events – a challenging task for RL due to the very noisy (and delayed) outcomes involved. Using a novel dataset of recent questions from a prediction market, and accompanying relevant news headlines, we show that a compact (14B) reasoning model can be trained to match or surpass the predictive accuracy of frontier models like <span class="ltx_text ltx_font_typewriter">o1</span>, while greatly improving probabilistic calibration. The model’s performance is also practically meaningful: in a Polymarket trading simulation, we estimate that its bets would have yielded a return on investment of over 10% across all questions in the test set. We detail and compare approaches used in training our model, including augmenting our training-data with synthetic prediction questions, guardrails for learning stability, and median prediction sampling at inference-time.<span class="ltx_note ltx_role_footnote" id="footnote1"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_tag ltx_tag_note">1</span>Dataset available at: <span class="ltx_ref ltx_href ltx_ref_self">https://huggingface.co/datasets/LightningRodLabs/outcome-rl-test-dataset</span></span></span></span></p>
+</div>
+<section class="ltx_section" id="S1">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">1 </span>Introduction</h2>
+<div class="ltx_para ltx_noindent" id="S1.p1">
+<p class="ltx_p">Reinforcement learning with verifiable rewards (RLVR) has recently boosted large language model (LLM) performance on benchmarks such as GSM8K, AIME, and MATH <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">zhao2025absolute</span>; <span class="ltx_ref ltx_missing_citation ltx_ref_self">shao2024deepseekmath</span>; <span class="ltx_ref ltx_missing_citation ltx_ref_self">guo2025deepseek</span>; <span class="ltx_ref ltx_missing_citation ltx_ref_self">lambert2024t</span>; <span class="ltx_ref ltx_missing_citation ltx_ref_self">xie2025logic</span>)</cite>.
+RLVR fine-tunes a base model with on-policy reinforcement learning (RL) against objective pass/fail signals, like unit tests or exact numeric solutions <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">liu2023rltf</span>; <span class="ltx_ref ltx_missing_citation ltx_ref_self">su2025expanding</span>)</cite>.
+Complementary self-learning work shows that mixing verifiable non-math corpora into RL pipelines can extend these gains beyond purely symbolic tasks <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">akter2025nemotron</span>)</cite>.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S1.p2">
+<p class="ltx_p">RLVR methods are principally applied to problems whose outcomes are deterministic and instantly verifiable <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">murphy2025rloverview</span>)</cite>. However, in this work we aim to apply RLVR methods to the problem of forecasting world events. This presents a substantial challenge, due to the inherently noisy and delayed outcomes involved: forecasting requires causal inference, trend extrapolation, and well-calibrated probabilities while supplying only sparse, lagged supervision <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">weng2024reward</span>; <span class="ltx_ref ltx_missing_citation ltx_ref_self">qu2025latent</span>)</cite>. Under these conditions, we find that standard GRPO-style updates can drive policies toward extreme overconfidence, gibberish output, or outright training collapse. Adapting RLVR to this setting promises to extend model reasoning ability to an especially demanding domain, potentially unlocking a host of real-world applications.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S1.p3">
+<p class="ltx_p">In this work, we design and empirically validate a stable RL pipeline for probabilistic forecasting.
+On the algorithmic side, we (i) remove per-question standard-deviation scaling from Group Relative Policy Optimisation (GRPO), (ii) switch to baseline-subtracted advantages in <span class="ltx_text ltx_font_smallcaps">ReMax</span> <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">li2023remax</span>)</cite>, and (iii) add lightweight guard-rails, token-length limits, a gibberish filter, and an early-stop criterion, to keep gradients proportional to Brier loss and prevent collapse over more than 100,000 sequential events. On the evaluation side, we collect a novel dataset of 1,265 questions on Polymarket, with accompanying news headlines up to a given prediction date, taking several measures to avoid temporal leakage (a common issue when backtesting the accuracy of forecasting models, see Section <a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.SS1" title="2.1 Data and Preprocessing ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_tag">2.1</span></a>). We assess accuracy with the soft-Brier score and calibration with expected calibration error (ECE). Finally, we quantify economic value by converting each forecast into a set of hypothetical trades and comparing realised profits with those of the frontier reasoning model <span class="ltx_text ltx_font_typewriter">o1</span> as a benchmark.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S1.p4">
+<p class="ltx_p">Overall, we find that on the 1,265-question hold-out set, a seven-run <span class="ltx_text ltx_font_smallcaps">ReMax</span> ensemble attains a Brier of 0.190 [0.178, 0.203] and an ECE of 0.062, meaning it matches or surpasses <span class="ltx_text ltx_font_typewriter">o1</span> in accuracy while markedly improving calibration. In a simulated trading scenario, in which the model places a one-share hypothetical bet on every Polymarket question in the test set, <span class="ltx_text ltx_font_smallcaps">ReMax</span> earns a profit of $52 versus $39 for <span class="ltx_text ltx_font_typewriter">o1</span>.
+Thus, we find that our <span class="ltx_text ltx_font_smallcaps">ReMax ensemble</span> is able to outperform frontier reasoning models in both accuracy and calibration when forecasting future world events, and can leverage this capability to earn meaningful profit in real-money prediction markets.</p>
+</div>
+</section>
+<section class="ltx_section" id="S2">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2 </span>Method</h2>
+<section class="ltx_subsection" id="S2.SS1">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">2.1 </span>Data and Preprocessing</h3>
+<div class="ltx_para ltx_noindent" id="S2.SS1.p1">
+<p class="ltx_p">We begin by collecting an ordered training dataset of 10,000 training questions from Polymarket (yes/no contracts), including creation date, close date, resolution timestamp and final outcome. For each question we draw a single prediction date uniformly at random between its on-chain open and scheduled close. For each question, we use the Exa.ai API to retrieve news headlines from <span class="ltx_text ltx_font_italic">before</span> the sampled prediction date (Exa.ai offers day-level granularity) to include in a model’s prompt. This aims to ensure that the model never sees information in its prompt dated on or after its own forecast.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS1.p2">
+<p class="ltx_p">When developing and evaluating forecasting models, it is critical to avoid sources of ‘temporal leakage’, in which the model is able to use knowledge of future events implicit in its training data or prompt in order to gain an unfair advantage <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">paleka2025pitfalls</span>)</cite>. To construct the test set, we follow the same approach as above, but take a variety of additional steps to minimise the possibility of temporal leakage:</p>
+<ol class="ltx_enumerate" id="S2.I1">
+<li class="ltx_item" id="S2.I1.i1" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">1.</span>
+<div class="ltx_para" id="S2.I1.i1.p1">
+<p class="ltx_p">We construct the test set such that all questions’ prediction-dates occur <span class="ltx_text ltx_font_italic">after</span> the latest resolution date of any training question.</p>
+</div>
+</li>
+<li class="ltx_item" id="S2.I1.i2" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">2.</span>
+<div class="ltx_para" id="S2.I1.i2.p1">
+<p class="ltx_p">Many questions have indeterminate resolution dates (e.g. <span class="ltx_text ltx_font_italic">“Will X happen some time before Y?”</span>), which could reveal information about the future due to selecting on only resolved questions. To address this, we restrict test-set questions to those which were <span class="ltx_text ltx_font_italic">originally scheduled</span> to close by the time of dataset construction.</p>
+</div>
+</li>
+<li class="ltx_item" id="S2.I1.i3" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">3.</span>
+<div class="ltx_para ltx_noindent" id="S2.I1.i3.p1">
+<p class="ltx_p">The Exa.ai API could potentially include errors in the date a given news article was published, allowing future information to leak into the prompt. To address this, we use OpenAI o3 to flag any questions for which the news stories contain relevant information that should not have been known at the prediction date, and exclude these questions from the test set.</p>
+</div>
+</li>
+</ol>
+<p class="ltx_p">In addition, all questions with zero trading volume were excluded from the test set, in order to allow fair comparison with Polymarket forecaster predictions.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS1.p3">
+<p class="ltx_p">Finally, for a second set of experiments, we generate 100,000 additional training questions and answers using Lightning Rod Labs’ proprietary ‘<span class="ltx_text ltx_font_italic">Foresight Learning</span>’ framework. These questions follow a similar format but are created automatically without humans in the loop or labeled data. Foresight Learning creates training instances from streams of data (e.g. news articles) by using a large language model to generate questions that are difficult to predict at one point in time but easier to verify at a later point in time. In the second set of experiments, we use the same 10,000 questions as the initial experiment plus an additional 100,000 generated questions mixed in and time-ordered. We reserved the same held-out test set of 1,265 questions for all models.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS1.p4">
+<p class="ltx_p">Examples of questions included in this test dataset are <span class="ltx_text ltx_font_italic">“Will Apple launch an iPhone SE on February 19?”</span>, <span class="ltx_text ltx_font_italic">“Will the highest temperature in London be between 37-38°F on February 16?”</span>, and <span class="ltx_text ltx_font_italic">“Will Southampton win on 2025-02-25?”</span>. The full dataset (including questions, relevant news headlines to aid prediction, model reasoning traces and predictions, and the true final resolution) is available <a class="ltx_ref ltx_href" href="https://huggingface.co/datasets/LightningRodLabs/outcome-rl-test-dataset" title="">here</a>.</p>
+</div>
+</section>
+<section class="ltx_subsection" id="S2.SS2">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">2.2 </span>Model</h3>
+<div class="ltx_para ltx_noindent" id="S2.SS2.p1">
+<p class="ltx_p">All experiments are conducted with <span class="ltx_text ltx_font_typewriter">DeepSeek-R1-Distill-Qwen-14B</span>, a 14-billion-parameter model initialised from the open-weight <span class="ltx_text ltx_font_typewriter">Qwen 2.5-14B</span> base checkpoint <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">yang2024qwen2</span>)</cite> and further instruction-tuned on the 800k-sample DeepSeek-R1 distilled reasoning corpus <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">zhao20251</span>)</cite>. Our fine-tuning regimes take this as the base model and our analyses compare to this base model as well as other benchmarks and frontier models.</p>
+</div>
+</section>
+<section class="ltx_subsection" id="S2.SS3">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">2.3 </span>Reward Design</h3>
+<div class="ltx_para ltx_noindent" id="S2.SS3.p1">
+<p class="ltx_p">We treat the forecasting task as a sequential decision problem in which the model receives a textual prompt about a future event, outputs a single probability <math alttext="\hat{p}\in[0,1]" class="ltx_Math" display="inline" id="S2.SS3.p1.m1" intent=":literal"><semantics><mrow><mover accent="true"><mi>p</mi><mo>^</mo></mover><mo>∈</mo><mrow><mo stretchy="false">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow></mrow><annotation encoding="application/x-tex">\hat{p}\in[0,1]</annotation></semantics></math> that the event will occur, and subsequently observes the binary outcome <math alttext="y\in\{0,1\}" class="ltx_Math" display="inline" id="S2.SS3.p1.m2" intent=":literal"><semantics><mrow><mi>y</mi><mo>∈</mo><mrow><mo stretchy="false">{</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false">}</mo></mrow></mrow><annotation encoding="application/x-tex">y\in\{0,1\}</annotation></semantics></math>. The episode reward is the (negative) Brier score <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">brier1950verification</span>)</cite></p>
+<table class="ltx_equation ltx_eqn_table" id="S2.Ex1">
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math alttext="R\;=\;-\,(\hat{p}-y)^{2}," class="ltx_Math" display="block" id="S2.Ex1.m1" intent=":literal"><semantics><mrow><mrow><mi>R</mi><mo lspace="0.558em" rspace="0.558em">=</mo><mrow><mo>−</mo><msup><mrow><mo stretchy="false">(</mo><mrow><mover accent="true"><mi>p</mi><mo>^</mo></mover><mo>−</mo><mi>y</mi></mrow><mo stretchy="false">)</mo></mrow><mn>2</mn></msup></mrow></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">R\;=\;-\,(\hat{p}-y)^{2},</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<p class="ltx_p">a strictly proper scoring rule that incentivises calibrated probabilistic forecasts.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS3.p2">
+<p class="ltx_p">Model outputs occasionally fail to parse as a valid probability, for example when the generation omits a numeric answer or when the model fails to answer altogether. During training, we use the following scheme:</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS3.p3">
+<ul class="ltx_itemize" id="S2.I2">
+<li class="ltx_item" id="S2.I2.i1" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span>
+<div class="ltx_para ltx_noindent" id="S2.I2.i1.p1">
+<p class="ltx_p"><span class="ltx_text ltx_font_italic">Strict Brier:</span> assign the maximum Brier loss of <math alttext="1.0" class="ltx_Math" display="inline" id="S2.I2.i1.p1.m1" intent=":literal"><semantics><mn>1.0</mn><annotation encoding="application/x-tex">1.0</annotation></semantics></math>
+(equivalently a training reward <math alttext="R=-1" class="ltx_Math" display="inline" id="S2.I2.i1.p1.m2" intent=":literal"><semantics><mrow><mi>R</mi><mo>=</mo><mrow><mo>−</mo><mn>1</mn></mrow></mrow><annotation encoding="application/x-tex">R=-1</annotation></semantics></math>) whenever the regex fails
+to extract a probability in <math alttext="[0,1]" class="ltx_Math" display="inline" id="S2.I2.i1.p1.m3" intent=":literal"><semantics><mrow><mo stretchy="false">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[0,1]</annotation></semantics></math>.</p>
+</div>
+</li>
+</ul>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS3.p4">
+<p class="ltx_p">For evaluation, we use the following metric that does not penalise misformatting and missing predictions as much:</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS3.p5">
+<ul class="ltx_itemize" id="S2.I3">
+<li class="ltx_item" id="S2.I3.i1" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span>
+<div class="ltx_para ltx_noindent" id="S2.I3.i1.p1">
+<p class="ltx_p"><span class="ltx_text ltx_font_italic">Soft Brier:</span> assign a constant Brier loss of <math alttext="0.25" class="ltx_Math" display="inline" id="S2.I3.i1.p1.m1" intent=":literal"><semantics><mn>0.25</mn><annotation encoding="application/x-tex">0.25</annotation></semantics></math>
+(training reward <math alttext="R=-0.25" class="ltx_Math" display="inline" id="S2.I3.i1.p1.m2" intent=":literal"><semantics><mrow><mi>R</mi><mo>=</mo><mrow><mo>−</mo><mn>0.25</mn></mrow></mrow><annotation encoding="application/x-tex">R=-0.25</annotation></semantics></math>) to any malformed or missing forecast,
+preserving gradient signal while avoiding training collapse.</p>
+</div>
+</li>
+</ul>
+</div>
+<section class="ltx_subsubsection" id="S2.SS3.SSS1">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">2.3.1 </span>RL Algorithms and Updates</h4>
+<div class="ltx_para ltx_noindent" id="S2.SS3.SSS1.p1">
+<p class="ltx_p">We evaluate three on-policy RL algorithms, GRPO, Modified-GRPO and ReMax, and include Direct Preference Optimisation (DPO) as an off-policy baseline.</p>
+</div>
+<section class="ltx_paragraph" id="S2.SS3.SSS1.Px1">
+<h5 class="ltx_title ltx_title_paragraph">GRPO</h5>
+<div class="ltx_para ltx_noindent" id="S2.SS3.SSS1.Px1.p1">
+<p class="ltx_p">First, we test Group Relative Policy Optimization (GRPO) <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">shao2024deepseekmath</span>)</cite>. For each question <math alttext="q" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px1.p1.m1" intent=":literal"><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> we draw <math alttext="G" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px1.p1.m2" intent=":literal"><semantics><mi>G</mi><annotation encoding="application/x-tex">G</annotation></semantics></math> outputs <math alttext="\{o^{1},\dots,o^{G}\}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px1.p1.m3" intent=":literal"><semantics><mrow><mo stretchy="false">{</mo><msup><mi>o</mi><mn>1</mn></msup><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><msup><mi>o</mi><mi>G</mi></msup><mo stretchy="false">}</mo></mrow><annotation encoding="application/x-tex">\{o^{1},\dots,o^{G}\}</annotation></semantics></math> from the old policy <math alttext="\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)" class="ltx_math_unparsed" display="inline" id="S2.SS3.SSS1.Px1.p1.m4" intent=":literal"><semantics><mrow><msub><mi>π</mi><msub><mi>θ</mi><mi>old</mi></msub></msub><mrow><mo stretchy="false">(</mo><mo lspace="0em" rspace="0em">⋅</mo><mo lspace="0em" rspace="0.167em">∣</mo><mi>q</mi><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)</annotation></semantics></math> and assign each output <math alttext="o^{i}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px1.p1.m5" intent=":literal"><semantics><msup><mi>o</mi><mi>i</mi></msup><annotation encoding="application/x-tex">o^{i}</annotation></semantics></math> a scalar reward <math alttext="r^{i}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px1.p1.m6" intent=":literal"><semantics><msup><mi>r</mi><mi>i</mi></msup><annotation encoding="application/x-tex">r^{i}</annotation></semantics></math>. Let</p>
+<table class="ltx_equation ltx_eqn_table" id="S2.Ex2">
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math alttext="\mu=\frac{1}{G}\sum_{i=1}^{G}r^{i},\qquad\sigma=\sqrt{\frac{1}{G}\sum_{i=1}^{G}(r^{i}-\mu)^{2}},\qquad\hat{A}^{i}=\frac{r^{i}-\mu}{\sigma}." class="ltx_Math" display="block" id="S2.Ex2.m1" intent=":literal"><semantics><mrow><mrow><mrow><mi>μ</mi><mo>=</mo><mrow><mfrac><mn>1</mn><mi>G</mi></mfrac><mo lspace="0em" rspace="0em">​</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>G</mi></munderover><msup><mi>r</mi><mi>i</mi></msup></mrow></mrow></mrow><mo rspace="2.167em">,</mo><mrow><mrow><mi>σ</mi><mo>=</mo><msqrt><mrow><mfrac><mn>1</mn><mi>G</mi></mfrac><mo lspace="0em" rspace="0em">​</mo><mrow><munderover><mo movablelimits="false" rspace="0em">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>G</mi></munderover><msup><mrow><mo stretchy="false">(</mo><mrow><msup><mi>r</mi><mi>i</mi></msup><mo>−</mo><mi>μ</mi></mrow><mo stretchy="false">)</mo></mrow><mn>2</mn></msup></mrow></mrow></msqrt></mrow><mo rspace="2.167em">,</mo><mrow><msup><mover accent="true"><mi>A</mi><mo>^</mo></mover><mi>i</mi></msup><mo>=</mo><mfrac><mrow><msup><mi>r</mi><mi>i</mi></msup><mo>−</mo><mi>μ</mi></mrow><mi>σ</mi></mfrac></mrow></mrow></mrow><mo lspace="0em">.</mo></mrow><annotation encoding="application/x-tex">\mu=\frac{1}{G}\sum_{i=1}^{G}r^{i},\qquad\sigma=\sqrt{\frac{1}{G}\sum_{i=1}^{G}(r^{i}-\mu)^{2}},\qquad\hat{A}^{i}=\frac{r^{i}-\mu}{\sigma}.</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<p class="ltx_p">The policy is updated by maximising</p>
+<table class="ltx_equation ltx_eqn_table" id="S2.Ex3">
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math alttext="\mathcal{J}_{\mathrm{GRPO}}(\theta)=\mathbb{E}_{q,\{o^{i}\}}\!\Bigl[\frac{1}{G}\sum_{i=1}^{G}\frac{1}{|o^{i}|}\sum_{t=1}^{|o^{i}|}\min\!\bigl(r_{i,t}\hat{A}^{i},\operatorname{clip}(r_{i,t},1-\varepsilon,1+\varepsilon)\hat{A}^{i}\bigr)-\beta\,D_{\mathrm{KL}}(\pi_{\theta}\!\|\!\pi_{\mathrm{ref}})\Bigr]," class="ltx_Math" display="block" id="S2.Ex3.m1" intent=":literal"><semantics><mrow><mrow><mrow><msub><mi class="ltx_font_mathcaligraphic">𝒥</mi><mi>GRPO</mi></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mi>θ</mi><mo stretchy="false">)</mo></mrow></mrow><mo>=</mo><mrow><msub><mi>𝔼</mi><mrow><mi>q</mi><mo>,</mo><mrow><mo stretchy="false">{</mo><msup><mi>o</mi><mi>i</mi></msup><mo stretchy="false">}</mo></mrow></mrow></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo maxsize="1.600em" minsize="1.600em">[</mo><mrow><mrow><mfrac><mn>1</mn><mi>G</mi></mfrac><mo lspace="0em" rspace="0em">​</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>G</mi></munderover><mrow><mfrac><mn>1</mn><mrow><mo stretchy="false">|</mo><msup><mi>o</mi><mi>i</mi></msup><mo stretchy="false">|</mo></mrow></mfrac><mo lspace="0em" rspace="0em">​</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><mrow><mo stretchy="false">|</mo><msup><mi>o</mi><mi>i</mi></msup><mo stretchy="false">|</mo></mrow></munderover><mrow><mpadded style="width:1.653em;" width="1.653em"><mi>min</mi></mpadded><mo>⁡</mo><mrow><mo maxsize="1.200em" minsize="1.200em">(</mo><mrow><msub><mi>r</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo lspace="0em" rspace="0em">​</mo><msup><mover accent="true"><mi>A</mi><mo>^</mo></mover><mi>i</mi></msup></mrow><mo>,</mo><mrow><mrow><mi>clip</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><msub><mi>r</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>,</mo><mrow><mn>1</mn><mo>−</mo><mi>ε</mi></mrow><mo>,</mo><mrow><mn>1</mn><mo>+</mo><mi>ε</mi></mrow><mo stretchy="false">)</mo></mrow></mrow><mo lspace="0em" rspace="0em">​</mo><msup><mover accent="true"><mi>A</mi><mo>^</mo></mover><mi>i</mi></msup></mrow><mo maxsize="1.200em" minsize="1.200em">)</mo></mrow></mrow></mrow></mrow></mrow></mrow><mo>−</mo><mrow><mi>β</mi><mo lspace="0.170em" rspace="0em">​</mo><msub><mi>D</mi><mi>KL</mi></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mrow><msub><mi>π</mi><mi>θ</mi></msub><mo rspace="0.108em">∥</mo><msub><mi>π</mi><mi>ref</mi></msub></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow><mo maxsize="1.600em" minsize="1.600em">]</mo></mrow></mrow></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">\mathcal{J}_{\mathrm{GRPO}}(\theta)=\mathbb{E}_{q,\{o^{i}\}}\!\Bigl[\frac{1}{G}\sum_{i=1}^{G}\frac{1}{|o^{i}|}\sum_{t=1}^{|o^{i}|}\min\!\bigl(r_{i,t}\hat{A}^{i},\operatorname{clip}(r_{i,t},1-\varepsilon,1+\varepsilon)\hat{A}^{i}\bigr)-\beta\,D_{\mathrm{KL}}(\pi_{\theta}\!\|\!\pi_{\mathrm{ref}})\Bigr],</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<p class="ltx_p">where</p>
+<table class="ltx_equation ltx_eqn_table" id="S2.Ex4">
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math alttext="r_{i,t}=\frac{\pi_{\theta}(o^{i}_{t}\mid q,o^{i}_{&lt;t})}{\pi_{\theta_{\mathrm{old}}}(o^{i}_{t}\mid q,o^{i}_{&lt;t})}," class="ltx_Math" display="block" id="S2.Ex4.m1" intent=":literal"><semantics><mrow><mrow><msub><mi>r</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>=</mo><mfrac><mrow><msub><mi>π</mi><mi>θ</mi></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mrow><msubsup><mi>o</mi><mi>t</mi><mi>i</mi></msubsup><mo>∣</mo><mrow><mi>q</mi><mo>,</mo><msubsup><mi>o</mi><mrow><mi></mi><mo>&lt;</mo><mi>t</mi></mrow><mi>i</mi></msubsup></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow><mrow><msub><mi>π</mi><msub><mi>θ</mi><mi>old</mi></msub></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mrow><msubsup><mi>o</mi><mi>t</mi><mi>i</mi></msubsup><mo>∣</mo><mrow><mi>q</mi><mo>,</mo><msubsup><mi>o</mi><mrow><mi></mi><mo>&lt;</mo><mi>t</mi></mrow><mi>i</mi></msubsup></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow></mfrac></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">r_{i,t}=\frac{\pi_{\theta}(o^{i}_{t}\mid q,o^{i}_{&lt;t})}{\pi_{\theta_{\mathrm{old}}}(o^{i}_{t}\mid q,o^{i}_{&lt;t})},</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<p class="ltx_p"><math alttext="\varepsilon" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px1.p1.m7" intent=":literal"><semantics><mi>ε</mi><annotation encoding="application/x-tex">\varepsilon</annotation></semantics></math> is the clipping threshold, <math alttext="\pi_{\mathrm{ref}}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px1.p1.m8" intent=":literal"><semantics><msub><mi>π</mi><mi>ref</mi></msub><annotation encoding="application/x-tex">\pi_{\mathrm{ref}}</annotation></semantics></math> is the reference policy reset to the current policy at the start of each outer iteration, and <math alttext="\beta" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px1.p1.m9" intent=":literal"><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math> is the KL-penalty coefficient. Normalising by <math alttext="\sigma" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px1.p1.m10" intent=":literal"><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math> stabilises the updates, but can dampen the learning signal when particularly large rewards are important.</p>
+</div>
+</section>
+<section class="ltx_paragraph" id="S2.SS3.SSS1.Px2">
+<h5 class="ltx_title ltx_title_paragraph">Modified GRPO</h5>
+<div class="ltx_para ltx_noindent" id="S2.SS3.SSS1.Px2.p1">
+<p class="ltx_p">Second, we modify the standard GRPO algorithm by removing the standard-deviation division and set <math alttext="\hat{A}^{i}=r^{i}-\mu" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px2.p1.m1" intent=":literal"><semantics><mrow><msup><mover accent="true"><mi>A</mi><mo>^</mo></mover><mi>i</mi></msup><mo>=</mo><mrow><msup><mi>r</mi><mi>i</mi></msup><mo>−</mo><mi>μ</mi></mrow></mrow><annotation encoding="application/x-tex">\hat{A}^{i}=r^{i}-\mu</annotation></semantics></math>. This preserves the raw magnitude of especially large forecast errors, potentially improving the model’s ability to correct extreme miscalibrations. Yet, omitting the normalisation can make optimisation more sensitive to outliers, requiring additional guard-rails to mitigate instability.<span class="ltx_note ltx_role_footnote" id="footnote2"><sup class="ltx_note_mark">2</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">2</sup><span class="ltx_tag ltx_tag_note">2</span>This vulnerability is partly mitigated in our setting because Brier scores are intrinsically bounded in <math alttext="[0,1]" class="ltx_Math" display="inline" id="footnote2.m1" intent=":literal"><semantics><mrow><mo stretchy="false">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[0,1]</annotation></semantics></math>, which caps the variance of individual rewards and makes the absence of per-question normalisation far less destabilising than it would be for tasks with unbounded numeric losses.</span></span></span> This modification parallels the Dr. GRPO method proposed by Liu et al. <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">liu2025drgrpo</span>)</cite>.</p>
+</div>
+</section>
+<section class="ltx_paragraph" id="S2.SS3.SSS1.Px3">
+<h5 class="ltx_title ltx_title_paragraph">ReMax</h5>
+<div class="ltx_para ltx_noindent" id="S2.SS3.SSS1.Px3.p1">
+<p class="ltx_p">Third, we also apply ReMax <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">li2023remax</span>)</cite> by first sampling <math alttext="G" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px3.p1.m1" intent=":literal"><semantics><mi>G</mi><annotation encoding="application/x-tex">G</annotation></semantics></math> outputs <math alttext="\{o^{1},\dots,o^{G}\}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px3.p1.m2" intent=":literal"><semantics><mrow><mo stretchy="false">{</mo><msup><mi>o</mi><mn>1</mn></msup><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><msup><mi>o</mi><mi>G</mi></msup><mo stretchy="false">}</mo></mrow><annotation encoding="application/x-tex">\{o^{1},\dots,o^{G}\}</annotation></semantics></math> from the old policy <math alttext="\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)" class="ltx_math_unparsed" display="inline" id="S2.SS3.SSS1.Px3.p1.m3" intent=":literal"><semantics><mrow><msub><mi>π</mi><msub><mi>θ</mi><mi>old</mi></msub></msub><mrow><mo stretchy="false">(</mo><mo lspace="0em" rspace="0em">⋅</mo><mo lspace="0em" rspace="0.167em">∣</mo><mi>q</mi><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)</annotation></semantics></math>, each with reward <math alttext="r^{i}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px3.p1.m4" intent=":literal"><semantics><msup><mi>r</mi><mi>i</mi></msup><annotation encoding="application/x-tex">r^{i}</annotation></semantics></math>. Let <math alttext="b^{i}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px3.p1.m5" intent=":literal"><semantics><msup><mi>b</mi><mi>i</mi></msup><annotation encoding="application/x-tex">b^{i}</annotation></semantics></math> be a learned baseline for each <math alttext="o^{i}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px3.p1.m6" intent=":literal"><semantics><msup><mi>o</mi><mi>i</mi></msup><annotation encoding="application/x-tex">o^{i}</annotation></semantics></math>. We set the advantage to <math alttext="\hat{A}^{i}=r^{i}-b^{i}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px3.p1.m7" intent=":literal"><semantics><mrow><msup><mover accent="true"><mi>A</mi><mo>^</mo></mover><mi>i</mi></msup><mo>=</mo><mrow><msup><mi>r</mi><mi>i</mi></msup><mo>−</mo><msup><mi>b</mi><mi>i</mi></msup></mrow></mrow><annotation encoding="application/x-tex">\hat{A}^{i}=r^{i}-b^{i}</annotation></semantics></math>, removing the need to divide by a standard deviation. The policy is then updated by maximising</p>
+<table class="ltx_equation ltx_eqn_table" id="S2.Ex5">
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math alttext="\mathcal{J}_{\mathrm{ReMax}}(\theta)=\mathbb{E}_{q,\{o^{i}\}}\!\Bigl[\tfrac{1}{G}\sum_{i=1}^{G}\hat{A}^{i}\sum_{t=1}^{|o^{i}|}\log\pi_{\theta}(o^{i}_{t}\mid q,o^{i}_{&lt;t})-\beta\,D_{\mathrm{KL}}(\pi_{\theta}\!\|\!\pi_{\mathrm{ref}})\Bigr]," class="ltx_Math" display="block" id="S2.Ex5.m1" intent=":literal"><semantics><mrow><mrow><mrow><msub><mi class="ltx_font_mathcaligraphic">𝒥</mi><mi>ReMax</mi></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mi>θ</mi><mo stretchy="false">)</mo></mrow></mrow><mo>=</mo><mrow><msub><mi>𝔼</mi><mrow><mi>q</mi><mo>,</mo><mrow><mo stretchy="false">{</mo><msup><mi>o</mi><mi>i</mi></msup><mo stretchy="false">}</mo></mrow></mrow></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo maxsize="1.600em" minsize="1.600em">[</mo><mrow><mrow><mstyle displaystyle="false"><mfrac><mn>1</mn><mi>G</mi></mfrac></mstyle><mo lspace="0em" rspace="0em">​</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>G</mi></munderover><mrow><msup><mover accent="true"><mi>A</mi><mo>^</mo></mover><mi>i</mi></msup><mo lspace="0em" rspace="0em">​</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><mrow><mo stretchy="false">|</mo><msup><mi>o</mi><mi>i</mi></msup><mo stretchy="false">|</mo></mrow></munderover><mrow><mrow><mi>log</mi><mo lspace="0.167em">⁡</mo><msub><mi>π</mi><mi>θ</mi></msub></mrow><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mrow><msubsup><mi>o</mi><mi>t</mi><mi>i</mi></msubsup><mo>∣</mo><mrow><mi>q</mi><mo>,</mo><msubsup><mi>o</mi><mrow><mi></mi><mo>&lt;</mo><mi>t</mi></mrow><mi>i</mi></msubsup></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow></mrow></mrow></mrow><mo>−</mo><mrow><mi>β</mi><mo lspace="0.170em" rspace="0em">​</mo><msub><mi>D</mi><mi>KL</mi></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mrow><msub><mi>π</mi><mi>θ</mi></msub><mo rspace="0.108em">∥</mo><msub><mi>π</mi><mi>ref</mi></msub></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow><mo maxsize="1.600em" minsize="1.600em">]</mo></mrow></mrow></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">\mathcal{J}_{\mathrm{ReMax}}(\theta)=\mathbb{E}_{q,\{o^{i}\}}\!\Bigl[\tfrac{1}{G}\sum_{i=1}^{G}\hat{A}^{i}\sum_{t=1}^{|o^{i}|}\log\pi_{\theta}(o^{i}_{t}\mid q,o^{i}_{&lt;t})-\beta\,D_{\mathrm{KL}}(\pi_{\theta}\!\|\!\pi_{\mathrm{ref}})\Bigr],</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<p class="ltx_p">where <math alttext="\beta" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px3.p1.m8" intent=":literal"><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math> balances a KL penalty term. Subtracting a baseline in lieu of variance normalisation often better preserves large reward signals.</p>
+</div>
+</section>
+<section class="ltx_paragraph" id="S2.SS3.SSS1.Px4">
+<h5 class="ltx_title ltx_title_paragraph">DPO</h5>
+<div class="ltx_para ltx_noindent" id="S2.SS3.SSS1.Px4.p1">
+<p class="ltx_p">Lastly, we also test Direct Preference Optimization <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">rafailov2023direct</span>)</cite>, a direct preference-based approach. This method has shown strong performance on QA tasks as well as forecasting tasks <cite class="ltx_cite ltx_citemacro_citep">(<span class="ltx_ref ltx_missing_citation ltx_ref_self">turtel2025llms</span>)</cite> and functions as a baseline for some of our analyses.</p>
+</div>
+</section>
+<section class="ltx_paragraph" id="S2.SS3.SSS1.Px5">
+<h5 class="ltx_title ltx_title_paragraph">General Remarks and Details</h5>
+<div class="ltx_para ltx_noindent" id="S2.SS3.SSS1.Px5.p1">
+<p class="ltx_p">In our forecasting context, normalising each question’s rewards by their standard deviation (as in standard GRPO) can excessively dampen large errors and encourage overconfidence: per-question normalisation flattens the reward distribution and erases the natural asymmetry whereby modest gains accrue from correct but overconfident predictions, while rare mis-predictions incur disproportionately large penalties, the very signal the model needs to learn proper calibration. By removing per-question normalisation (Modified GRPO) or using ReMax’s baseline-based approach, we better preserves the impact of large deviations, improving calibration when probabilistic forecasts deviate significantly from eventual outcomes.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS3.SSS1.Px5.p2">
+<p class="ltx_p">Across algorithms we keep the optimisation scaffold identical: AdamW (<math alttext="\beta_{1}=0.9" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m1" intent=":literal"><semantics><mrow><msub><mi>β</mi><mn>1</mn></msub><mo>=</mo><mn>0.9</mn></mrow><annotation encoding="application/x-tex">\beta_{1}=0.9</annotation></semantics></math>, <math alttext="\beta_{2}=0.999" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m2" intent=":literal"><semantics><mrow><msub><mi>β</mi><mn>2</mn></msub><mo>=</mo><mn>0.999</mn></mrow><annotation encoding="application/x-tex">\beta_{2}=0.999</annotation></semantics></math>, <math alttext="\epsilon=1\times 10^{-8}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m3" intent=":literal"><semantics><mrow><mi>ϵ</mi><mo>=</mo><mrow><mn>1</mn><mo lspace="0.222em" rspace="0.222em">×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>8</mn></mrow></msup></mrow></mrow><annotation encoding="application/x-tex">\epsilon=1\times 10^{-8}</annotation></semantics></math>, no weight decay), <span class="ltx_text ltx_font_typewriter">bfloat16</span> precision, global grad-norm clip <math alttext="1.0" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m4" intent=":literal"><semantics><mn>1.0</mn><annotation encoding="application/x-tex">1.0</annotation></semantics></math>, and an entropy bonus coefficient of <math alttext="0.001" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m5" intent=":literal"><semantics><mn>0.001</mn><annotation encoding="application/x-tex">0.001</annotation></semantics></math>. We modify only the levers each method cares about. GRPO uses an actor learning rate of <math alttext="1\times 10^{-6}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m6" intent=":literal"><semantics><mrow><mn>1</mn><mo lspace="0.222em" rspace="0.222em">×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>6</mn></mrow></msup></mrow><annotation encoding="application/x-tex">1\times 10^{-6}</annotation></semantics></math>, an initial KL penalty of <math alttext="0.005" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m7" intent=":literal"><semantics><mn>0.005</mn><annotation encoding="application/x-tex">0.005</annotation></semantics></math>, PPO ratio-clip <math alttext="\epsilon=0.20" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m8" intent=":literal"><semantics><mrow><mi>ϵ</mi><mo>=</mo><mn>0.20</mn></mrow><annotation encoding="application/x-tex">\epsilon=0.20</annotation></semantics></math>, and <math alttext="G=4" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m9" intent=":literal"><semantics><mrow><mi>G</mi><mo>=</mo><mn>4</mn></mrow><annotation encoding="application/x-tex">G=4</annotation></semantics></math> roll-outs per prompt; Modified-GRPO is identical except that it drops the <math alttext="\sigma" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m10" intent=":literal"><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math> division in the advantage to isolate the effect of normalisation. ReMax doubles the actor learning rate to <math alttext="2\times 10^{-6}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m11" intent=":literal"><semantics><mrow><mn>2</mn><mo lspace="0.222em" rspace="0.222em">×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>6</mn></mrow></msup></mrow><annotation encoding="application/x-tex">2\times 10^{-6}</annotation></semantics></math>, keeps the KL schedule unchanged, and trains its learned value baseline with <math alttext="1\times 10^{-6}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m12" intent=":literal"><semantics><mrow><mn>1</mn><mo lspace="0.222em" rspace="0.222em">×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>6</mn></mrow></msup></mrow><annotation encoding="application/x-tex">1\times 10^{-6}</annotation></semantics></math> under an MSE loss scaled by <math alttext="0.5" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m13" intent=":literal"><semantics><mn>0.5</mn><annotation encoding="application/x-tex">0.5</annotation></semantics></math>. DPO is run for <math alttext="4" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m14" intent=":literal"><semantics><mn>4</mn><annotation encoding="application/x-tex">4</annotation></semantics></math> epochs at <math alttext="\beta=0.1" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m15" intent=":literal"><semantics><mrow><mi>β</mi><mo>=</mo><mn>0.1</mn></mrow><annotation encoding="application/x-tex">\beta=0.1</annotation></semantics></math> with a constant <math alttext="1\times 10^{-5}" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m16" intent=":literal"><semantics><mrow><mn>1</mn><mo lspace="0.222em" rspace="0.222em">×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>5</mn></mrow></msup></mrow><annotation encoding="application/x-tex">1\times 10^{-5}</annotation></semantics></math> learning rate and a batch size of <math alttext="128" class="ltx_Math" display="inline" id="S2.SS3.SSS1.Px5.p2.m17" intent=":literal"><semantics><mn>128</mn><annotation encoding="application/x-tex">128</annotation></semantics></math> sequences. All runs employ automatic mixed precision and gradient accumulation to emulate two sequences per GPU.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS3.SSS1.Px5.p3">
+<p class="ltx_p">All experiments ran on a single 8-GPU node. The GRPO (10k), <span class="ltx_text ltx_font_smallcaps">ReMax</span>, Modified-GRPO, DPO, and the large-scale GRPO-100k run used eight NVIDIA H100 GPUs, for approximately three days. This computational requirement is a substantial constraint for individuals, but is nonetheless a realistic resource available for many computational researchers at academic institutions.</p>
+</div>
+</section>
+</section>
+</section>
+<section class="ltx_subsection" id="S2.SS4">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">2.4 </span>Training Protocol and Stability Measures</h3>
+<section class="ltx_paragraph" id="S2.SS4.SSS0.Px1">
+<h5 class="ltx_title ltx_font_bold ltx_title_paragraph">Online, single-pass training</h5>
+<div class="ltx_para ltx_noindent" id="S2.SS4.SSS0.Px1.p1">
+<p class="ltx_p">All on-policy algorithms (GRPO, Modified-GRPO, <span class="ltx_text ltx_font_smallcaps">ReMax</span>) are trained strictly online: each question is encountered only once in chronological order, and its outcome is revealed immediately after the event date. We do not perform multiple epochs, as re-exposing the model to past questions after outcomes are known leads to severe over-fitting (the model essentially “learns the future” on subsequent epochs).</p>
+</div>
+</section>
+<section class="ltx_paragraph" id="S2.SS4.SSS0.Px2">
+<h5 class="ltx_title ltx_font_bold ltx_title_paragraph">Guard-rails and failure modes</h5>
+<div class="ltx_para ltx_noindent" id="S2.SS4.SSS0.Px2.p1">
+<p class="ltx_p">Scaling the training to 100k questions introduces stability challenges, particularly related to <em class="ltx_emph ltx_font_italic">overconfidence</em>, where some models drift toward 0% or 100% forecasts when per-question reward normalisation is used, and the generation of <em class="ltx_emph ltx_font_italic">invalid text or gibberish</em>, where large, noisy datasets can push the policy to produce nonsensical or non-English text. This happens especially when reward gradients fail to distinguish valid forecasts from invalid ones.
+To maintain stable training at scale, we use a scorer that deducts reward whenever a response violates any of three checks: it flags out-of-context non-English passages, nonsense or random character strings, and the absence of an explanation for the final answer inside a <code class="ltx_verbatim ltx_font_typewriter">&lt;think&gt;...&lt;/think&gt;</code> block. During evaluation the scorer sets the Boolean fields
+<span class="ltx_text ltx_font_typewriter">contains_non_english</span>,
+<span class="ltx_text ltx_font_typewriter">contains_gibberish</span>,
+and <span class="ltx_text ltx_font_typewriter">explains_answer</span> and records the continuous
+estimates
+<math alttext="\mathrm{non\allowbreak\_english\allowbreak\_proportion}" class="ltx_Math" display="inline" id="S2.SS4.SSS0.Px2.p1.m1" intent=":literal"><semantics><mrow><mi>non</mi><mo lspace="0em" rspace="0em">​</mo><mi mathvariant="normal">_</mi><mo lspace="0em" rspace="0em">​</mo><mi>english</mi><mo lspace="0em" rspace="0em">​</mo><mi mathvariant="normal">_</mi><mo lspace="0em" rspace="0em">​</mo><mi>proportion</mi></mrow><annotation encoding="application/x-tex">\mathrm{non\allowbreak\_english\allowbreak\_proportion}</annotation></semantics></math>,
+<math alttext="\mathrm{gibberish\allowbreak\_proportion}" class="ltx_Math" display="inline" id="S2.SS4.SSS0.Px2.p1.m2" intent=":literal"><semantics><mrow><mi>gibberish</mi><mo lspace="0em" rspace="0em">​</mo><mi mathvariant="normal">_</mi><mo lspace="0em" rspace="0em">​</mo><mi>proportion</mi></mrow><annotation encoding="application/x-tex">\mathrm{gibberish\allowbreak\_proportion}</annotation></semantics></math>,
+and <math alttext="\mathrm{explanation\allowbreak\_quality}" class="ltx_Math" display="inline" id="S2.SS4.SSS0.Px2.p1.m3" intent=":literal"><semantics><mrow><mi>explanation</mi><mo lspace="0em" rspace="0em">​</mo><mi mathvariant="normal">_</mi><mo lspace="0em" rspace="0em">​</mo><mi>quality</mi></mrow><annotation encoding="application/x-tex">\mathrm{explanation\allowbreak\_quality}</annotation></semantics></math> (each in <math alttext="[0,1]" class="ltx_Math" display="inline" id="S2.SS4.SSS0.Px2.p1.m4" intent=":literal"><semantics><mrow><mo stretchy="false">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[0,1]</annotation></semantics></math>).
+The downstream reward subtracts penalties such as <math alttext="\lambda_{\mathrm{lang}}\times\mathrm{non\_english\_proportion}" class="ltx_Math" display="inline" id="S2.SS4.SSS0.Px2.p1.m5" intent=":literal"><semantics><mrow><mrow><msub><mi>λ</mi><mi>lang</mi></msub><mo lspace="0.222em" rspace="0.222em">×</mo><mi>non</mi></mrow><mo lspace="0em" rspace="0em">​</mo><mi mathvariant="normal">_</mi><mo lspace="0em" rspace="0em">​</mo><mi>english</mi><mo lspace="0em" rspace="0em">​</mo><mi mathvariant="normal">_</mi><mo lspace="0em" rspace="0em">​</mo><mi>proportion</mi></mrow><annotation encoding="application/x-tex">\lambda_{\mathrm{lang}}\times\mathrm{non\_english\_proportion}</annotation></semantics></math> and <math alttext="\lambda_{\mathrm{gib}}\times\mathrm{gibberish\_proportion}" class="ltx_Math" display="inline" id="S2.SS4.SSS0.Px2.p1.m6" intent=":literal"><semantics><mrow><mrow><msub><mi>λ</mi><mi>gib</mi></msub><mo lspace="0.222em" rspace="0.222em">×</mo><mi>gibberish</mi></mrow><mo lspace="0em" rspace="0em">​</mo><mi mathvariant="normal">_</mi><mo lspace="0em" rspace="0em">​</mo><mi>proportion</mi></mrow><annotation encoding="application/x-tex">\lambda_{\mathrm{gib}}\times\mathrm{gibberish\_proportion}</annotation></semantics></math>, applies a fixed penalty <math alttext="\lambda_{\mathrm{miss}}" class="ltx_Math" display="inline" id="S2.SS4.SSS0.Px2.p1.m7" intent=":literal"><semantics><msub><mi>λ</mi><mi>miss</mi></msub><annotation encoding="application/x-tex">\lambda_{\mathrm{miss}}</annotation></semantics></math> when <span class="ltx_text ltx_font_typewriter">explains_answer</span> is <span class="ltx_text ltx_font_typewriter">false</span>, and can add up to <math alttext="\lambda_{\mathrm{exp}}\times\mathrm{explanation\_quality}" class="ltx_Math" display="inline" id="S2.SS4.SSS0.Px2.p1.m8" intent=":literal"><semantics><mrow><mrow><msub><mi>λ</mi><mi>exp</mi></msub><mo lspace="0.222em" rspace="0.222em">×</mo><mi>explanation</mi></mrow><mo lspace="0em" rspace="0em">​</mo><mi mathvariant="normal">_</mi><mo lspace="0em" rspace="0em">​</mo><mi>quality</mi></mrow><annotation encoding="application/x-tex">\lambda_{\mathrm{exp}}\times\mathrm{explanation\_quality}</annotation></semantics></math> when a rationale is present. The routine also hard-truncates any input beyond 16 000 characters to keep evaluation stable, and its Pydantic schema validation guarantees that any formatting error or missing key zeroes the reward.</p>
+</div>
+</section>
+<section class="ltx_paragraph" id="S2.SS4.SSS0.Px3">
+<h5 class="ltx_title ltx_font_bold ltx_title_paragraph">Baselines</h5>
+<div class="ltx_para ltx_noindent" id="S2.SS4.SSS0.Px3.p1">
+<p class="ltx_p">While our primary focus is on comparing the four RL algorithms, we also benchmark forecasts against two additional references:</p>
+<ol class="ltx_enumerate" id="S2.I4">
+<li class="ltx_item" id="S2.I4.i1" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">1.</span>
+<div class="ltx_para" id="S2.I4.i1.p1">
+<p class="ltx_p"><span class="ltx_text ltx_font_bold">OpenAI’s o1</span>, prompted with the same question text, to assess performance against a frontier reasoning model.</p>
+</div>
+</li>
+<li class="ltx_item" id="S2.I4.i2" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">2.</span>
+<div class="ltx_para ltx_noindent" id="S2.I4.i2.p1">
+<p class="ltx_p"><span class="ltx_text ltx_font_bold">Market prices (Polymarket)</span>, the market’s implicit probability at the time each question was asked. For every test question, the Polymarket price is sampled at precisely the same timestamp used for the prompt cut-off, yielding a strictly contemporaneous benchmark.</p>
+</div>
+</li>
+</ol>
+<p class="ltx_p">These baselines indicate how our RL-trained models perform relative to both a state-of-the-art commercial LLM and a real-world prediction market.</p>
+</div>
+</section>
+</section>
+<section class="ltx_subsection" id="S2.SS5">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">2.5 </span>Failure Modes</h3>
+<div class="ltx_para ltx_noindent" id="S2.SS5.p1">
+<p class="ltx_p">We observed a set of different failure modes. For example, in the model trained with GRPO without any guardrails, we find that the model sometimes assigns a probability of 0 to outcomes that are not impossible but rather unlikely. Assigning a probability of 0 is not something a capable forecaster would do and should be avoided by forecasting models. For example, in response to the question “Will Trump say “Ukraine” 20+ times during Macron presser today?”, the model outputs</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS5.p2">
+<blockquote class="ltx_quote">
+<p class="ltx_p">[…] In conclusion, while Ukraine will definitely be a topic, the number of mentions reaching 20 is astronomically low. Even if every statement and answer included "Ukraine," it’s improbable to reach that number. Therefore, my estimate is that the probability is extremely low, almost zero. <code class="ltx_verbatim ltx_font_typewriter">&lt;/think&gt;</code> <em class="ltx_emph ltx_font_italic">*0.000*</em>.</p>
+</blockquote>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS5.p3">
+<p class="ltx_p">Similarly, the model shows this overconfidence also on the other end of the probability spectrum. While acknowledging that it may have misunderstood something, it assigns probability of 1 to questions that the model itself is somewhat unsure about: “Therefore, unless I’m missing something, the probability is 1.” Overall, this model has 39.3% of predictions in either the 0–10% or the 90–100% bucket, with many landing exactly on 0 and 1, which shows a prevalence for very high or low probabilities.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS5.p4">
+<p class="ltx_p">Using our Modified GRPO approach, again without any guardrails, we do find that the model is more likely to avoid the extreme overconfidence of the standard GRPO approach, with only a total of 7.9% of predictions landing in either of the extreme buckets. However, we do observe a different failure mode. Some of the answers show language switching between Chinese and English within an output, “Alright, so I need to预测 Patrick Mahomes 在超级碗 LXIX 中是否会 rush 30+码，结果以超过30码为<span class="ltx_ERROR undefined">\CJK@punctchar</span><span class="ltx_ERROR undefined">\CJK@uniPunct</span>0"80"9COver<span class="ltx_ERROR undefined">\CJK@punctchar</span><span class="ltx_ERROR undefined">\CJK@uniPunct</span>0"80"9D，否则为<span class="ltx_ERROR undefined">\CJK@punctchar</span><span class="ltx_ERROR undefined">\CJK@uniPunct</span>0"80"9CUnder<span class="ltx_ERROR undefined">\CJK@punctchar</span><span class="ltx_ERROR undefined">\CJK@uniPunct</span>0"80"9D。首先，我会回顾提供的新闻和背景信息，找出相关数据和趋势”, while others show partial segments of ungrammatical phrases and gibberish, such as “Next, I look at the …think that would happen in this interview,” “I s…,” “Lamar Jac…that,” and “They talk about the theme, ticket distribution, and guests, but t…that they’re involved.”</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S2.SS5.p5">
+<p class="ltx_p">When training the model with our set of guardrails in place on the 100k data set, both types of failure modes are less pronounced. For example, 13.1% of predictions fell into the 0–10% and 90–100% buckets, with many forecasts that were close to 0% now having values that are greater than 0. Similarly, gibberish responses are less likely, though some ungrammatical phrases and elisions remain, such as in “Looking a…ould impact the price.”</p>
+</div>
+<figure class="ltx_figure" id="S2.F1"><img alt="Refer to caption" class="ltx_graphics ltx_centering ltx_img_landscape" height="355" id="S2.F1.g1" src="algorithm_comparison.png" width="598"/>
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Figure 1: </span>Mean soft-Brier score (accuracy, left) and mean expected calibration error (ECE, right) for each training algorithm on the Polymarket hold-out set. Error bars show <math alttext="95\%" class="ltx_Math" display="inline" id="S2.F1.m2" intent=":literal"><semantics><mrow><mn>95</mn><mo>%</mo></mrow><annotation encoding="application/x-tex">95\%</annotation></semantics></math> confidence intervals. Lower values are better on both axes.</figcaption>
+</figure>
+</section>
+</section>
+<section class="ltx_section" id="S3">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">3 </span>Results</h2>
+<section class="ltx_subsection" id="S3.SS1">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.1 </span>Training Algorithm Comparisons</h3>
+<div class="ltx_para ltx_noindent" id="S3.SS1.p1">
+<p class="ltx_p">We measure predictive accuracy with the <em class="ltx_emph">soft-Brier score</em>, defined as the squared error <math alttext="(\hat{p}-y)^{2}" class="ltx_Math" display="inline" id="S3.SS1.p1.m1" intent=":literal"><semantics><msup><mrow><mo stretchy="false">(</mo><mrow><mover accent="true"><mi>p</mi><mo>^</mo></mover><mo>−</mo><mi>y</mi></mrow><mo stretchy="false">)</mo></mrow><mn>2</mn></msup><annotation encoding="application/x-tex">(\hat{p}-y)^{2}</annotation></semantics></math> averaged over all 1,265 questions but assigning a soft penalty of <math alttext="0.25" class="ltx_Math" display="inline" id="S3.SS1.p1.m2" intent=":literal"><semantics><mn>0.25</mn><annotation encoding="application/x-tex">0.25</annotation></semantics></math> whenever a model fails to produce a parseable probability. A score of 0.25 is equivalent to guessing 50% on a question, and thus functions as a suitable stand-in for failed responses. For calibration, we use the <em class="ltx_emph ltx_font_italic">expected calibration error</em> (ECE) computed in ten equal-mass probability bins. For both accuracy and calibration, lower scores indicate higher accuracy and better calibration respectively. All statistics are paired across the identical question set; confidence intervals (CI) are two-sided <math alttext="95\%" class="ltx_Math" display="inline" id="S3.SS1.p1.m3" intent=":literal"><semantics><mrow><mn>95</mn><mo>%</mo></mrow><annotation encoding="application/x-tex">95\%</annotation></semantics></math> Wald intervals for Brier and bootstrap intervals for ECE unless specified otherwise; every <math alttext="p" class="ltx_Math" display="inline" id="S3.SS1.p1.m4" intent=":literal"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math>-value reported below is two-sided.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S3.SS1.p2">
+<p class="ltx_p">As shown in Figure <a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S2.F1" title="Figure 1 ‣ 2.5 Failure Modes ‣ 2 Method ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_tag">1</span></a>, among the 10k-trained models, the model optimized using ReMax was most accurate, with a soft-Brier score of 0.199 [0.187, 0.211]. This model also achieved the best probabilistic calibration, with an expected calibration error of 0.067 [0.047, 0.087].
+In our follow-up experiment - scaling ReMax to the 100k Lightning corpus, and ensembling the predictions across 7 samples, achieved a Brier score of 0.190 [0.178, 0.203] and an ECE of 0.062 [0.041,0.082].
+</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S3.SS1.p3">
+<p class="ltx_p">Table <a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S3.T1" title="Table 1 ‣ 3.1 Training Algorithm Comparisons ‣ 3 Results ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_tag">1</span></a> reports mean soft-Brier score and ECE for the 7-run ReMax ensemble and Modified-GRPO (both trained on the 100k corpus), compared to both frontier and human baselines. While no models achieved the same accuracy as human forecasters on Polymarket, we find that the most effective finetuned model (Remax, Ensemble-7) was nonetheless significantly more accurate than OpenAI o1, despite being likely 1-2 orders of magnitude smaller in parameter count.</p>
+</div>
+<figure class="ltx_table" id="S3.T1">
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_table">Table 1: </span>Accuracy summary and pair-wise tests (1 265 questions).</figcaption><div class="ltx_flex_figure">
+<div class="ltx_flex_cell ltx_flex_size_1">
+<table class="ltx_tabular ltx_centering ltx_figure_panel ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_left ltx_th ltx_th_column ltx_th_row ltx_border_tt" rowspan="2">Model</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_tt" colspan="2">Descriptive means</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_tt" colspan="3">Brier difference (<math alttext="\Delta" class="ltx_Math" display="inline" id="S3.T1.m1" intent=":literal"><semantics><mi mathvariant="normal">Δ</mi><annotation encoding="application/x-tex">\Delta</annotation></semantics></math> vs.)</th>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_t">Soft-Brier</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_t">ECE</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_t">Base</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_t"><span class="ltx_text ltx_font_typewriter">o1</span></th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_t">Market</th>
+</tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_left ltx_th ltx_th_row ltx_border_t">DeepSeek-R1 14B</th>
+<td class="ltx_td ltx_align_center ltx_border_t">0.215</td>
+<td class="ltx_td ltx_align_center ltx_border_t">0.089</td>
+<td class="ltx_td ltx_align_center ltx_border_t">–</td>
+<td class="ltx_td ltx_align_center ltx_border_t">+0.013**</td>
+<td class="ltx_td ltx_align_center ltx_border_t">+0.064***</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_left ltx_th ltx_th_row">ReMax, Ensemble-7</th>
+<td class="ltx_td ltx_align_center">0.190</td>
+<td class="ltx_td ltx_align_center">0.062</td>
+<td class="ltx_td ltx_align_center">-0.025***</td>
+<td class="ltx_td ltx_align_center">-0.011*</td>
+<td class="ltx_td ltx_align_center">+0.039***</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_left ltx_th ltx_th_row">Modified-GRPO</th>
+<td class="ltx_td ltx_align_center">0.192</td>
+<td class="ltx_td ltx_align_center">0.054</td>
+<td class="ltx_td ltx_align_center">-0.023***</td>
+<td class="ltx_td ltx_align_center">-0.010</td>
+<td class="ltx_td ltx_align_center">+0.041***</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_left ltx_th ltx_th_row">OpenAI <span class="ltx_text ltx_font_typewriter">o1</span>
+</th>
+<td class="ltx_td ltx_align_center">0.202</td>
+<td class="ltx_td ltx_align_center">0.093</td>
+<td class="ltx_td ltx_align_center">-0.013**</td>
+<td class="ltx_td ltx_align_center">–</td>
+<td class="ltx_td ltx_align_center">+0.051***</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_left ltx_th ltx_th_row ltx_border_bb">Polymarket</th>
+<td class="ltx_td ltx_align_center ltx_border_bb">0.151</td>
+<td class="ltx_td ltx_align_center ltx_border_bb">0.043</td>
+<td class="ltx_td ltx_align_center ltx_border_bb">-0.064***</td>
+<td class="ltx_td ltx_align_center ltx_border_bb">-0.051***</td>
+<td class="ltx_td ltx_align_center ltx_border_bb">–</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="ltx_flex_break"></div>
+<div class="ltx_flex_cell ltx_flex_size_1">
+<p class="ltx_p ltx_figure_panel ltx_align_center"><span class="ltx_text" style="font-size:80%;">Soft-Brier and ECE are means across questions; lower is better.
+Differences are (model – reference).
+Stars mark two-sided <math alttext="p" class="ltx_Math" display="inline" id="S3.T1.m2" intent=":literal"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math>-values for the corresponding pair-wise tests
+(<math alttext="*" class="ltx_Math" display="inline" id="S3.T1.m3" intent=":literal"><semantics><mo>∗</mo><annotation encoding="application/x-tex">*</annotation></semantics></math><math alttext="&lt;0.05" class="ltx_Math" display="inline" id="S3.T1.m4" intent=":literal"><semantics><mrow><mi></mi><mo>&lt;</mo><mn>0.05</mn></mrow><annotation encoding="application/x-tex">&lt;0.05</annotation></semantics></math>, <math alttext="**" class="ltx_Math" display="inline" id="S3.T1.m5" intent=":literal"><semantics><mrow><mo>∗</mo><mo lspace="0em">⁣</mo><mo>∗</mo></mrow><annotation encoding="application/x-tex">**</annotation></semantics></math><math alttext="&lt;0.01" class="ltx_Math" display="inline" id="S3.T1.m6" intent=":literal"><semantics><mrow><mi></mi><mo>&lt;</mo><mn>0.01</mn></mrow><annotation encoding="application/x-tex">&lt;0.01</annotation></semantics></math>, <math alttext="***" class="ltx_Math" display="inline" id="S3.T1.m7" intent=":literal"><semantics><mrow><mo>∗</mo><mo lspace="0em">⁣</mo><mo>∗</mo><mo lspace="0em">⁣</mo><mo>∗</mo></mrow><annotation encoding="application/x-tex">***</annotation></semantics></math><math alttext="&lt;0.001" class="ltx_Math" display="inline" id="S3.T1.m8" intent=":literal"><semantics><mrow><mi></mi><mo>&lt;</mo><mn>0.001</mn></mrow><annotation encoding="application/x-tex">&lt;0.001</annotation></semantics></math>).</span></p>
+</div>
+</div>
+</figure>
+</section>
+<section class="ltx_subsection" id="S3.SS2">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.2 </span>Hypothetical Trading Evaluation</h3>
+<div class="ltx_para ltx_noindent" id="S3.SS2.p1">
+<p class="ltx_p">While no model was alone able to achieve a lower Brier score than Polymarket itself, a model’s predictions may nonetheless contain incremental information beyond what is captured by the market price. To provide another test of each model’s value in aiding human prediction, we conduct a simulation analysis in which each model is used to place hypothetical one-share ‘bets’ on all questions in the test set. We then calculate the profit or loss that these bets would have returned on Polymarket.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S3.SS2.p2">
+<p class="ltx_p">For this simulation, we first convert every probability into a one-share trade against the contemporaneous Polymarket price. On Polymarket, users trade <span class="ltx_text ltx_font_italic">shares</span> in forecasting questions, which then pay out a value of $1 if the question resolves in the direction specified. Therefore, the price of each share corresponds to the market’s estimate of the probability of a given event. For each question in our simulation, we compare the model’s probability <math alttext="p" class="ltx_Math" display="inline" id="S3.SS2.p2.m1" intent=":literal"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math> with the last quoted market price <math alttext="m" class="ltx_Math" display="inline" id="S3.SS2.p2.m2" intent=":literal"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>: If <math alttext="p&gt;m" class="ltx_Math" display="inline" id="S3.SS2.p2.m3" intent=":literal"><semantics><mrow><mi>p</mi><mo>&gt;</mo><mi>m</mi></mrow><annotation encoding="application/x-tex">p&gt;m</annotation></semantics></math>, the simulated betting strategy buys one $1 long share at <math alttext="m+0.01" class="ltx_Math" display="inline" id="S3.SS2.p2.m4" intent=":literal"><semantics><mrow><mi>m</mi><mo>+</mo><mn>0.01</mn></mrow><annotation encoding="application/x-tex">m+0.01</annotation></semantics></math>; if <math alttext="p&lt;m" class="ltx_Math" display="inline" id="S3.SS2.p2.m5" intent=":literal"><semantics><mrow><mi>p</mi><mo>&lt;</mo><mi>m</mi></mrow><annotation encoding="application/x-tex">p&lt;m</annotation></semantics></math>, it shorts one share at <math alttext="(1-m)+0.01" class="ltx_Math" display="inline" id="S3.SS2.p2.m6" intent=":literal"><semantics><mrow><mrow><mo stretchy="false">(</mo><mrow><mn>1</mn><mo>−</mo><mi>m</mi></mrow><mo stretchy="false">)</mo></mrow><mo>+</mo><mn>0.01</mn></mrow><annotation encoding="application/x-tex">(1-m)+0.01</annotation></semantics></math>; exact ties are broken at random.
+The added cent approximates fees and slippage.
+Each trade therefore has a known entry cost <math alttext="c" class="ltx_Math" display="inline" id="S3.SS2.p2.m7" intent=":literal"><semantics><mi>c</mi><annotation encoding="application/x-tex">c</annotation></semantics></math>, an expected value under the model’s belief (<math alttext="p" class="ltx_Math" display="inline" id="S3.SS2.p2.m8" intent=":literal"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math> for longs, <math alttext="1-p" class="ltx_Math" display="inline" id="S3.SS2.p2.m9" intent=":literal"><semantics><mrow><mn>1</mn><mo>−</mo><mi>p</mi></mrow><annotation encoding="application/x-tex">1-p</annotation></semantics></math> for shorts), and a realised value <math alttext="v\!\in\!\{0,1\}" class="ltx_Math" display="inline" id="S3.SS2.p2.m10" intent=":literal"><semantics><mrow><mi>v</mi><mo lspace="0.108em" rspace="0.108em">∈</mo><mrow><mo stretchy="false">{</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false">}</mo></mrow></mrow><annotation encoding="application/x-tex">v\!\in\!\{0,1\}</annotation></semantics></math> at resolution.
+We evaluate four models: ReMax Ensemble-7, Modified-GRPO, the untuned DeepSeek-R1 base model, and the frontier benchmark <span class="ltx_text ltx_font_typewriter">OpenAI o1</span>.
+Profits <math alttext="v-c" class="ltx_Math" display="inline" id="S3.SS2.p2.m11" intent=":literal"><semantics><mrow><mi>v</mi><mo>−</mo><mi>c</mi></mrow><annotation encoding="application/x-tex">v-c</annotation></semantics></math> are aggregated in descending order of expected edge to yield cumulative-profit curves, and we report the total return under three bet-selection rules: trading until the edge drops below (i) the model’s own expected calibration error (Edge &gt; ECE), (ii) zero after fees (Edge &gt; 0), and (iii) across all markets.</p>
+</div>
+<figure class="ltx_figure" id="S3.F2"><img alt="Refer to caption" class="ltx_graphics ltx_centering ltx_img_landscape" height="252" id="S3.F2.g1" src="trading.png" width="598"/>
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Figure 2: </span>Left: cumulative realised profit (USD) as each model sequentially places one-share trades, ranked by ex-ante expected edge.
+Solid disks mark the last trade with Edge &gt; ECE; open rings mark the last trade with Edge &gt; 0.
+Right: total profit under the three bet-selection rules.
+Truncating the strategy at the calibration threshold (Edge &gt; ECE) retains almost the entire upside while avoiding the loss-making tail.</figcaption>
+</figure>
+<div class="ltx_para ltx_noindent" id="S3.SS2.p3">
+<p class="ltx_p">Figure <a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S3.F2" title="Figure 2 ‣ 3.2 Hypothetical Trading Evaluation ‣ 3 Results ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_tag">2</span></a> visualizes the return on trading for each model tested. The left panel shows cumulative realised profit as we step through the 1,265 Polymarket questions in descending order of expected edge; the right panel condenses the final take under the three bet-selection rules. Overall, we find that all models were able to earn a total (hypothetical) profit when betting on Polymarket questions in our simulation. This result held even in the most challenging case - forcing a model to bet on every market even when it expects to make a loss (when it agrees with the market price to within 1c). However, by far largest profit was achieved by the two finetuned models, trained by ReMax (profit $52, from a total cost of $433) or Modified GRPO (profit $54, cost $428). This corresponds to a total return of investment of approximately 10% across all questions.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S3.SS2.p4">
+<p class="ltx_p">These results indicate that the accuracy of our forecasting approach is sufficient to be practically meaningful, providing substantial information to inform future prediction beyond what is available in prediction markets. To better characterize the success and failure cases, we finally analyse how the win probability of bets placed by the top model (Remax Ensemble-7) varies by the confidence of the market. These results are shown in Figure <a class="ltx_ref" href="https://arxiv.org/html/2505.17989v4#S3.F3" title="Figure 3 ‣ 3.2 Hypothetical Trading Evaluation ‣ 3 Results ‣ Outcome-based Reinforcement Learning to Predict the Future"><span class="ltx_text ltx_ref_tag">3</span></a>.</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S3.SS2.p5">
+<p class="ltx_p">For test set questions on which Polymarket was highly confident, we find that our best-performing model was not statistically better than chance at betting against the market. Rather, its overall profit was driven almost entirely by questions on which the market was most unsure (market probability 40-60%). For these questions, the model’s bets were successful 11.8 percentage points [8.0, 15.7] more often than would be predicted by the market price. In terms of trading profit, this corresponds to a substantial return on investment of approximately 20% on these questions.</p>
+</div>
+<figure class="ltx_figure" id="S3.F3"><img alt="Refer to caption" class="ltx_graphics ltx_centering ltx_img_landscape" height="192" id="S3.F3.g1" src="improvement_by_market_confidence_bar.png" width="240"/>
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Figure 3: </span>Win probability of simulated bets placed by Remax, Ensemble 7, by market price.</figcaption>
+</figure>
+</section>
+</section>
+<section class="ltx_section" id="S4">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">4 </span>Conclusion</h2>
+<div class="ltx_para ltx_noindent" id="S4.p1">
+<p class="ltx_p">This paper demonstrates the effective application of Reinforcement Learning with Verifiable Rewards (RLVR) to the challenging domain of forecasting real-world events. We train a variety of reasoning models that take as input a TRUE/FALSE forecasting question, alongside a set of news articles published before the prediction date, and aims to predict how the question will resolve. We compare a variety of training algorithms for reasoning models, using a sample of 110k historical questions (10k from Polymarket + 100k generated).</p>
+</div>
+<div class="ltx_para ltx_noindent" id="S4.p2">
+<p class="ltx_p">On a test set of recent forecasting questions, our best-performing model was a 7‑run ensemble trained using ReMax, and with guardrails to improve learning stability. This model reached a Brier score of 0.190: outperforming much larger frontier models. We find that these gains are also practically meaningful: in a trading simulation, the ReMax ensemble earned a total of $52 in profit from simulated bets on Polymarket, with a 10% return on investment - or 20% among questions with low market confidence. To be clear, we do not intend for this simulation to be understood as an estimate for the impact our model may have on real-world <span class="ltx_text ltx_font_italic">financial trading</span>: Financial markets operate under different constraints to prediction markets and, among other differences, are many thousands of times larger in volume than prediction markets. Rather, our results highlight the promise of well-calibrated RL-trained forecasters to serve as tools to support human reasoning under uncertainty.</p>
+</div>
+</section>
+<section class="ltx_section" id="S5">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">5 </span>Broader Impact</h2>
+<div class="ltx_para ltx_noindent" id="S5.p1">
+<p class="ltx_p">Our results carry potential societal implications and risks. For one, while we do not directly evaluate our approach in the domain of financial trading, it is realistic that our model or training strategy may be employed by individuals or institutions to guide investment in financial markets. Furthermore, prediction markets themselves frequently inform societal decisions in many high stakes domains such as policy. In both cases, if an AI model were used directly to make high stakes decisions, then inaccuracies or systematic biases in the model could carry substantial risks. However, we consider it a strength of our method that it provides human-readable chain-of-thought traces to accompany its predictions, which greatly aid interpretability. In general, we expect that the best use of such models is as tools to support, rather than replace, existing processes of human decision-making.</p>
+</div>
+<div class="ltx_pagination ltx_role_newpage"></div>
+<div class="ltx_para ltx_noindent" id="S5.p2">
+<span class="ltx_ERROR undefined">\CJK@envEnd</span>
+</div>
+</section>
+</article>
+</div>
+<footer class="ltx_page_footer">
+<div class="ltx_page_logo">Generated  on Mon Dec  1 18:10:01 2025 by <a class="ltx_LaTeXML_logo" href="http://dlmf.nist.gov/LaTeXML/"><span style="letter-spacing:-0.2em; margin-right:0.1em;">L<span class="ltx_font_smallcaps" style="position:relative; bottom:2.2pt;">a</span>T<span class="ltx_font_smallcaps" style="font-size:120%;position:relative; bottom:-0.2ex;">e</span></span><span style="font-size:90%; position:relative; bottom:-0.2ex;">XML</span><img alt="Mascot Sammy" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAAOCAYAAAD5YeaVAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wKExQZLWTEaOUAAAAddEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIFRoZSBHSU1Q72QlbgAAAdpJREFUKM9tkL+L2nAARz9fPZNCKFapUn8kyI0e4iRHSR1Kb8ng0lJw6FYHFwv2LwhOpcWxTjeUunYqOmqd6hEoRDhtDWdA8ApRYsSUCDHNt5ul13vz4w0vWCgUnnEc975arX6ORqN3VqtVZbfbTQC4uEHANM3jSqXymFI6yWazP2KxWAXAL9zCUa1Wy2tXVxheKA9YNoR8Pt+aTqe4FVVVvz05O6MBhqUIBGk8Hn8HAOVy+T+XLJfLS4ZhTiRJgqIoVBRFIoric47jPnmeB1mW/9rr9ZpSSn3Lsmir1fJZlqWlUonKsvwWwD8ymc/nXwVBeLjf7xEKhdBut9Hr9WgmkyGEkJwsy5eHG5vN5g0AKIoCAEgkEkin0wQAfN9/cXPdheu6P33fBwB4ngcAcByHJpPJl+fn54mD3Gg0NrquXxeLRQAAwzAYj8cwTZPwPH9/sVg8PXweDAauqqr2cDjEer1GJBLBZDJBs9mE4zjwfZ85lAGg2+06hmGgXq+j3+/DsixYlgVN03a9Xu8jgCNCyIegIAgx13Vfd7vdu+FweG8YRkjXdWy329+dTgeSJD3ieZ7RNO0VAXAPwDEAO5VKndi2fWrb9jWl9Esul6PZbDY9Go1OZ7PZ9z/lyuD3OozU2wAAAABJRU5ErkJggg=="/></a>
+</div></footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,10 @@
+model = "Qwen/Qwen3.5-4B"
+thinking = false
+adapter = "flash-1784400917-21885c19" # This is the SFT adapter.
+
+[environment]
+id = "tech-s-cool/climate-market-env"
+
+[eval]
+split = "eval"
+batch_size = 8

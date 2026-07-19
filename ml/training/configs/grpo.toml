@@ -1,0 +1,21 @@
+model = "Qwen/Qwen3.5-4B"
+algorithm = "grpo"
+thinking = false
+
+[environment]
+id = "tech-s-cool/climate-market-env"
+
+[train]
+# Will be updated with the new SFT adapter ID after the format-prior run completes.
+init_from_adapter = "flash-1784408663-cc74e9c4"
+group_size = 8
+learning_rate = 1e-5
+batch_size = 4
+epochs = 2
+temperature = 1.0
+
+[train.structured_outputs]
+regex = "0\\.\\d{2}|1\\.00"
+
+[gpu]
+max_wall_seconds = 14400
