@@ -801,12 +801,36 @@ export default function ClimateGlobe({
     }
   }
 
+  const prefetchedRegionsRef = useRef<Set<string>>(new Set())
+
+  const prefetchRegionModel = useCallback((regionName: string) => {
+    if (prefetchedRegionsRef.current.has(regionName)) return
+    prefetchedRegionsRef.current.add(regionName)
+
+    const targetMarket = marketsRef.current.find(
+      (m) => m.continent === regionName || m.region === regionName
+    )
+    if (!targetMarket) return
+
+    fetch("/api/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: targetMarket.question.replace(/^\[DEMO\]\s*/i, ""),
+        resolution_rules: targetMarket.resolutionRules,
+      }),
+    }).catch(() => {})
+  }, [])
+
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const pointer = pointersRef.current.get(event.pointerId)
     if (!pointer) {
       const target = findTarget(event.clientX, event.clientY)
       if (target?.type === "cluster") {
         const singleMarket = target.cluster.markets[0]
+        if (singleMarket) {
+          prefetchRegionModel(singleMarket.continent)
+        }
         hoveredCanvasMarketIdRef.current = singleMarket?.id ?? null
         setHoverLabel(
           target.cluster.markets.length > 1
@@ -820,6 +844,7 @@ export default function ClimateGlobe({
       } else if (target?.type === "region") {
         hoveredCanvasMarketIdRef.current = null
         setHoverLabel(`${target.region} · select region`)
+        prefetchRegionModel(target.region)
       } else {
         hoveredCanvasMarketIdRef.current = null
         setHoverLabel(null)
