@@ -1,5 +1,3 @@
-import type { ObjectId } from "mongodb"
-
 import type {
   MarketEvidence,
   MarketHistoryPoint,
@@ -7,7 +5,7 @@ import type {
 } from "@/lib/markets/types"
 
 export interface UserDoc {
-  _id: ObjectId
+  _id: string
   walletAddress: string
   externalUserId?: string
   username?: string
@@ -16,7 +14,7 @@ export interface UserDoc {
 }
 
 export interface MarketDoc {
-  _id: ObjectId
+  _id: string
   marketId: string
   onchainMarketId: number
   title: string
@@ -54,10 +52,10 @@ export interface MarketDoc {
 }
 
 export interface PositionDoc {
-  _id: ObjectId
-  userId?: ObjectId
+  _id: string
+  userId?: string
   walletAddress: string
-  marketId?: ObjectId
+  marketId?: string
   marketDocId: string
   onchainMarketId: number
   marketQuestion: string
@@ -73,8 +71,8 @@ export interface PositionDoc {
 }
 
 export interface TransactionDoc {
-  _id: ObjectId
-  userId?: ObjectId
+  _id: string
+  userId?: string
   walletAddress: string
   type:
     | "purchase_yes"
@@ -90,8 +88,8 @@ export interface TransactionDoc {
   amountLamports?: string
   txSignature: string
   status: "pending" | "confirmed" | "failed"
-  relatedPositionId?: ObjectId
-  relatedMarketId?: ObjectId
+  relatedPositionId?: string
+  relatedMarketId?: string
   marketDocId?: string
   onchainMarketId?: number
   createdAt: Date
@@ -100,8 +98,8 @@ export interface TransactionDoc {
 }
 
 export interface ResolutionDoc {
-  _id: ObjectId
-  marketId: ObjectId
+  _id: string
+  marketId: string
   marketDocId: string
   dataSource: string
   resolvedOutcome: "yes" | "no" | "cancelled"
@@ -112,8 +110,8 @@ export interface ResolutionDoc {
 }
 
 export interface MarketPriceDoc {
-  _id: ObjectId
-  marketId: ObjectId
+  _id: string
+  marketId: string
   timestamp: Date
   yesPrice: number
   noPrice: number
@@ -125,7 +123,7 @@ export interface MarketPriceDoc {
 }
 
 export interface AuthChallengeDoc {
-  _id: ObjectId
+  _id: string
   walletAddress: string
   nonce: string
   createdAt: Date

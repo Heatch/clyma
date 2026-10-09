@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   const existing = await findTransactionBySignature(input.transactionSignature)
   if (existing) {
     return apiSuccess({
-      id: existing._id.toHexString(),
+      id: existing._id,
       signature: input.transactionSignature,
       deduped: true,
     })
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
   }
 
   return apiSuccess({
-    id: tx._id.toHexString(),
+    id: tx._id,
     signature: input.transactionSignature,
   })
 }

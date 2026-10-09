@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { randomBytes } from "node:crypto"
-import { getAuthChallengesCollection } from "@/lib/db/collections"
+import { insertChallenge } from "@/lib/db/store.mjs"
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000
 
@@ -38,17 +38,9 @@ export async function POST(request: Request) {
   }
 
   const nonce = randomBytes(32).toString("hex")
-  const now = new Date()
-  const expiresAt = new Date(now.getTime() + CHALLENGE_TTL_MS)
-
-  const challenges = await getAuthChallengesCollection()
-  await challenges.insertOne({
-    walletAddress,
-    nonce,
-    createdAt: now,
-    expiresAt,
-    used: false,
-  })
+  const challenge = insertChallenge(walletAddress, nonce, CHALLENGE_TTL_MS) as {
+    expiresAt: Date
+  }
 
   const message = `Sign this message to authenticate with Climate Prediction Market.\n\nWallet: ${walletAddress}\nNonce: ${nonce}`
 
@@ -56,7 +48,7 @@ export async function POST(request: Request) {
     data: {
       nonce,
       message,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: challenge.expiresAt.toISOString(),
     },
   })
 }

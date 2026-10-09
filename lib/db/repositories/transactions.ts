@@ -1,13 +1,14 @@
-import { getTransactionsCollection } from "@/lib/db/collections"
+import {
+  findTransactionBySignature as storeFindBySignature,
+  insertTransaction as storeInsertTransaction,
+  listActivityByWallet as storeListActivity,
+} from "@/lib/db/store.mjs"
 import type { TransactionDoc } from "@/lib/db/types"
-import type { UserActivity, IndexedTransactionInput } from "@/lib/markets/types"
-import { getUserByWallet } from "./users"
-import { getMarketDocIdByMarketId } from "./markets"
-import type { ObjectId } from "mongodb"
+import type { UserActivity } from "@/lib/markets/types"
 
 function transactionDocToActivity(doc: TransactionDoc): UserActivity {
   return {
-    id: doc._id.toHexString(),
+    id: doc._id,
     wallet: doc.walletAddress,
     marketId: doc.marketDocId ?? "",
     onchainMarketId: doc.onchainMarketId ?? 0,
@@ -40,56 +41,19 @@ export async function insertTransaction(params: {
   onchainMarketId?: number
   failureReason?: string
 }): Promise<TransactionDoc> {
-  const transactions = await getTransactionsCollection()
-  const user = await getUserByWallet(params.walletAddress)
-  const marketObjId = params.marketDocId
-    ? await getMarketDocIdByMarketId(params.marketDocId)
-    : undefined
-
-  const now = new Date()
-  const doc = {
-    userId: user?._id,
-    walletAddress: params.walletAddress,
-    type: params.type,
-    chain: "solana" as const,
-    token: "SOL" as const,
-    amountSol: params.amountSol,
-    amountLamports: params.amountLamports,
-    txSignature: params.txSignature,
-    status: params.status,
-    relatedMarketId: marketObjId,
-    marketDocId: params.marketDocId,
-    onchainMarketId: params.onchainMarketId,
-    createdAt: now,
-    confirmedAt: params.status === "confirmed" ? now : undefined,
-    failureReason: params.failureReason,
-  }
-
-  try {
-    await transactions.insertOne(doc)
-  } catch {
-    // Duplicate signature - already indexed
-  }
-
-  return doc as TransactionDoc
+  return storeInsertTransaction(params).doc as unknown as TransactionDoc
 }
 
 export async function findTransactionBySignature(
   txSignature: string,
 ): Promise<TransactionDoc | null> {
-  const transactions = await getTransactionsCollection()
-  const doc = await transactions.findOne({ txSignature })
+  const doc = storeFindBySignature(txSignature)
   return (doc as unknown as TransactionDoc | null) ?? null
 }
 
 export async function getActivityByWallet(
   walletAddress: string,
 ): Promise<UserActivity[]> {
-  const transactions = await getTransactionsCollection()
-  const docs = await transactions
-    .find({ walletAddress })
-    .sort({ createdAt: -1 })
-    .limit(50)
-    .toArray()
-  return (docs as unknown as TransactionDoc[]).map(transactionDocToActivity)
+  const docs = storeListActivity(walletAddress) as unknown as TransactionDoc[]
+  return docs.map(transactionDocToActivity)
 }

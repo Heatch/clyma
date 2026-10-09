@@ -1,6 +1,5 @@
-import { getResolutionsCollection } from "@/lib/db/collections"
+import { insertResolution as storeInsertResolution } from "@/lib/db/store.mjs"
 import type { ResolutionDoc } from "@/lib/db/types"
-import { getMarketDocIdByMarketId } from "./markets"
 
 export async function insertResolution(params: {
   marketDocId: string
@@ -9,20 +8,5 @@ export async function insertResolution(params: {
   resolverWallet: string
   proofUrl?: string
 }): Promise<ResolutionDoc> {
-  const resolutions = await getResolutionsCollection()
-  const marketId = await getMarketDocIdByMarketId(params.marketDocId)
-
-  const doc = {
-    marketId,
-    marketDocId: params.marketDocId,
-    dataSource: "solana-program",
-    resolvedOutcome: params.resolvedOutcome,
-    resolverType: params.resolverType,
-    resolverWallet: params.resolverWallet,
-    proofUrl: params.proofUrl,
-    resolvedAt: new Date(),
-  }
-
-  await resolutions.insertOne(doc)
-  return doc as ResolutionDoc
+  return storeInsertResolution(params) as unknown as ResolutionDoc
 }

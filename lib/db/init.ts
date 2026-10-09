@@ -1,9 +1,9 @@
-import { ensureIndexes } from "./collections"
+import { openStore } from "./store.mjs"
 
 let initialized = false
 
 export async function initDb(): Promise<void> {
   if (initialized) return
-  await ensureIndexes()
+  openStore()
   initialized = true
 }

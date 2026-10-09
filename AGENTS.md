@@ -31,7 +31,7 @@ The Devpost page is stale in two places:
 
 ```bash
 npm install
-cp .env.example .env   # fill in GEMINI_API_KEY and MONGODB_URI
+cp .env.example .env   # fill in GEMINI_API_KEY (SQLITE_PATH defaults work)
 npm run dev            # http://localhost:3000
 ```
 
@@ -75,13 +75,13 @@ components/
   wallet/ ui/ icons/          connect button, balance, skeletons, logo, hazard glyphs
 hooks/                        useAIForecast, useMarketProgram (Anchor client)
 lib/
-  markets/                    types, calculations, gemini, data (demo catalogue), openingPrice
+  markets/                    types, calculations, generation, data (fixtures), openingPrice
   solana/                     config, pdas, accounts, instructions, encoding, errors, idl
-  db/                         connection, collections, types, init, repositories/
+  db/                         store.mjs (+ .d.mts), types, init, repositories/
   auth/ geo/ utils/ validation/
 programs/climate_market/      Anchor Rust program (instructions, state, errors, events)
-scripts/                      setup.mjs (prod seeder), seed-markets.mjs (chain demo),
-                              seed-db.mjs (MongoDB demo)
+scripts/                      lifecycle.mjs (seed/close/resolve/roll),
+                              preflight.mjs, lib/ (env, tape)
 tests/                        vitest suite (see Testing)
 ```
 
@@ -103,7 +103,7 @@ only in code, env vars, and this doc.
 
 ## Frontend
 
-- `app/page.tsx` is `force-dynamic`, queries MongoDB, renders
+- `app/page.tsx` is `force-dynamic`, queries SQLite, renders
   `<Dashboard initialMarkets>`.
 - `MarketProvider.tsx:145-230` enriches the catalogue from chain PDAs on mount,
   on a 30s interval, and on `terraform:market-state-changed` events.
@@ -195,15 +195,25 @@ Provider naming never reaches the UI or API consumers.
   executability/owner, protocol PDA discriminator (validates the deployed
   program matches this repo's account layout), and wallet balance.
 
-## Database (`lib/db/`, MongoDB `climate_market`)
+## Database (`lib/db/`, SQLite `./data/clyma.db`)
 
-- `connection.ts`: cached `MongoClient`, throws if `MONGODB_URI` unset.
-- `collections.ts`: `users, markets, positions, transactions, resolutions,
-  market_prices, auth_challenges` + `ensureIndexes()`. `init.ts: initDb()` only
-  ensures indexes — no document seeding.
-- Repositories: `markets` (`queryMarkets/getMarketById/getMarketsByContinent/
-  updateMarketPrices/getMarketHistory`), `positions`, `transactions`,
-  `marketPrices.insertPriceSnapshot`, `resolutions`, `users`.
+- `store.mjs` (+ `store.d.mts`): the single data layer, imported by both the
+  TS repositories and `scripts/*.mjs`. Opens the DB (WAL, foreign keys,
+  busy timeout), runs `user_version`-gated migrations, exposes table
+  functions. Requires `node:sqlite` — flag-gated on Node 22.5.x, see
+  `.npmrc` (`node-options`) for npm scripts, `start-app.bat`, and the
+  `NODE_OPTIONS=--experimental-sqlite` prefix for bare `node scripts/*`.
+  No MongoDB anywhere: the `mongodb` dependency is uninstalled.
+- `types.ts`: doc types with string ids (positions use natural keys
+  `market:side:txSignature`).
+- Repositories: thin wrappers preserving signatures (`markets`, `positions`,
+  `transactions`, `marketPrices`, `resolutions`, `users`). `init.ts: initDb()`
+  just opens the store (migrations run inside).
+- Schema: normalized where queried (`markets`, `market_history` capped at
+  500 rows, `market_participants`, `market_prices`, `positions`,
+  `transactions`, `resolutions`, `users`, `auth_challenges` with lazy expiry
+  sweep); write-once blobs as JSON (`evidence`, `recentTrades`).
+  `participants` is always `COUNT(*)` — no counter drift by construction.
 - **Live trade writes:** `POST /api/index-transaction` writes the tx, position,
   price snapshot, capped history point, and counters — idempotent per
   signature, so retries and duplicate client POSTs are safe. The chart reads
@@ -216,7 +226,7 @@ continent allow-lists, lat/lon ranges, real-URL check, prob clamp 0.05–0.95,
 `climateMarketSchema.safeParse`, invalid dropped with warn) → disk cache
 (`os.tmpdir()/clyma/gemini-markets.json`, 24h TTL, 5-min failure backoff).
 `getInitialClimateMarkets()` falls back to `{ markets: [], source: "fallback" }`
-— currently **dead code** (nothing imports it; `app/page.tsx` queries MongoDB
+— currently **dead code** (nothing imports it; `app/page.tsx` queries SQLite
 directly).
 
 ## Scripts
@@ -249,19 +259,21 @@ directly).
   `requireProgramId()`, `resolveRpcUrl()`. All scripts read the program id
   through here.
 
-## Environment (`.env.example`, 12 lines)
+## Environment (`.env.example`)
 
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_SOLANA_NETWORK` | Must be `devnet` |
 | `NEXT_PUBLIC_SOLANA_RPC_URL` | Optional override; defaults to public Devnet |
 | `NEXT_PUBLIC_PROGRAM_ID` | Program address; unset → trading blocked ("program is not configured") |
-| `MONGODB_URI` | Required by API routes + seeders |
+| `SQLITE_PATH` | App database file (default `./data/clyma.db`) |
 | `GEMINI_API_KEY` | AI Studio key; gates market generation + `/api/predict` |
 | `GEMINI_MODEL` | Default `gemini-3.5-flash` |
 | `GEMINI_MARKET_COUNT` | Default 24, max 40 |
 
-Serving markets requires `MONGODB_URI` + `GEMINI_API_KEY`.
+Serving markets requires `GEMINI_API_KEY` (generation + forecasts). No DB
+server: SQLite file via `node:sqlite` (flag-gated on Node 22.5.x — `.npmrc`
+forwards `--experimental-sqlite` to all npm scripts).
 Note: the SDK prefers a `GOOGLE_API_KEY` env var over `GEMINI_API_KEY` if both
 are set — check there on auth confusion.
 
@@ -269,8 +281,9 @@ are set — check there on auth confusion.
 
 - `npm test` → `vitest run`, jsdom, `tests/setup.ts` shims. Includes
   `tests/*.test.tsx` (api-routes, globe-drawer, navbar, prediction-form,
-  hazard-icons) + co-located `lib/solana/*.test.ts` (accounts, encoding,
-  errors, instructions).
+  hazard-icons, store, tape, lifecycle, market-history) + co-located
+  `lib/solana/*.test.ts` (accounts, encoding, errors, instructions).
+  Store tests run against real in-memory SQLite (`:memory:`).
 - `tests/climate-market.ts` is Anchor integration — runs via
   `npm run test:anchor` only, not vitest.
 - `fixtureUserPositions` / `fixtureUserActivity` in `lib/markets/data.ts` are
@@ -308,7 +321,7 @@ are set — check there on auth confusion.
    capped history point to the market doc and a snapshot to `market_prices`;
    `getMarketHistory` merges both. In-session immediacy comes from the
    provider's optimistic points (see Frontend).
-4. `GET /api/markets` in prod returns MongoDB docs, not chain state — headline
+4. `GET /api/markets` returns SQLite docs, not chain state — headline
    odds only refresh after `MarketProvider`'s client-side PDA enrichment.
 5. Scripts read RPC from `NEXT_PUBLIC_SOLANA_RPC_URL` (default public Devnet);
    `Anchor.toml` provider defaults to localnet — confirm cluster + program ID

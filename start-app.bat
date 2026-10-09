@@ -19,11 +19,16 @@ rem  First run installs node_modules and creates .env from .env.example
 rem  when either is missing.
 rem
 rem  One-time market seeding (optional, needs a funded Devnet wallet):
+rem    set NODE_OPTIONS=--experimental-sqlite
 rem    node scripts/preflight.mjs
 rem    node scripts/lifecycle.mjs seed
 rem ===========================================================================
 
 cd /d "%~dp0"
+
+rem node:sqlite is flag-gated on Node 22.5.x; .npmrc covers npm scripts,
+rem this covers everything the launcher spawns.
+set "NODE_OPTIONS=--experimental-sqlite %NODE_OPTIONS%"
 
 set "MODE=%~1"
 if /i not "%MODE%"=="prod" set "MODE=dev"

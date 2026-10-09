@@ -8,7 +8,7 @@ step prints what it will do before writing anything.
 - Node.js ≥ 22.13, npm dependencies installed (`npm install`)
 - Phantom (or compatible) wallet with **~10 SOL on Devnet** for a full
   100-market seed (pools + rent + trading float + fees)
-- `.env` filled in: `MONGODB_URI`, `GEMINI_API_KEY`
+- `.env` filled in: `GEMINI_API_KEY` (`SQLITE_PATH` defaults to `./data/clyma.db`)
   (`GEMINI_MODEL` defaults to `gemini-3.5-flash`)
 - Faucet if short: `solana airdrop 2` (repeat as needed), or
   https://faucet.solana.com
@@ -36,8 +36,8 @@ node scripts/lifecycle.mjs seed
 What it does: batched model generation (≤40/call, validated, de-duplicated)
 → deterministic trade tape per market (pools sized to `--budget`, default
 6.5 SOL total) → `create_market` + asymmetric `fund_market` at exact tape
-totals → MongoDB upsert (market docs with embedded history/trades +
-`market_prices` creation snapshots). Definitions are saved to
+totals → SQLite indexing (market rows with history/trades + `market_prices`
+creation snapshots). Definitions are saved to
 `os.tmpdir()/clyma/seed-definitions-<ts>.json` — keep the file; it is the
 offline replay for demo day:
 
@@ -104,7 +104,7 @@ and seed with a new `--base-id`.
 | Symptom | Cause / fix |
 |---|---|
 | `Insufficient funds` | Airdrop more Devnet SOL; `--dry-run` shows the exact ask |
-| `MARKET_NOT_FOUND` / empty board | MongoDB empty or unreachable — check `MONGODB_URI`, re-run seed |
+| `MARKET_NOT_FOUND` / empty board | SQLite file missing or empty — check `SQLITE_PATH` (default `./data/clyma.db`), re-run seed |
 | Trading blocked, "not bound to a verified account" | `NEXT_PUBLIC_PROGRAM_ID` mismatch — run `preflight.mjs` |
 | `/api/predict` 500 `server_misconfigured` | `GEMINI_API_KEY` missing; chart still renders market history |
 | Generation 429s | Free-tier quota — the seeder backs off and retries; replay a saved definitions file instead |

@@ -35,7 +35,6 @@ import {
   Transaction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js"
-import { MongoClient } from "mongodb"
 import { createHash } from "node:crypto"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { readFileSync } from "node:fs"
@@ -45,6 +44,21 @@ import { fileURLToPath } from "node:url"
 
 import { loadEnv, requireProgramId, resolveRpcUrl } from "./lib/env.mjs"
 import { buildTape, LAMPORTS_PER_SOL } from "./lib/tape.mjs"
+import {
+  countOpenMarkets,
+  dueToClose,
+  dueToResolve,
+  insertResolution,
+  insertTransaction,
+  maxOnchainMarketId,
+  replaceCreationSnapshots,
+  replaceHistory,
+  resetMarketData,
+  seedParticipants,
+  settlePositionsByMarket,
+  updateMarketStatus,
+  upsertMarket,
+} from "../lib/db/store.mjs"
 
 // ---------------------------------------------------------------------------
 // Args
@@ -506,6 +520,24 @@ async function sendTxn(tx, signer) {
   throw new Error("Failed after 10 retries (rate limited)")
 }
 
+/** Bulk account read with 429 backoff (public Devnet RPC is strict). */
+async function getMultipleAccountsWithRetry(addresses) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      return await connection.getMultipleAccountsInfo(addresses)
+    } catch (err) {
+      if (err.message && err.message.includes("429") && attempt < 7) {
+        const wait = 2000 * 2 ** attempt
+        console.log(`  RPC rate-limited, retrying in ${wait / 1000}s...`)
+        await sleep(wait)
+        continue
+      }
+      throw err
+    }
+  }
+  throw new Error("Failed after 8 retries (rate limited)")
+}
+
 // ---------------------------------------------------------------------------
 // Seed command
 // ---------------------------------------------------------------------------
@@ -559,12 +591,6 @@ function modelOddsOf(doc) {
   return clamp(Number(odds) || 0.5, 0.05, 0.95)
 }
 
-async function connectDb(mongoUri) {
-  const client = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 15000 })
-  await client.connect()
-  return { client, db: client.db("climate_market") }
-}
-
 function loadWallet(requireIt) {
   const walletPath = join(homedir(), ".config", "solana", "id.json")
   try {
@@ -604,7 +630,7 @@ async function checkBudget(markets, fundingTotal) {
   const addresses = markets.map((m) => deriveMarket(m.doc.onchainMarketId).market)
   const infos = []
   for (let i = 0; i < addresses.length; i += 100) {
-    infos.push(...(await connection.getMultipleAccountsInfo(addresses.slice(i, i + 100))))
+    infos.push(...(await getMultipleAccountsWithRetry(addresses.slice(i, i + 100))))
   }
   const newCount = infos.filter((info) => !info).length
   const [rentMarket, rentVault] = await Promise.all([
@@ -646,8 +672,19 @@ async function requireFunds(wallet, needLamports, force) {
 /**
  * Fund on-chain pools + index to MongoDB. Shared by `seed` and `roll` top-up.
  */
-async function fundAndIndex(markets, { wallet, mongoUri, reset }) {
+async function fundAndIndex(markets, { wallet, indexDb, reset }) {
+  // Bulk existence check up front: one RPC call per 100 markets instead of
+  // one per market (public Devnet RPC rate-limits hard on sequential reads).
+  let existingIds = new Set()
   if (wallet) {
+    const addresses = markets.map((m) => deriveMarket(m.doc.onchainMarketId).market)
+    const infos = []
+    for (let i = 0; i < addresses.length; i += 100) {
+      infos.push(...(await getMultipleAccountsWithRetry(addresses.slice(i, i + 100))))
+    }
+    existingIds = new Set(
+      markets.filter((_, i) => infos[i]).map((m) => m.doc.onchainMarketId),
+    )
     const protocolPda = deriveProtocol()
     if (!(await connection.getAccountInfo(protocolPda))) {
       console.log("Initializing protocol...")
@@ -661,7 +698,7 @@ async function fundAndIndex(markets, { wallet, mongoUri, reset }) {
     }
     for (const m of markets) {
       const { market, vault } = deriveMarket(m.doc.onchainMarketId)
-      if (await connection.getAccountInfo(market)) {
+      if (existingIds.has(m.doc.onchainMarketId)) {
         console.log(`  [${m.doc.onchainMarketId}] already exists, skipping`)
         continue
       }
@@ -694,71 +731,35 @@ async function fundAndIndex(markets, { wallet, mongoUri, reset }) {
     }
   }
 
-  if (mongoUri) {
-    console.log("Indexing to MongoDB...")
-    const { client, db } = await connectDb(mongoUri)
+  if (indexDb) {
+    console.log("Indexing to SQLite...")
     if (reset) {
-      for (const name of ["markets", "positions", "transactions", "market_prices", "resolutions"]) {
-        await db.collection(name).drop().catch(() => {})
-      }
-      await db.collection("markets").createIndex({ status: 1 })
-      await db.collection("markets").createIndex({ category: 1 })
-      await db.collection("markets").createIndex({ closesAt: 1 })
-      await db
-        .collection("markets")
-        .createIndex({ onchainMarketId: 1 }, { unique: true, sparse: true })
-      await db.collection("market_prices").createIndex({ marketId: 1, timestamp: 1 })
-      console.log("  Reset: dropped market collections, recreated indexes")
+      resetMarketData()
+      console.log("  Reset: dropped market data (schema + indexes persist)")
     }
     for (const m of markets) {
       const d = m.doc
-      await db.collection("markets").updateOne(
-        { onchainMarketId: d.onchainMarketId },
-        {
-          $set: {
-            marketId: d.id, onchainMarketId: d.onchainMarketId,
-            title: d.question, question: d.question, description: d.description, slug: d.slug,
-            category: d.category, continent: d.continent, country: d.country ?? null, region: d.region,
-            latitude: d.latitude, longitude: d.longitude,
-            resolutionSource: d.resolutionSource, resolutionSourceUrl: d.resolutionSourceUrl,
-            resolutionRules: d.resolutionRules,
-            status: d.status, outcome: d.outcome,
-            yesPrice: d.yesPrice, noPrice: d.noPrice,
-            yesLiquidity: d.yesLiquidity, noLiquidity: d.noLiquidity,
-            totalVolume: d.totalVolume, participants: d.participants,
-            featured: d.featured, trendingScore: d.trendingScore,
-            resolver: d.resolver,
-            history: d.history, evidence: d.evidence, recentTrades: d.recentTrades,
-            participantWallets: [...new Set(m.tape.trades.map((t) => t.wallet))],
-            openAt: new Date(d.createdAt), closesAt: new Date(d.closeTime),
-            resolvesAt: new Date(d.resolutionTime),
-            createdAt: new Date(d.createdAt),
-          },
-        },
-        { upsert: true },
-      )
-      const doc = await db
-        .collection("markets")
-        .findOne({ onchainMarketId: d.onchainMarketId }, { projection: { _id: 1 } })
-      if (doc) {
-        await db.collection("market_prices").deleteMany({
-          marketId: doc._id, triggerEvent: "creation",
-        })
-        await db.collection("market_prices").insertMany(
-          d.history.map((p) => ({
-            marketId: doc._id,
-            timestamp: new Date(p.timestamp),
-            yesPrice: p.yesProbability,
-            noPrice: p.noProbability,
-            volume: p.totalVolume,
-            triggerEvent: "creation",
-          })),
-        )
-      }
+      upsertMarket({
+        marketId: d.id, onchainMarketId: d.onchainMarketId,
+        title: d.question, question: d.question, description: d.description, slug: d.slug,
+        category: d.category, continent: d.continent, country: d.country ?? null, region: d.region,
+        latitude: d.latitude, longitude: d.longitude,
+        resolutionSource: d.resolutionSource, resolutionSourceUrl: d.resolutionSourceUrl,
+        resolutionRules: d.resolutionRules,
+        status: d.status, outcome: d.outcome,
+        yesPrice: d.yesPrice, noPrice: d.noPrice,
+        yesLiquidity: d.yesLiquidity, noLiquidity: d.noLiquidity,
+        totalVolume: d.totalVolume, participants: d.participants,
+        featured: d.featured, trendingScore: d.trendingScore,
+        resolver: d.resolver,
+        evidence: d.evidence, recentTrades: d.recentTrades,
+        createdAt: d.createdAt, closeTime: d.closeTime, resolutionTime: d.resolutionTime,
+      })
+      replaceHistory(d.id, d.history)
+      seedParticipants(d.id, [...new Set(m.tape.trades.map((t) => t.wallet))])
+      replaceCreationSnapshots(d.id, d.history)
     }
-    const countDocs = await db.collection("markets").countDocuments()
-    console.log(`  MongoDB: ${countDocs} market documents`)
-    await client.close()
+    console.log(`  SQLite: indexed ${markets.length} markets`)
   }
 }
 
@@ -767,23 +768,19 @@ async function fundAndIndex(markets, { wallet, mongoUri, reset }) {
  * With dry=true, only lists what would close.
  * Returns { closed, failed }.
  */
-async function closeDueMarkets(db, wallet, dry = false) {
-  const now = new Date()
-  const due = await db
-    .collection("markets")
-    .find({ status: "open", closesAt: { $lte: now } })
-    .project({ marketId: 1, onchainMarketId: 1, question: 1 })
-    .toArray()
+async function closeDueMarkets(wallet, dry = false) {
+  const now = new Date().toISOString()
+  const due = dueToClose(now)
   if (dry) {
     for (const doc of due) {
-      console.log(`  would close ${doc.onchainMarketId}: ${doc.question?.slice(0, 60)}...`)
+      console.log(`  would close ${doc.onchain_market_id}: ${doc.question?.slice(0, 60)}...`)
     }
     return { closed: [], failed: [] }
   }
   const closed = []
   const failed = []
   for (const doc of due) {
-    const { market } = deriveMarket(doc.onchainMarketId)
+    const { market } = deriveMarket(doc.onchain_market_id)
     try {
       if (wallet) {
         const protocolPda = deriveProtocol()
@@ -795,14 +792,12 @@ async function closeDueMarkets(db, wallet, dry = false) {
         )
         await sleep(1500)
       }
-      await db
-        .collection("markets")
-        .updateOne({ _id: doc._id }, { $set: { status: "closed" } })
-      closed.push(doc.marketId)
-      console.log(`  closed ${doc.onchainMarketId}: ${doc.question?.slice(0, 60)}...`)
+      updateMarketStatus(doc.market_id, "closed")
+      closed.push(doc.market_id)
+      console.log(`  closed ${doc.onchain_market_id}: ${doc.question?.slice(0, 60)}...`)
     } catch (err) {
-      failed.push(doc.marketId)
-      console.error(`  CLOSE FAILED ${doc.onchainMarketId}: ${err.message}`)
+      failed.push(doc.market_id)
+      console.error(`  CLOSE FAILED ${doc.onchain_market_id}: ${err.message}`)
     }
   }
   return { closed, failed }
@@ -814,12 +809,9 @@ async function closeDueMarkets(db, wallet, dry = false) {
  * With dry=true, only lists what would resolve (with drawn outcomes).
  * Returns { resolved, failed }.
  */
-async function resolveDueMarkets(db, wallet, dry = false) {
-  const now = new Date()
-  const due = await db
-    .collection("markets")
-    .find({ status: "closed", resolvesAt: { $lte: now } })
-    .toArray()
+async function resolveDueMarkets(wallet, dry = false) {
+  const now = new Date().toISOString()
+  const due = dueToResolve(now)
   if (dry) {
     for (const doc of due) {
       const outcome = resolveDraw(doc.marketId, modelOddsOf(doc))
@@ -845,52 +837,31 @@ async function resolveDueMarkets(db, wallet, dry = false) {
         )
         await sleep(1500)
       }
-      await db.collection("markets").updateOne(
-        { _id: doc._id },
-        { $set: { status: "resolved", outcome } },
-      )
-      await db.collection("resolutions").insertOne({
-        marketId: doc._id,
+      updateMarketStatus(doc.marketId, "resolved", outcome)
+      insertResolution({
         marketDocId: doc.marketId,
-        dataSource: "lifecycle-seed-draw",
         resolvedOutcome: outcome,
         resolverType: "automated",
         resolverWallet: wallet ? wallet.publicKey.toBase58() : "lifecycle",
         proofUrl: signature
           ? `https://explorer.solana.com/tx/${signature}?cluster=devnet`
           : undefined,
-        resolvedAt: new Date(),
       })
-      const won = await db.collection("positions").updateMany(
-        { marketDocId: doc.marketId, status: "open", side: outcome },
-        { $set: { status: "won", settledAt: new Date() } },
-      )
-      const lost = await db.collection("positions").updateMany(
-        {
-          marketDocId: doc.marketId,
-          status: "open",
-          side: outcome === "yes" ? "no" : "yes",
-        },
-        { $set: { status: "lost", settledAt: new Date() } },
-      )
+      const { won, lost } = settlePositionsByMarket(doc.marketId, outcome)
       if (signature) {
-        await db.collection("transactions").insertOne({
+        insertTransaction({
           walletAddress: wallet.publicKey.toBase58(),
           type: "market_resolved",
-          chain: "solana",
-          token: "SOL",
           txSignature: signature,
           status: "confirmed",
           marketDocId: doc.marketId,
           onchainMarketId: doc.onchainMarketId,
-          createdAt: new Date(),
-          confirmedAt: new Date(),
         })
       }
       resolved.push(doc.marketId)
       console.log(
         `  resolved ${doc.onchainMarketId} -> ${outcome.toUpperCase()} ` +
-          `(winners: ${won.modifiedCount}, losers: ${lost.modifiedCount})`,
+          `(winners: ${won}, losers: ${lost})`,
       )
     } catch (err) {
       failed.push(doc.marketId)
@@ -906,11 +877,6 @@ async function seed(args) {
   connection = new Connection(resolveRpcUrl(), "confirmed")
 
   const apiKey = process.env.GEMINI_API_KEY?.trim()
-  const mongoUri = process.env.MONGODB_URI
-  if (!args.skipDb && !mongoUri) {
-    console.error("MONGODB_URI is not set (or pass --skip-db)")
-    process.exit(1)
-  }
 
   const wallet = loadWallet(!args.skipChain)
 
@@ -958,7 +924,11 @@ async function seed(args) {
     await requireFunds(wallet, needLamports, args.force)
   }
 
-  await fundAndIndex(markets, { wallet, mongoUri, reset: args.reset })
+  await fundAndIndex(markets, {
+    wallet: args.skipChain ? null : wallet,
+    indexDb: !args.skipDb,
+    reset: args.reset,
+  })
 
   console.log(
     `\nDone! Markets ${args.baseId}–${args.baseId + markets.length - 1} ` +
@@ -975,15 +945,8 @@ async function closeCommand(args) {
   PROGRAM_ID = requireProgramId()
   connection = new Connection(resolveRpcUrl(), "confirmed")
 
-  const mongoUri = process.env.MONGODB_URI
-  if (!mongoUri) {
-    console.error("MONGODB_URI is not set")
-    process.exit(1)
-  }
   const wallet = loadWallet(true)
-  const { client, db } = await connectDb(mongoUri)
-  const { closed, failed } = await closeDueMarkets(db, wallet, args.dryRun)
-  await client.close()
+  const { closed, failed } = await closeDueMarkets(wallet, args.dryRun)
   if (args.dryRun) {
     console.log("\nDry run — no writes.")
     return
@@ -1001,15 +964,8 @@ async function resolveCommand(args) {
   PROGRAM_ID = requireProgramId()
   connection = new Connection(resolveRpcUrl(), "confirmed")
 
-  const mongoUri = process.env.MONGODB_URI
-  if (!mongoUri) {
-    console.error("MONGODB_URI is not set")
-    process.exit(1)
-  }
   const wallet = loadWallet(true)
-  const { client, db } = await connectDb(mongoUri)
-  const { resolved, failed } = await resolveDueMarkets(db, wallet, args.dryRun)
-  await client.close()
+  const { resolved, failed } = await resolveDueMarkets(wallet, args.dryRun)
   if (args.dryRun) {
     console.log("\nDry run — no writes.")
     return
@@ -1029,26 +985,18 @@ async function rollCommand(args) {
 
   const target = Number.isFinite(args.markets) ? args.markets : 100
   const apiKey = process.env.GEMINI_API_KEY?.trim()
-  const mongoUri = process.env.MONGODB_URI
-  if (!mongoUri) {
-    console.error("MONGODB_URI is not set")
-    process.exit(1)
-  }
   const wallet = loadWallet(true)
 
-  const { client, db } = await connectDb(mongoUri)
-
   console.log("Step 1: closing expired markets...")
-  const closed = await closeDueMarkets(db, wallet, args.dryRun)
+  const closed = await closeDueMarkets(wallet, args.dryRun)
   console.log("Step 2: resolving due markets...")
-  const resolved = await resolveDueMarkets(db, wallet, args.dryRun)
+  const resolved = await resolveDueMarkets(wallet, args.dryRun)
 
-  const openCount = await db.collection("markets").countDocuments({ status: "open" })
+  const openCount = countOpenMarkets()
   const needed = target - openCount
   console.log(`Open markets: ${openCount}, target: ${target}, needed: ${Math.max(0, needed)}`)
   if (needed <= 0) {
     console.log("Nothing to top up.")
-    await client.close()
     return
   }
 
@@ -1060,18 +1008,11 @@ async function rollCommand(args) {
   }
   if (chosen.length === 0) {
     console.error("No definitions to top up with")
-    await client.close()
     process.exit(1)
   }
 
-  const maxDoc = await db
-    .collection("markets")
-    .find({})
-    .sort({ onchainMarketId: -1 })
-    .limit(1)
-    .project({ onchainMarketId: 1 })
-    .toArray()
-  const baseId = (maxDoc[0]?.onchainMarketId ?? args.baseId - 1) + 1
+  const maxOnchain = maxOnchainMarketId()
+  const baseId = (maxOnchain ?? args.baseId - 1) + 1
   // Pro-rate the pool budget to the markets actually created.
   const budgetTotal = args.budgetExplicit
     ? args.budget
@@ -1090,15 +1031,13 @@ async function rollCommand(args) {
 
   if (args.dryRun) {
     console.log("Dry run — no chain or DB writes. Exiting.")
-    await client.close()
     return
   }
   const budget = await checkBudget(markets, fundingTotal)
   const needLamports = printBudget(budget)
   await requireFunds(wallet, needLamports, args.force)
-  await client.close()
 
-  await fundAndIndex(markets, { wallet, mongoUri, reset: false })
+  await fundAndIndex(markets, { wallet, indexDb: true, reset: false })
 
   console.log(
     `\nRoll done! closed=${closed.closed.length} resolved=${resolved.resolved.length} ` +

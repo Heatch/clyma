@@ -13,7 +13,7 @@
 //
 // The tape is off-chain history ("trades that happened before you arrived"):
 // trades carry no transaction signatures. Live Devnet trades append to the
-// same Mongo collections afterwards.
+// same SQLite tables afterwards.
 
 import bs58 from "bs58"
 import { createHash } from "node:crypto"

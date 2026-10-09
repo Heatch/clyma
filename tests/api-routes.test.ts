@@ -110,7 +110,7 @@ beforeEach(() => {
     fixtureUserActivity.filter((activity) => activity.wallet === wallet),
   )
   dbMocks.insertTransaction.mockResolvedValue({
-    _id: { toHexString: () => "mongo-transaction-id" },
+    _id: "mongo-transaction-id",
   })
   dbMocks.insertPosition.mockResolvedValue({})
   dbMocks.insertPriceSnapshot.mockResolvedValue(undefined)
@@ -297,7 +297,7 @@ describe("wallet and transaction API routes", () => {
 
     // Same signature again: deduped, no duplicate writes.
     dbMocks.findTransactionBySignature.mockResolvedValue({
-      _id: { toHexString: () => "mongo-transaction-id" },
+      _id: "mongo-transaction-id",
     })
     const retry = await post()
     const retryBody = (await retry.json()) as {

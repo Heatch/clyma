@@ -2,8 +2,8 @@ import { NextResponse } from "next/server"
 import { PublicKey } from "@solana/web3.js"
 import nacl from "tweetnacl"
 import bs58 from "bs58"
-import { getAuthChallengesCollection } from "@/lib/db/collections"
-import { getUsersCollection } from "@/lib/db/collections"
+import { getChallenge, markChallengeUsed } from "@/lib/db/store.mjs"
+import { upsertUser } from "@/lib/db/repositories/users"
 import { signJwt } from "@/lib/auth"
 
 export async function POST(request: Request) {
@@ -47,14 +47,13 @@ export async function POST(request: Request) {
     )
   }
 
-  const challenges = await getAuthChallengesCollection()
-  const challenge = await challenges.findOne({
-    walletAddress,
-    nonce,
-    used: false,
-  })
+  const challenge = getChallenge(walletAddress, nonce) as {
+    _id: string
+    expiresAt: Date
+    used: boolean
+  } | null
 
-  if (!challenge) {
+  if (!challenge || challenge.used) {
     return NextResponse.json(
       {
         error: {
@@ -112,17 +111,9 @@ export async function POST(request: Request) {
     )
   }
 
-  await challenges.updateOne({ _id: challenge._id }, { $set: { used: true } })
+  markChallengeUsed(challenge._id)
 
-  const users = await getUsersCollection()
-  await users.updateOne(
-    { walletAddress },
-    {
-      $setOnInsert: { walletAddress, createdAt: new Date() },
-      $set: { lastLoginAt: new Date() },
-    },
-    { upsert: true },
-  )
+  await upsertUser(walletAddress)
 
   const token = await signJwt({ sub: walletAddress, wallet: walletAddress })
 

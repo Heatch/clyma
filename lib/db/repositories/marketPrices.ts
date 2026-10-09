@@ -1,7 +1,10 @@
-import { getMarketPricesCollection } from "@/lib/db/collections"
+import {
+  deleteCreationSnapshots,
+  getRowIdByMarketId,
+  insertPriceSnapshot as storeInsertSnapshot,
+  listPriceSnapshots,
+} from "@/lib/db/store.mjs"
 import type { MarketPriceDoc } from "@/lib/db/types"
-import { getMarketDocIdByMarketId } from "./markets"
-import type { ObjectId } from "mongodb"
 
 export async function insertPriceSnapshot(params: {
   marketDocId: string
@@ -13,18 +16,21 @@ export async function insertPriceSnapshot(params: {
   noLiquidity?: number
   totalVolume?: number
 }): Promise<void> {
-  const prices = await getMarketPricesCollection()
-  const marketId = await getMarketDocIdByMarketId(params.marketDocId)
+  const marketRowId = getRowIdByMarketId(params.marketDocId)
+  storeInsertSnapshot({ ...params, marketRowId })
+}
 
-  await prices.insertOne({
-    marketId,
-    timestamp: new Date(),
-    yesPrice: params.yesPrice,
-    noPrice: params.noPrice,
-    volume: params.volume,
-    triggerEvent: params.triggerEvent,
-    yesLiquidity: params.yesLiquidity,
-    noLiquidity: params.noLiquidity,
-    totalVolume: params.totalVolume,
-  } as Omit<MarketPriceDoc, "_id">)
+export async function getPriceSnapshots(
+  marketDocId: string,
+): Promise<MarketPriceDoc[]> {
+  const marketRowId = getRowIdByMarketId(marketDocId)
+  if (marketRowId === null) return []
+  return listPriceSnapshots(marketRowId) as unknown as MarketPriceDoc[]
+}
+
+export async function clearCreationSnapshots(
+  marketDocId: string,
+): Promise<void> {
+  const marketRowId = getRowIdByMarketId(marketDocId)
+  if (marketRowId !== null) deleteCreationSnapshots(marketRowId)
 }

@@ -13,6 +13,12 @@ test-ledger/
 *.tsbuildinfo
 .DS_Store
 
+# Local SQLite database (gitignored; recreated by seeding or migration)
+data/
+*.db
+*.db-wal
+*.db-shm
+
 # Local Gemini API test scratch (not part of the app)
 .venv/
 /test.py

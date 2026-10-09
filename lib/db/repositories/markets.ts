@@ -1,8 +1,15 @@
-import { getMarketPricesCollection, getMarketsCollection } from "@/lib/db/collections"
-import type { MarketDoc, MarketPriceDoc } from "@/lib/db/types"
+import {
+  appendHistoryPoint as storeAppendHistoryPoint,
+  getMarketByIdOrSlug,
+  getRowIdByMarketId,
+  incrementActivity as storeIncrementActivity,
+  listMarkets as storeListMarkets,
+  listMarketsByContinent as storeListByContinent,
+  listPriceSnapshots,
+  updateMarketStatus,
+} from "@/lib/db/store.mjs"
+import type { MarketDoc } from "@/lib/db/types"
 import type { ClimateMarket, MarketListQuery, MarketListResult, MarketHistoryPoint, MarketHistoryResult } from "@/lib/markets/types"
-import { calculateImpliedProbabilities } from "@/lib/markets/calculations"
-import type { ObjectId } from "mongodb"
 
 function marketDocToClimateMarket(doc: MarketDoc): ClimateMarket {
   return {
@@ -44,44 +51,24 @@ function marketDocToClimateMarket(doc: MarketDoc): ClimateMarket {
 }
 
 export async function queryMarkets(query: MarketListQuery): Promise<MarketListResult> {
-  const markets = await getMarketsCollection()
-  const filter: Record<string, unknown> = {}
-
-  if (query.search) {
-    filter.title = { $regex: query.search, $options: "i" }
+  const result = storeListMarkets(query) as unknown as {
+    markets: MarketDoc[]
+    total: number
+    limit: number
+    offset: number
   }
-  if (query.category) filter.category = query.category
-  if (query.continent) filter.continent = query.continent
-  if (query.status) filter.status = query.status
-  if (query.featured !== undefined) filter.featured = query.featured
-
-  const limit = query.limit ?? 24
-  const offset = query.offset ?? 0
-  const total = await markets.countDocuments(filter)
-  const docs = await markets
-    .find(filter)
-    .sort({ trendingScore: -1 })
-    .skip(offset)
-    .limit(limit)
-    .toArray()
-
   return {
-    markets: docs.map((d) =>
-      marketDocToClimateMarket(d as unknown as MarketDoc),
-    ),
-    total,
-    limit,
-    offset,
+    markets: result.markets.map(marketDocToClimateMarket),
+    total: result.total,
+    limit: result.limit,
+    offset: result.offset,
   }
 }
 
 export async function getMarketById(
   idOrSlug: string,
 ): Promise<ClimateMarket | null> {
-  const markets = await getMarketsCollection()
-  const doc = (await markets.findOne({
-    $or: [{ marketId: idOrSlug }, { slug: idOrSlug }],
-  })) as MarketDoc | null
+  const doc = getMarketByIdOrSlug(idOrSlug) as unknown as MarketDoc | null
   return doc ? marketDocToClimateMarket(doc) : null
 }
 
@@ -89,52 +76,18 @@ export async function getMarketsByContinent(
   continent: string,
   query: Partial<MarketListQuery> = {},
 ): Promise<MarketListResult> {
-  const markets = await getMarketsCollection()
-  const filter: Record<string, unknown> = { continent }
-
-  if (query.search) filter.title = { $regex: query.search, $options: "i" }
-  if (query.category) filter.category = query.category
-  if (query.status) filter.status = query.status
-
-  const limit = query.limit ?? 24
-  const offset = query.offset ?? 0
-  const total = await markets.countDocuments(filter)
-  const docs = await markets.find(filter).skip(offset).limit(limit).toArray()
-
-  return {
-    markets: docs.map((d) =>
-      marketDocToClimateMarket(d as unknown as MarketDoc),
-    ),
-    total,
-    limit,
-    offset,
+  const result = storeListByContinent(continent, query) as unknown as {
+    markets: MarketDoc[]
+    total: number
+    limit: number
+    offset: number
   }
-}
-
-export async function updateMarketPrices(
-  marketDocId: string,
-  yesAmount: number,
-  noAmount: number,
-  totalPool: number,
-): Promise<void> {
-  const markets = await getMarketsCollection()
-  const probabilities = calculateImpliedProbabilities(
-    BigInt(Math.round(yesAmount * 1e9)),
-    BigInt(Math.round(noAmount * 1e9)),
-  )
-
-  await markets.updateOne(
-    { marketId: marketDocId },
-    {
-      $set: {
-        yesPrice: probabilities.yes,
-        noPrice: probabilities.no,
-        yesLiquidity: yesAmount,
-        noLiquidity: noAmount,
-      },
-      $inc: { totalVolume: yesAmount + noAmount },
-    },
-  )
+  return {
+    markets: result.markets.map(marketDocToClimateMarket),
+    total: result.total,
+    limit: result.limit,
+    offset: result.offset,
+  }
 }
 
 export async function getMarketHistory(
@@ -143,7 +96,7 @@ export async function getMarketHistory(
   const market = await getMarketById(marketId)
   if (!market) return null
 
-  // Merge tape backfill (embedded) with live snapshots, oldest first.
+  // Merge embedded tape backfill with live snapshots, oldest first.
   // Embedded points win exact-timestamp ties; either source alone still
   // yields a usable series.
   const byTime = new Map<string, MarketHistoryPoint>()
@@ -151,23 +104,26 @@ export async function getMarketHistory(
     byTime.set(point.timestamp, point)
   }
   try {
-    const prices = await getMarketPricesCollection()
-    const docId = await getMarketDocIdByMarketId(market.id)
-    if (docId) {
-      const snaps = await prices
-        .find({ marketId: docId })
-        .sort({ timestamp: 1 })
-        .toArray()
-      for (const snap of snaps as unknown as MarketPriceDoc[]) {
-        const timestamp = snap.timestamp.toISOString()
-        if (byTime.has(timestamp)) continue
-        byTime.set(timestamp, {
-          timestamp,
-          yesProbability: snap.yesPrice,
-          noProbability: snap.noPrice,
-          totalVolume: snap.totalVolume ?? snap.volume ?? 0,
-          yesLiquidity: snap.yesLiquidity ?? 0,
-          noLiquidity: snap.noLiquidity ?? 0,
+    const rowId = getRowIdByMarketId(market.id)
+    if (rowId !== null) {
+      for (const snap of listPriceSnapshots(rowId)) {
+        const s = snap as unknown as {
+          timestamp: string
+          yesPrice: number
+          noPrice: number
+          volume: number
+          yesLiquidity: number | null
+          noLiquidity: number | null
+          totalVolume: number | null
+        }
+        if (byTime.has(s.timestamp)) continue
+        byTime.set(s.timestamp, {
+          timestamp: s.timestamp,
+          yesProbability: s.yesPrice,
+          noProbability: s.noPrice,
+          totalVolume: s.totalVolume ?? s.volume ?? 0,
+          yesLiquidity: s.yesLiquidity ?? 0,
+          noLiquidity: s.noLiquidity ?? 0,
         })
       }
     }
@@ -188,58 +144,29 @@ export async function getMarketHistory(
 
 export async function getMarketDocIdByMarketId(
   marketId: string,
-): Promise<ObjectId | null> {
-  const markets = await getMarketsCollection()
-  const doc = await markets.findOne({ marketId }, { projection: { _id: 1 } })
-  return doc ? (doc as { _id: ObjectId })._id : null
+): Promise<number | null> {
+  return getRowIdByMarketId(marketId)
 }
 
-/**
- * Records a confirmed purchase against the market document: turnover and
- * unique-participant counters. Repeat buys from the same wallet bump volume
- * but not the participant count.
- */
+export async function setMarketStatus(
+  marketDocId: string,
+  status: MarketDoc["status"],
+  outcome?: MarketDoc["outcome"],
+): Promise<void> {
+  updateMarketStatus(marketDocId, status, outcome)
+}
+
 export async function incrementMarketActivity(params: {
   marketDocId: string
   amountSol: number
   walletAddress: string
 }): Promise<void> {
-  const markets = await getMarketsCollection()
-  await markets.updateOne(
-    { marketId: params.marketDocId },
-    {
-      $inc: { totalVolume: params.amountSol },
-      $addToSet: { participantWallets: params.walletAddress },
-    },
-  )
-  const doc = await markets.findOne(
-    { marketId: params.marketDocId },
-    { projection: { participantWallets: 1 } },
-  )
-  const wallets = (doc as { participantWallets?: unknown } | null)
-    ?.participantWallets
-  if (Array.isArray(wallets)) {
-    await markets.updateOne(
-      { marketId: params.marketDocId },
-      { $set: { participants: wallets.length } },
-    )
-  }
+  storeIncrementActivity(params.marketDocId, params.amountSol, params.walletAddress)
 }
 
-/**
- * Appends a live trade point to the market document's embedded history (the
- * chart source), keeping the most recent 500 points. Tape backfill provides
- * the older points; this keeps the line bending after real trades without a
- * separate read path.
- */
 export async function appendMarketHistoryPoint(
   marketDocId: string,
   point: MarketHistoryPoint,
 ): Promise<void> {
-  const markets = await getMarketsCollection()
-  // $each/$slice capped push; the untyped driver signature needs a cast.
-  const push = {
-    $push: { history: { $each: [point], $slice: -500 } },
-  } as never
-  await markets.updateOne({ marketId: marketDocId }, push)
+  storeAppendHistoryPoint(marketDocId, point)
 }
