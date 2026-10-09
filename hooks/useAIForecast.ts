@@ -7,13 +7,13 @@ export interface AIForecastResult {
   loading: boolean;
   error: string | null;
   newsContext: string | null;
-  adapterId: string | null;
+  model: string | null;
 }
 
 export function useAIForecast(question?: string, resolutionRules?: string): AIForecastResult {
   const [probability, setProbability] = useState<number | null>(null);
   const [newsContext, setNewsContext] = useState<string | null>(null);
-  const [adapterId, setAdapterId] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +39,7 @@ export function useAIForecast(question?: string, resolutionRules?: string): AIFo
         if (res.ok && typeof data.probability === "number") {
           setProbability(data.probability);
           setNewsContext(data.news_context_used ?? null);
-          setAdapterId(data.adapter_id ?? null);
+          setModel(data.model ?? null);
         } else {
           setError(data.error || "Inference unavailable");
           if (typeof data.fallback === "number") {
@@ -54,5 +54,5 @@ export function useAIForecast(question?: string, resolutionRules?: string): AIFo
       .finally(() => setLoading(false));
   }, [question, resolutionRules]);
 
-  return { probability, loading, error, newsContext, adapterId };
+  return { probability, loading, error, newsContext, model };
 }

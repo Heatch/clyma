@@ -1,187 +1,137 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server"
+
+import { GoogleGenAI } from "@google/genai"
 
 /**
  * POST /api/predict
  *
- * Implements Option A: Just-In-Time News Retrieval (RAG) + Calibrated Inference.
- * 
+ * Gemini-backed calibrated probability forecast for a climate market.
+ *
  * 1. Receives the market question and resolution rules.
- * 2. Fetches recent news context published in the days prior to the event (via Tavily/Search or fallback).
- * 3. Appends the live news context to the prompt.
- * 4. Queries the Freesolo GRPO model endpoint.
+ * 2. Optionally uses caller-provided news context (no live retrieval).
+ * 3. Asks Gemini for a calibrated YES probability and validates the output.
  *
  * Environment variables required:
- *   FREESOLO_API_KEY    — API key for the Freesolo/Modal endpoint
- *   GRPO_ADAPTER_ID     — Run ID of the deployed GRPO adapter (e.g. "flash-XXXX-YYYY")
- *   TAVILY_API_KEY      — (Optional) API key for real-time news retrieval
+ *   GEMINI_API_KEY  — Google AI Studio API key
+ *   GEMINI_MODEL    — (Optional) model id, defaults to `gemini-3.5-flash`
  */
 
-const FREESOLO_BASE_URL =
-  'https://clado-ai--freesolo-lora-serving.modal.run/v1';
+const FALLBACK_PROBABILITY = 0.5
+const INFERENCE_TIMEOUT_MS = 15_000
 
-const INFERENCE_TIMEOUT_MS = 6_000;
+interface PredictBody {
+  question?: string
+  resolution_rules?: string
+  news_context?: string
+}
 
-/**
- * Helper: Fetches recent news context prior to the event.
- */
-async function fetchRecentNewsContext(question: string): Promise<string> {
-  const tavilyKey = process.env.TAVILY_API_KEY;
+function forecastModel(): string {
+  return process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash"
+}
 
-  if (tavilyKey) {
-    try {
-      const response = await fetch('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: tavilyKey,
-          query: `climate weather news: ${question}`,
-          search_depth: 'basic',
-          max_results: 3,
-        }),
-        signal: AbortSignal.timeout(2500),
-      });
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Gemini request timed out after ${ms}ms`)),
+        ms,
+      ),
+    ),
+  ])
+}
 
-      if (response.ok) {
-        const data = await response.json();
-        const snippets = data?.results
-          ?.map((r: { title: string; content: string }) => `${r.title}: ${r.content}`)
-          .join('\n');
-        if (snippets) {
-          return snippets.slice(0, 1000);
-        }
+/** Parses the model output: strict "0.42" first, then any lone decimal. */
+function parseProbability(raw: string): {
+  probability: number
+  formatValid: boolean
+} {
+  const strict = raw.match(/^(0\.\d{2}|1\.00)$/)
+  if (strict) {
+    return { probability: Number.parseFloat(strict[1]!), formatValid: true }
+  }
+
+  const loose = raw.match(/\b(0(?:\.\d+)?|1(?:\.0+)?)\b/)
+  if (loose) {
+    const value = Number.parseFloat(loose[1]!)
+    if (Number.isFinite(value)) {
+      return {
+        probability: Math.min(1, Math.max(0, value)),
+        formatValid: false,
       }
-    } catch {
-      // Ignore search errors, fallback to default
     }
   }
 
-  return 'No recent news context available. Forecast based on resolution rules and internal climate priors.';
+  return { probability: FALLBACK_PROBABILITY, formatValid: false }
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.FREESOLO_API_KEY;
-  const adapterId = process.env.GRPO_ADAPTER_ID;
+  const apiKey = process.env.GEMINI_API_KEY?.trim()
+  const model = forecastModel()
 
-  if (!apiKey || !adapterId) {
+  if (!apiKey) {
     return NextResponse.json(
       {
-        error: 'server_misconfigured',
-        detail:
-          'FREESOLO_API_KEY and GRPO_ADAPTER_ID must be set in .env.local',
+        error: "server_misconfigured",
+        detail: "GEMINI_API_KEY must be set in .env",
       },
-      { status: 500 }
-    );
+      { status: 500 },
+    )
   }
 
-  let body: { question?: string; resolution_rules?: string; news_context?: string };
+  let body: PredictBody
   try {
-    body = await request.json();
+    body = await request.json()
   } catch {
-    return NextResponse.json(
-      { error: 'invalid_json' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 })
   }
 
   if (!body.question) {
-    return NextResponse.json(
-      { error: 'missing_question' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "missing_question" }, { status: 400 })
   }
 
-  // 1. Just-In-Time News Retrieval (Option A)
-  const newsContext = body.news_context || (await fetchRecentNewsContext(body.question));
+  const newsContext = body.news_context?.trim() || null
 
-  const systemPrompt =
-    'You are a highly calibrated forecasting agent. Your goal is to predict ' +
+  const prompt =
+    "You are a highly calibrated forecasting agent. Your goal is to predict " +
     "the probability of climate-related events occurring based on the market's " +
-    'resolution rules and recent news context.\n' +
-    'You must output ONLY a float value between 0.00 and 1.00 representing the ' +
-    'probability, formatted to exactly two decimal places. Do not output any other text.';
-
-  const userPrompt =
+    "resolution rules and the available context.\n" +
+    "You must output ONLY a float value between 0.00 and 1.00 representing the " +
+    "probability, formatted to exactly two decimal places. Do not output any other text.\n\n" +
     `Question: ${body.question}\n` +
-    `Resolution Rules: ${body.resolution_rules ?? 'Not provided.'}\n` +
-    `Recent News Context (Prior 72h): ${newsContext}\n\n` +
-    'What is the probability of this event occurring? (0.00 to 1.00):';
-
-  // 6-second abort controller for the outbound fetch.
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), INFERENCE_TIMEOUT_MS);
+    `Resolution Rules: ${body.resolution_rules ?? "Not provided."}\n` +
+    `Context: ${newsContext ?? "No additional context available. Forecast from the resolution rules and climate priors."}\n\n` +
+    "What is the probability of this event occurring? (0.00 to 1.00):"
 
   try {
-    const response = await fetch(
-      `${FREESOLO_BASE_URL}/chat/completions`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: adapterId,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          max_tokens: 10,
-          temperature: 0.0,
-        }),
-        signal: controller.signal,
-      }
-    );
-
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'unknown');
-      console.error(
-        `[/api/predict] Freesolo returned ${response.status}: ${errorText}`
-      );
-      return NextResponse.json(
-        {
-          error: 'inference_unavailable',
-          detail: `Upstream returned ${response.status}`,
-          fallback: 0.5,
-        },
-        { status: 502 }
-      );
-    }
-
-    const data = await response.json();
-    const rawPrediction =
-      data?.choices?.[0]?.message?.content?.trim() ?? '';
-
-    // Validate the model's output against our expected format.
-    const match = rawPrediction.match(/^(0\.\d{2}|1\.00)$/);
-    const probability = match ? parseFloat(match[1]) : 0.5;
+    const ai = new GoogleGenAI({ apiKey })
+    const interaction = await withTimeout(
+      ai.interactions.create({ model, input: prompt }),
+      INFERENCE_TIMEOUT_MS,
+    )
+    const rawOutput = interaction.output_text?.trim() ?? ""
+    const { probability, formatValid } = parseProbability(rawOutput)
 
     return NextResponse.json({
       probability,
-      raw_output: rawPrediction,
-      adapter_id: adapterId,
-      format_valid: !!match,
+      raw_output: rawOutput,
+      model,
+      format_valid: formatValid,
       news_context_used: newsContext,
-    });
+    })
   } catch (err: unknown) {
-    clearTimeout(timeout);
-
-    const isTimeout =
-      err instanceof DOMException && err.name === 'AbortError';
-    console.error(
-      `[/api/predict] ${isTimeout ? 'Timeout' : 'Error'}: ${err}`
-    );
+    const isTimeout = err instanceof Error && err.message.includes("timed out")
+    console.error(`[/api/predict] ${isTimeout ? "Timeout" : "Error"}: ${err}`)
 
     return NextResponse.json(
       {
-        error: 'inference_unavailable',
+        error: "inference_unavailable",
         detail: isTimeout
           ? `Request timed out after ${INFERENCE_TIMEOUT_MS}ms`
           : String(err),
-        fallback: 0.5,
+        fallback: FALLBACK_PROBABILITY,
       },
-      { status: 502 }
-    );
+      { status: 502 },
+    )
   }
 }

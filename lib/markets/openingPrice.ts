@@ -6,8 +6,8 @@ interface ProbabilityPayload {
 }
 
 /**
- * Fetches the opening probability from the local LoRA inference server.
- * Returns a fallback of 0.5 if the server is unreachable or fails.
+ * Fetches the opening probability from the Gemini-backed forecast route.
+ * Returns a fallback of 0.5 if the route is unreachable or fails.
  */
 export async function fetchOpeningProbability(
   payload: ProbabilityPayload
@@ -28,7 +28,7 @@ export async function fetchOpeningProbability(
 
     if (!response.ok) {
       console.warn(
-        `Inference server returned status: ${response.status}. Using fallback probability.`
+        `Forecast route returned status: ${response.status}. Using fallback probability.`
       );
       return 0.5;
     }
@@ -39,10 +39,10 @@ export async function fetchOpeningProbability(
       return data.probability;
     }
 
-    console.warn("Invalid response format from inference server. Using fallback.");
+    console.warn("Invalid response format from forecast route. Using fallback.");
     return 0.5;
   } catch (error) {
-    console.error("Failed to connect to inference server. Using fallback:", error);
+    console.error("Failed to reach forecast route. Using fallback:", error);
     return 0.5;
   }
 }

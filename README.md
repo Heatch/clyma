@@ -136,9 +136,6 @@ GEMINI_MARKET_COUNT=24
 | `GEMINI_API_KEY`               | Google Gemini API key for market generation       |
 | `GEMINI_MODEL`                 | Model for generation (default: `gemini-3.5-flash`)|
 | `GEMINI_MARKET_COUNT`          | Markets to generate (default 24, max 40)          |
-| `FREESOLO_API_KEY`             | Freesolo/Modal endpoint key for AI oddsmaker      |
-| `GRPO_ADAPTER_ID`              | Deployed GRPO adapter run ID (e.g. `flash-XXXX`)  |
-| `TAVILY_API_KEY`               | Optional; Tavily search API for live news context |
 
 Prod mode requires `MONGODB_URI` and `GEMINI_API_KEY`. Demo mode works without
 either — it serves the bundled demo catalogue.
@@ -200,26 +197,17 @@ npm run test:anchor
 
 4. Set `NEXT_PUBLIC_PROGRAM_ID` in `.env` and start the app.
 
-## Machine Learning & Model Evaluation
+## AI probability forecasts
 
-TerraForm incorporates a fine-tuned **GRPO (Group Relative Policy Optimization)** climate forecasting engine trained on meteorological resolution rules and historical probability outcomes.
+`POST /api/predict` asks Gemini for a calibrated YES probability from the market
+question, its resolution rules, and any caller-supplied context. The result drives
+the AI forecast point on the market chart and the opening probability of newly
+created markets.
 
-### 📊 3-Way Benchmark Comparison: Base Model vs. MiniMax-M3 vs. Our GRPO Model
-
-![IEEE / NeurIPS 3-Way Model Evaluation Comparison](docs/images/minimax_vs_grpo_comparison.png)
-
-#### Empirical Evaluation Summary (Dataset: `ml/training/dataset/eval.jsonl`)
-
-| Metric | Base SFT Model (4B) | MiniMax-M3 (Frontier SoTA) | Our Fine-Tuned GRPO Model (4B) |
-| :--- | :---: | :---: | :---: |
-| **Inverted Brier Score ($1 - \text{MSE}$ ↑)** | `0.7326` | `0.7768` | **`0.8048`** *(Higher is Better)* |
-| **Expected Calibration Error (ECE ↓)** | `0.1316` | `0.2913` | **`0.1167`** *(Lowest Error)* |
-| **Mean Predicted Probability ($\bar{p}$)** | `0.6010` (Prior Bias) | `0.4513` (S-Curve) | **`0.4033`** *(Base-Rate Calibrated)* |
-| **Format-Fail Rate (↓)** | `0.00%` | `0.00%` | **`0.00%`** *(100% Strict JSON)* |
-
-- **Brier Accuracy Gain:** Our 4B fine-tuned GRPO model achieves **`0.8048` Inverted Brier**, outperforming both the un-tuned Base SFT Model (`0.7326`) and MiniMax-M3 (`0.7768`).
-- **60% Lower Calibration Error:** Reduces Expected Calibration Error (ECE) from `0.2913` down to **`0.1167`**, remaining tightly aligned to the ideal $y=x$ calibration diagonal.
-- **RAG & Real-Time Evidence:** Integrated with Tavily web retrieval to fetch live news context, URLs, and snippets prior to probability generation.
+- Uses `GEMINI_API_KEY` and `GEMINI_MODEL` (default `gemini-3.5-flash`), the same
+  credentials as market generation
+- Output is validated as a float in `[0.00, 1.00]`; anything else falls back to `0.5`
+- No live web retrieval: callers may pass their own `news_context`
 
 ## API routes
 
