@@ -9,6 +9,9 @@ export async function insertPriceSnapshot(params: {
   noPrice: number
   volume: number
   triggerEvent: MarketPriceDoc["triggerEvent"]
+  yesLiquidity?: number
+  noLiquidity?: number
+  totalVolume?: number
 }): Promise<void> {
   const prices = await getMarketPricesCollection()
   const marketId = await getMarketDocIdByMarketId(params.marketDocId)
@@ -20,5 +23,8 @@ export async function insertPriceSnapshot(params: {
     noPrice: params.noPrice,
     volume: params.volume,
     triggerEvent: params.triggerEvent,
+    yesLiquidity: params.yesLiquidity,
+    noLiquidity: params.noLiquidity,
+    totalVolume: params.totalVolume,
   } as Omit<MarketPriceDoc, "_id">)
 }

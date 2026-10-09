@@ -7,18 +7,21 @@ import { GET as getMarkets } from "@/app/api/markets/route"
 import { GET as getActivity } from "@/app/api/users/[wallet]/activity/route"
 import { GET as getPositions } from "@/app/api/users/[wallet]/positions/route"
 import {
-  DEMO_WALLETS,
-  demoMarkets,
-  demoUserActivity,
-  demoUserPositions,
+  SEED_WALLETS,
+  fixtureMarkets,
+  fixtureUserActivity,
+  fixtureUserPositions,
 } from "@/lib/markets/data"
 import type { MarketListQuery } from "@/lib/markets/types"
 
 const dbMocks = vi.hoisted(() => ({
+  appendMarketHistoryPoint: vi.fn(),
+  findTransactionBySignature: vi.fn(),
   getActivityByWallet: vi.fn(),
   getMarketById: vi.fn(),
   getMarketsByContinent: vi.fn(),
   getPositionsByWalletForApi: vi.fn(),
+  incrementMarketActivity: vi.fn(),
   initDb: vi.fn(),
   insertPosition: vi.fn(),
   insertPriceSnapshot: vi.fn(),
@@ -29,8 +32,10 @@ const dbMocks = vi.hoisted(() => ({
 vi.mock("@/lib/db/init", () => ({ initDb: dbMocks.initDb }))
 
 vi.mock("@/lib/db/repositories/markets", () => ({
+  appendMarketHistoryPoint: dbMocks.appendMarketHistoryPoint,
   getMarketById: dbMocks.getMarketById,
   getMarketsByContinent: dbMocks.getMarketsByContinent,
+  incrementMarketActivity: dbMocks.incrementMarketActivity,
   queryMarkets: dbMocks.queryMarkets,
 }))
 
@@ -44,11 +49,12 @@ vi.mock("@/lib/db/repositories/marketPrices", () => ({
 }))
 
 vi.mock("@/lib/db/repositories/transactions", () => ({
+  findTransactionBySignature: dbMocks.findTransactionBySignature,
   getActivityByWallet: dbMocks.getActivityByWallet,
   insertTransaction: dbMocks.insertTransaction,
 }))
 
-const DEMO_RESOLUTION_SIGNATURE = "aqcDTRNkJKwcprcwLbCSkXWyUKBXGmYA63iJrEwksaXg5zte76RQ6b2HEXNJp4QQ1tpqWVXaYGtYu2F9mjDuTRM"
+const RESOLUTION_SIGNATURE = "aqcDTRNkJKwcprcwLbCSkXWyUKBXGmYA63iJrEwksaXg5zte76RQ6b2HEXNJp4QQ1tpqWVXaYGtYu2F9mjDuTRM"
 
 interface ErrorBody {
   error: { code: string; message: string }
@@ -60,7 +66,7 @@ beforeEach(() => {
   dbMocks.initDb.mockResolvedValue(undefined)
 
   dbMocks.queryMarkets.mockImplementation(async (query: MarketListQuery) => {
-    const matches = demoMarkets.filter(
+    const matches = fixtureMarkets.filter(
       (market) =>
         (!query.category || market.category === query.category) &&
         (!query.status || market.status === query.status),
@@ -75,13 +81,13 @@ beforeEach(() => {
     }
   })
   dbMocks.getMarketById.mockImplementation(async (id: string) =>
-    demoMarkets.find((market) => market.id === id || market.slug === id),
+    fixtureMarkets.find((market) => market.id === id || market.slug === id),
   )
   dbMocks.getMarketsByContinent.mockImplementation(
     async (continent: string, query: Partial<MarketListQuery>) => {
       const continentName =
         continent === "north-america" ? "North America" : continent
-      const matches = demoMarkets.filter(
+      const matches = fixtureMarkets.filter(
         (market) =>
           market.continent === continentName &&
           (!query.status || market.status === query.status),
@@ -98,16 +104,19 @@ beforeEach(() => {
   )
   dbMocks.getPositionsByWalletForApi.mockImplementation(
     async (wallet: string) =>
-      demoUserPositions.filter((position) => position.wallet === wallet),
+      fixtureUserPositions.filter((position) => position.wallet === wallet),
   )
   dbMocks.getActivityByWallet.mockImplementation(async (wallet: string) =>
-    demoUserActivity.filter((activity) => activity.wallet === wallet),
+    fixtureUserActivity.filter((activity) => activity.wallet === wallet),
   )
   dbMocks.insertTransaction.mockResolvedValue({
     _id: { toHexString: () => "mongo-transaction-id" },
   })
   dbMocks.insertPosition.mockResolvedValue({})
   dbMocks.insertPriceSnapshot.mockResolvedValue(undefined)
+  dbMocks.findTransactionBySignature.mockResolvedValue(null)
+  dbMocks.appendMarketHistoryPoint.mockResolvedValue(undefined)
+  dbMocks.incrementMarketActivity.mockResolvedValue(undefined)
 })
 
 describe("market API routes", () => {
@@ -152,12 +161,12 @@ describe("market API routes", () => {
 
   it("gets a market by slug and returns a typed not-found response", async () => {
     const found = await getMarket(new Request("http://localhost"), {
-      params: Promise.resolve({ id: "florida-category-4-hurricane-2026-demo" }),
+      params: Promise.resolve({ id: "florida-category-4-hurricane-2026" }),
     })
     const foundBody = (await found.json()) as {
       data: { id: string }
     }
-    expect(foundBody.data.id).toBe("demo-fl-hurricane-2026")
+    expect(foundBody.data.id).toBe("fixture-fl-hurricane-2026")
 
     const missing = await getMarket(new Request("http://localhost"), {
       params: Promise.resolve({ id: "missing-market" }),
@@ -196,7 +205,7 @@ describe("market API routes", () => {
 describe("wallet and transaction API routes", () => {
   it("returns positions for a valid wallet and rejects malformed keys", async () => {
     const response = await getPositions(new Request("http://localhost"), {
-      params: Promise.resolve({ wallet: DEMO_WALLETS.atlas }),
+      params: Promise.resolve({ wallet: SEED_WALLETS.atlas }),
     })
     const body = (await response.json()) as {
       data: { positions: unknown[]; total: number }
@@ -229,10 +238,10 @@ describe("wallet and transaction API routes", () => {
   })
 
   it("indexes valid metadata idempotently and exposes it in wallet activity", async () => {
-    const signature = DEMO_RESOLUTION_SIGNATURE
+    const signature = RESOLUTION_SIGNATURE
     const payload = {
-      wallet: DEMO_WALLETS.boreal,
-      marketId: "demo-fl-hurricane-2026",
+      wallet: SEED_WALLETS.boreal,
+      marketId: "fixture-fl-hurricane-2026",
       onchainMarketId: 1001,
       type: "purchase_no",
       status: "confirmed",
@@ -240,14 +249,18 @@ describe("wallet and transaction API routes", () => {
       amountLamports: "125000000",
       transactionSignature: signature,
       timestamp: "2026-07-18T03:00:00.000Z",
+      yesPrice: 0.41,
+      noPrice: 0.59,
     }
-    const response = await indexTransaction(
-      new Request("http://localhost/api/index-transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }),
-    )
+    const post = () =>
+      indexTransaction(
+        new Request("http://localhost/api/index-transaction", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }),
+      )
+    const response = await post()
     const body = (await response.json()) as {
       data: { id: string; signature: string }
     }
@@ -259,23 +272,52 @@ describe("wallet and transaction API routes", () => {
     })
     expect(dbMocks.insertTransaction).toHaveBeenCalledWith(
       expect.objectContaining({
-        walletAddress: DEMO_WALLETS.boreal,
+        walletAddress: SEED_WALLETS.boreal,
         type: "purchase_no",
         amountSol: 0.125,
       }),
     )
     expect(dbMocks.insertPosition).toHaveBeenCalledOnce()
-    expect(dbMocks.insertPriceSnapshot).toHaveBeenCalledOnce()
+    expect(dbMocks.insertPriceSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        marketDocId: "fixture-fl-hurricane-2026",
+        yesPrice: 0.41,
+        noPrice: 0.59,
+        triggerEvent: "trade",
+      }),
+    )
+    expect(dbMocks.appendMarketHistoryPoint).toHaveBeenCalledOnce()
+    expect(dbMocks.incrementMarketActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        marketDocId: "fixture-fl-hurricane-2026",
+        amountSol: 0.125,
+        walletAddress: SEED_WALLETS.boreal,
+      }),
+    )
+
+    // Same signature again: deduped, no duplicate writes.
+    dbMocks.findTransactionBySignature.mockResolvedValue({
+      _id: { toHexString: () => "mongo-transaction-id" },
+    })
+    const retry = await post()
+    const retryBody = (await retry.json()) as {
+      data: { id: string; signature: string; deduped: boolean }
+    }
+    expect(retry.status).toBe(200)
+    expect(retryBody.data.deduped).toBe(true)
+    expect(dbMocks.insertTransaction).toHaveBeenCalledTimes(1)
+    expect(dbMocks.insertPosition).toHaveBeenCalledTimes(1)
+    expect(dbMocks.insertPriceSnapshot).toHaveBeenCalledTimes(1)
 
     dbMocks.getActivityByWallet.mockResolvedValue([
       {
-        ...demoUserActivity[0],
-        wallet: DEMO_WALLETS.boreal,
+        ...fixtureUserActivity[0],
+        wallet: SEED_WALLETS.boreal,
         transactionSignature: signature,
       },
     ])
     const activity = await getActivity(new Request("http://localhost"), {
-      params: Promise.resolve({ wallet: DEMO_WALLETS.boreal }),
+      params: Promise.resolve({ wallet: SEED_WALLETS.boreal }),
     })
     const activityBody = (await activity.json()) as {
       data: { activity: Array<{ transactionSignature: string }> }

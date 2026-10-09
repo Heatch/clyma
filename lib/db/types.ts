@@ -1,5 +1,11 @@
 import type { ObjectId } from "mongodb"
 
+import type {
+  MarketEvidence,
+  MarketHistoryPoint,
+  MarketTrade,
+} from "@/lib/markets/types"
+
 export interface UserDoc {
   _id: ObjectId
   walletAddress: string
@@ -37,9 +43,10 @@ export interface MarketDoc {
   featured: boolean
   trendingScore: number
   resolver: string
-  isDemo: boolean
-  dataLabel: string
-  dataDisclaimer: string
+  participantWallets?: string[]
+  history?: MarketHistoryPoint[]
+  evidence?: MarketEvidence[]
+  recentTrades?: MarketTrade[]
   openAt: Date
   closesAt: Date
   resolvesAt: Date
@@ -112,6 +119,9 @@ export interface MarketPriceDoc {
   noPrice: number
   volume: number
   triggerEvent: "trade" | "resolution" | "creation"
+  yesLiquidity?: number
+  noLiquidity?: number
+  totalVolume?: number
 }
 
 export interface AuthChallengeDoc {

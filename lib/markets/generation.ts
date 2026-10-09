@@ -46,7 +46,7 @@ const EVIDENCE_KINDS = [
   "background",
 ] as const
 
-export type MarketSource = "gemini" | "sample"
+export type MarketSource = "gemini" | "fallback"
 
 export interface MarketGenerationResult {
   markets: ClimateMarket[]
@@ -86,7 +86,7 @@ interface CacheShape {
   markets: ClimateMarket[]
 }
 
-const PROMPT = `You are curating ${MARKET_COUNT} binary (YES/NO) climate prediction markets for a demonstration app. Spread them across all six inhabited continents and vary the hazard categories.
+const PROMPT = `You are curating ${MARKET_COUNT} binary (YES/NO) climate prediction markets for a climate prediction app. Spread them across all six inhabited continents and vary the hazard categories.
 
 Every question must resolve in the FUTURE relative to the provided current date. Do not reference past years or already-completed seasons or events.
 
@@ -204,7 +204,6 @@ function buildEvidence(
       url,
       publishedAt,
       kind,
-      isDemo: false,
     })
   })
 
@@ -213,13 +212,11 @@ function buildEvidence(
     items.push({
       id: `${id}-evidence-source`,
       title: publisher.slice(0, 240),
-      summary:
-        "Official source proposed for resolution. Pool balances and the trend graph shown here are sample data.",
+      summary: "Official source proposed for resolution.",
       publisher: publisher.slice(0, 160),
       url: fallbackUrl,
       publishedAt,
       kind: "resolution-source",
-      isDemo: false,
     })
   }
 
@@ -335,9 +332,6 @@ function mapMarket(market: GeminiMarket, index: number): ClimateMarket | null {
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: false,
-    dataLabel: "",
-    dataDisclaimer: "",
   }
 
   const validated = climateMarketSchema.safeParse(climateMarket)
@@ -438,14 +432,14 @@ export async function getInitialClimateMarkets(): Promise<MarketGenerationResult
   if (!API_KEY) {
     return {
       markets: [],
-      source: "sample",
+      source: "fallback",
       error: "GEMINI_API_KEY not set",
     }
   }
   if (Date.now() < failedUntil) {
     return {
       markets: [],
-      source: "sample",
+      source: "fallback",
       error: "recent generation failure",
     }
   }
@@ -466,7 +460,7 @@ export async function getInitialClimateMarkets(): Promise<MarketGenerationResult
     failedUntil = Date.now() + FAILURE_BACKOFF_MS
     const message = error instanceof Error ? error.message : String(error)
     console.warn(`[gemini] generation failed: ${message}`)
-    return { markets: [], source: "sample", error: message }
+    return { markets: [], source: "fallback", error: message }
   } finally {
     inFlight = null
   }

@@ -18,9 +18,9 @@ rem
 rem  First run installs node_modules and creates .env from .env.example
 rem  when either is missing.
 rem
-rem  One-time on-chain seeding (optional, needs a funded Devnet wallet):
-rem    solana airdrop 2
-rem    node scripts/setup.mjs
+rem  One-time market seeding (optional, needs a funded Devnet wallet):
+rem    node scripts/preflight.mjs
+rem    node scripts/lifecycle.mjs seed
 rem ===========================================================================
 
 cd /d "%~dp0"

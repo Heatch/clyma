@@ -28,7 +28,6 @@ function positionDocToUserPosition(doc: PositionDoc): UserPosition {
     updatedAt: (doc.settledAt ?? doc.createdAt).toISOString(),
     transactionSignature: doc.txSignature,
     network: "devnet",
-    isDemo: true,
   }
 }
 

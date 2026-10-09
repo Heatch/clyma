@@ -90,7 +90,7 @@ export default function GlobeHero() {
               <strong className="mr-1 text-sm font-medium text-white/90">
                 Devnet
               </strong>
-              sample
+              markets
             </span>
           </div>
         </div>

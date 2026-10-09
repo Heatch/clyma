@@ -12,7 +12,7 @@ import { PositionProvider } from "@/components/providers/PositionProvider"
 import SolanaProvider from "@/components/providers/SolanaProvider"
 import type { ClimateMarket } from "@/lib/markets/types"
 
-function DashboardContent({ isDemo }: { isDemo: boolean }) {
+function DashboardContent() {
   const { search, setSearch } = useMarkets()
 
   return (
@@ -20,7 +20,7 @@ function DashboardContent({ isDemo }: { isDemo: boolean }) {
       id="top"
       className="fixed inset-0 isolate h-[100svh] min-h-0 w-full overflow-hidden bg-[#030605] text-white"
     >
-      <Navbar search={search} onSearchChange={setSearch} isDemo={isDemo} />
+      <Navbar search={search} onSearchChange={setSearch} />
       <main
         id="globe-workspace"
         className="h-full min-h-0 min-w-0 overflow-hidden md:pl-52"
@@ -34,17 +34,15 @@ function DashboardContent({ isDemo }: { isDemo: boolean }) {
 
 export default function Dashboard({
   initialMarkets,
-  isDemo = false,
 }: {
   initialMarkets?: ClimateMarket[]
-  isDemo?: boolean
 }) {
   return (
     <SolanaProvider>
-      <MarketProvider initialMarkets={initialMarkets} isDemo={isDemo}>
+      <MarketProvider initialMarkets={initialMarkets}>
         <PositionProvider>
           <GlobeLinkProvider>
-            <DashboardContent isDemo={isDemo} />
+            <DashboardContent />
           </GlobeLinkProvider>
         </PositionProvider>
       </MarketProvider>

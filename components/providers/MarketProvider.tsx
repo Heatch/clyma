@@ -19,8 +19,11 @@ import {
 import type {
   ClimateMarket,
   MarketCategory,
+  MarketHistoryPoint,
   MarketStatus,
+  TradeConfirmedDetail,
 } from "@/lib/markets/types"
+import { TRADE_CONFIRMED_EVENT } from "@/lib/markets/types"
 import { decodeMarketAccount } from "@/lib/solana/accounts"
 import { SOLANA_COMMITMENT, SOLANA_PROGRAM_ID } from "@/lib/solana/config"
 import { deriveMarketPda, deriveProtocolConfigPda } from "@/lib/solana/pdas"
@@ -59,6 +62,43 @@ type MarketContextValue = {
 
 const MarketContext = createContext<MarketContextValue | null>(null)
 const MARKET_REFRESH_EVENT = "terraform:market-state-changed"
+
+interface OptimisticPoint {
+  timestamp: string
+  yesProbability: number
+  noProbability: number
+}
+
+/**
+ * Re-applies confirmed-trade points on top of any market snapshot. Chain
+ * refreshes rebuild state from the catalog (wiping in-flight points), so
+ * this keeps the chart bent in-session. Pools and volumes are chain-owned
+ * and intentionally untouched here — only history and headline odds.
+ */
+function withOptimisticPoints(
+  market: ClimateMarket,
+  points: OptimisticPoint[],
+): ClimateMarket {
+  if (points.length === 0) return market
+  const history: MarketHistoryPoint[] = [
+    ...market.history,
+    ...points.map((point) => ({
+      timestamp: point.timestamp,
+      yesProbability: point.yesProbability,
+      noProbability: point.noProbability,
+      totalVolume: market.totalVolume,
+      yesLiquidity: market.yesLiquidity,
+      noLiquidity: market.noLiquidity,
+    })),
+  ]
+  const last = points[points.length - 1]!
+  return {
+    ...market,
+    history,
+    yesPrice: last.yesProbability,
+    noPrice: last.noProbability,
+  }
+}
 
 const STATUS_ORDER: Record<MarketStatus, number> = {
   open: 0,
@@ -104,11 +144,9 @@ function comparatorFor(sort: MarketSort) {
 export function MarketProvider({
   children,
   initialMarkets,
-  isDemo = false,
 }: {
   children: React.ReactNode
   initialMarkets?: ClimateMarket[]
-  isDemo?: boolean
 }) {
   const { connection } = useSolanaWallet()
   // Treat the server payload as initial state. Keeping this catalog stable lets
@@ -120,7 +158,7 @@ export function MarketProvider({
   const [markets, setMarkets] = useState<ClimateMarket[]>(() =>
     marketCatalog.map((market) => ({
       ...market,
-      chainState: SOLANA_PROGRAM_ID ? "loading" : "demo-only",
+      chainState: SOLANA_PROGRAM_ID ? "loading" : "unconfigured",
     })),
   )
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
@@ -141,16 +179,19 @@ export function MarketProvider({
   // Reference "now" resolved after mount (never during render) so time-based
   // card tags like "Closing soon" stay pure and hydration-safe.
   const [now, setNow] = useState(0)
+  // Confirmed-trade points awaiting chain confirmation. Re-applied on top of
+  // every chain refresh so the chart stays bent in-session.
+  const optimisticRef = useRef(new Map<string, OptimisticPoint[]>())
 
   const refreshOnchainMarkets = useCallback(async () => {
     const requestId = ++refreshRequestRef.current
     const programId = SOLANA_PROGRAM_ID
-    if (isDemo || !programId) {
+    if (!programId) {
       if (requestId !== refreshRequestRef.current) return
       setMarkets(
         marketCatalog.map((market) => ({
           ...market,
-          chainState: "demo-only" as const,
+          chainState: "unconfigured" as const,
         })),
       )
       return
@@ -219,7 +260,12 @@ export function MarketProvider({
           } catch {
             return { ...market, chainState: "error" as const }
           }
-        }),
+        }).map((market) =>
+          withOptimisticPoints(
+            market,
+            optimisticRef.current.get(market.id) ?? [],
+          ),
+        ),
       )
     } catch {
       if (requestId !== refreshRequestRef.current) return
@@ -227,7 +273,7 @@ export function MarketProvider({
         current.map((market) => ({ ...market, chainState: "error" })),
       )
     }
-  }, [connection, marketCatalog, isDemo])
+  }, [connection, marketCatalog])
 
   // Flip off after the first client commit so board/card skeletons show during
   // hydration and swap seamlessly to content (and stay ready for async data).
@@ -251,6 +297,35 @@ export function MarketProvider({
       window.removeEventListener(MARKET_REFRESH_EVENT, refresh)
     }
   }, [refreshOnchainMarkets])
+
+  // Optimistic post-trade feedback: append the confirmed point immediately so
+  // the chart bends without waiting for the next chain refresh (which
+  // re-applies the same points on top of fresh chain state).
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<TradeConfirmedDetail>).detail
+      if (!detail) return
+      const point: OptimisticPoint = {
+        timestamp: new Date().toISOString(),
+        yesProbability: detail.yesProbabilityAfter,
+        noProbability: detail.noProbabilityAfter,
+      }
+      const kept = [
+        ...(optimisticRef.current.get(detail.marketId) ?? []),
+        point,
+      ].slice(-50)
+      optimisticRef.current.set(detail.marketId, kept)
+      setMarkets((current) =>
+        current.map((market) =>
+          market.id === detail.marketId
+            ? withOptimisticPoints(market, [point])
+            : market,
+        ),
+      )
+    }
+    window.addEventListener(TRADE_CONFIRMED_EVENT, handler)
+    return () => window.removeEventListener(TRADE_CONFIRMED_EVENT, handler)
+  }, [])
 
   useEffect(() => {
     setSelectedMarket((current) =>

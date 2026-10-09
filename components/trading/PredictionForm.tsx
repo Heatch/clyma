@@ -6,6 +6,15 @@ import { usePositions } from "@/components/providers/PositionProvider"
 import { useSolanaWallet } from "@/components/providers/SolanaProvider"
 import useMarketProgram from "@/hooks/useMarketProgram"
 import type { ClimateMarket, TradeSide } from "@/lib/markets/types"
+import {
+  TRADE_CONFIRMED_EVENT,
+  type TradeConfirmedDetail,
+} from "@/lib/markets/types"
+import {
+  calculatePooledTradeQuote,
+  solToLamports,
+  type PooledTradeQuote,
+} from "@/lib/markets/calculations"
 import { getExplorerTransactionUrl } from "@/lib/solana/config"
 import { formatProbability, formatSol } from "@/lib/utils/format"
 
@@ -15,6 +24,12 @@ const DEFAULT_NETWORK_FEE_SOL = 0.000005
 interface PredictionFormProps {
   market: ClimateMarket
   tone?: "light" | "dark"
+  onPreviewChange?: (preview: TradePreview | null) => void
+}
+
+export interface TradePreview {
+  side: TradeSide
+  yesProbability: number
 }
 
 function parseAmount(value: string) {
@@ -25,6 +40,7 @@ function parseAmount(value: string) {
 export default function PredictionForm({
   market,
   tone = "light",
+  onPreviewChange,
 }: PredictionFormProps) {
   const { connected, publicKey } = useSolanaWallet()
   const { positions, recordPurchase } = usePositions()
@@ -130,30 +146,30 @@ export default function PredictionForm({
   const amountSol = parseAmount(amount)
   const balanceSol =
     balanceLamports === null ? null : Number(balanceLamports) / 1_000_000_000
-  const quote = useMemo(() => {
-    const safeAmount =
-      Number.isFinite(amountSol) && amountSol > 0 ? amountSol : 0
-    const totalPool = market.yesLiquidity + market.noLiquidity
-    const selectedPool =
-      side === "yes" ? market.yesLiquidity : market.noLiquidity
-    const currentProbability = totalPool > 0 ? selectedPool / totalPool : 0.5
-    const nextTotalPool = totalPool + safeAmount
-    const nextSelectedPool = selectedPool + safeAmount
-    const nextProbability =
-      nextTotalPool > 0 ? nextSelectedPool / nextTotalPool : currentProbability
-    const estimatedPayout =
-      nextSelectedPool > 0 ? (safeAmount * nextTotalPool) / nextSelectedPool : 0
-    const averageExecutionPrice =
-      estimatedPayout > 0 ? safeAmount / estimatedPayout : 0
-    return {
-      currentProbability,
-      nextProbability,
-      priceImpact: Math.max(0, (nextProbability - currentProbability) * 100),
-      estimatedPayout,
-      averageExecutionPrice,
-      positionUnits: safeAmount,
+  const quote: PooledTradeQuote | null = useMemo(() => {
+    if (!Number.isFinite(amountSol) || amountSol <= 0) return null
+    try {
+      return calculatePooledTradeQuote({
+        side,
+        amountLamports: solToLamports(amountSol),
+        yesPoolLamports: solToLamports(market.yesLiquidity),
+        noPoolLamports: solToLamports(market.noLiquidity),
+      })
+    } catch {
+      return null
     }
   }, [amountSol, market.noLiquidity, market.yesLiquidity, side])
+
+  const priceImpactPts = quote ? quote.priceImpact * 100 : 0
+
+  // Drive the parent chart's what-if projection segment.
+  useEffect(() => {
+    onPreviewChange?.(
+      quote
+        ? { side, yesProbability: quote.yesProbabilityAfter }
+        : null,
+    )
+  }, [quote, side, onPreviewChange])
 
   const validationError = useMemo(() => {
     if (!connected || !publicKey)
@@ -163,7 +179,7 @@ export default function PredictionForm({
     if (market.chainState === "loading")
       return "Checking this market's Devnet account…"
     if (market.chainState === "missing")
-      return "This demo market has not been created on Devnet."
+      return "This market has not been created on Devnet."
     if (market.chainState === "error")
       return "This market's Devnet account could not be verified."
     if (isConfigured && market.chainState !== "synced")
@@ -208,7 +224,7 @@ export default function PredictionForm({
         region: market.region,
         side,
         amountSol,
-        estimatedPayoutSol: quote.estimatedPayout,
+        estimatedPayoutSol: quote?.potentialPayoutSol ?? 0,
         signature: result.signature,
       })
 
@@ -225,9 +241,22 @@ export default function PredictionForm({
             side,
             amountLamports: Math.round(amountSol * 1_000_000_000).toString(),
             transactionSignature: result.signature,
+            yesPrice: quote?.yesProbabilityAfter,
+            noPrice: quote?.noProbabilityAfter,
           }),
         }).catch(() => undefined)
       }
+
+      const detail: TradeConfirmedDetail = {
+        marketId: market.id,
+        side,
+        amountSol,
+        yesProbabilityAfter: quote?.yesProbabilityAfter ?? market.yesPrice,
+        noProbabilityAfter: quote?.noProbabilityAfter ?? market.noPrice,
+      }
+      window.dispatchEvent(
+        new CustomEvent(TRADE_CONFIRMED_EVENT, { detail }),
+      )
     } catch {
       // The hook maps and exposes a user-safe error in state.
     }
@@ -394,6 +423,43 @@ export default function PredictionForm({
         </div>
       </div>
 
+      <div className="mt-3">
+        <div className="flex items-center justify-between gap-3">
+          <label
+            htmlFor={`size-preview-${market.id}`}
+            className={`text-[10px] font-bold uppercase tracking-wider ${
+              isDark ? "text-white/35" : "text-neutral-500"
+            }`}
+          >
+            What-if size
+          </label>
+          <span
+            className={`tabular text-[10px] font-semibold ${
+              isDark ? "text-white/60" : "text-neutral-600"
+            }`}
+            aria-live="polite"
+          >
+            {quote
+              ? `YES ${formatProbability(market.yesPrice)} → ${formatProbability(quote.yesProbabilityAfter)}`
+              : "Enter an amount"}
+          </span>
+        </div>
+        <input
+          id={`size-preview-${market.id}`}
+          type="range"
+          min={0.01}
+          max={2}
+          step={0.01}
+          value={Math.min(2, Math.max(0.01, Number.isFinite(amountSol) ? amountSol : 0.01))}
+          disabled={isPending}
+          onChange={(event) => {
+            setAmount(event.target.value)
+            reset()
+          }}
+          className="mt-1.5 w-full"
+        />
+      </div>
+
       <dl
         className={`mt-4 space-y-2 rounded-xl p-3 text-[10px] ${
           isDark ? "border border-white/10 bg-black/20" : "bg-neutral-100"
@@ -404,7 +470,7 @@ export default function PredictionForm({
             Estimated position units
           </dt>
           <dd className="tabular font-semibold">
-            {quote.positionUnits.toFixed(4)} {side.toUpperCase()}
+            {(quote?.amountSol ?? 0).toFixed(4)} {side.toUpperCase()}
           </dd>
         </div>
         <div className="flex justify-between gap-3">
@@ -412,7 +478,7 @@ export default function PredictionForm({
             Average execution probability
           </dt>
           <dd className="tabular font-semibold">
-            {formatProbability(quote.averageExecutionPrice)}
+            {formatProbability(quote?.averageExecutionPrice ?? 0)}
           </dd>
         </div>
         <div className="flex justify-between gap-3">
@@ -420,15 +486,36 @@ export default function PredictionForm({
             Potential payout if correct
           </dt>
           <dd className="tabular font-semibold">
-            {formatSol(quote.estimatedPayout, 4)}
+            {formatSol(quote?.potentialPayoutSol ?? 0, 4)}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className={isDark ? "text-white/35" : "text-neutral-500"}>
+            Odds after this trade
+          </dt>
+          <dd className="tabular font-semibold">
+            {quote ? formatProbability(quote.yesProbabilityAfter) : "—"}
           </dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt className={isDark ? "text-white/35" : "text-neutral-500"}>
             Estimated price impact
           </dt>
-          <dd className="tabular font-semibold">
-            +{quote.priceImpact.toFixed(2)} pts
+          <dd className="tabular flex items-center gap-1.5 font-semibold">
+            +{priceImpactPts.toFixed(2)} pts
+            {quote && quote.priceImpactLevel !== "none" && (
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
+                  quote.priceImpactLevel === "low"
+                    ? "bg-emerald-300/15 text-emerald-200"
+                    : quote.priceImpactLevel === "moderate"
+                      ? "bg-amber-300/15 text-amber-200"
+                      : "bg-rose-300/15 text-rose-200"
+                }`}
+              >
+                {quote.priceImpactLevel}
+              </span>
+            )}
           </dd>
         </div>
         <div className="flex justify-between gap-3">
@@ -473,7 +560,7 @@ export default function PredictionForm({
         </div>
       )}
 
-      {quote.priceImpact >= 5 && amountSol > 0 && (
+      {priceImpactPts >= 5 && amountSol > 0 && (
         <p
           className={`mt-3 rounded-lg border px-3 py-2 text-[10px] font-semibold ${
             isDark
@@ -482,7 +569,7 @@ export default function PredictionForm({
           }`}
           role="alert"
         >
-          High price impact: this deposit materially changes the sample pool
+          High price impact: this deposit materially changes the pool
           probability.
         </p>
       )}
@@ -673,7 +760,7 @@ export default function PredictionForm({
                       Estimated payout
                     </dt>
                     <dd className="tabular font-semibold">
-                      {formatSol(quote.estimatedPayout, 4)}
+                      {formatSol(quote?.potentialPayoutSol ?? 0, 4)}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4 py-3">

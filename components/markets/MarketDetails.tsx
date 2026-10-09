@@ -1,14 +1,20 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 
 import HazardIcon from "@/components/icons/HazardIcon"
 import MarketChart from "@/components/markets/MarketChart"
-import PredictionForm from "@/components/trading/PredictionForm"
+import PredictionForm, {
+  type TradePreview,
+} from "@/components/trading/PredictionForm"
 import RedeemPosition from "@/components/trading/RedeemPosition"
 import { useAIForecast } from "@/hooks/useAIForecast"
 import { CATEGORY_ACCENTS, CATEGORY_LABELS } from "@/lib/markets/categories"
-import type { ClimateMarket } from "@/lib/markets/types"
+import type {
+  ClimateMarket,
+  TradeConfirmedDetail,
+} from "@/lib/markets/types"
+import { TRADE_CONFIRMED_EVENT } from "@/lib/markets/types"
 import {
   formatCompact,
   formatCountdown,
@@ -36,28 +42,44 @@ export default function MarketDetails({
     return () => window.clearInterval(timer)
   }, [])
 
-  const { probability: aiProb } = useAIForecast(
+  const { probability: modelProb } = useAIForecast(
     market.question,
-    market.resolutionRules
+    market.resolutionRules,
   )
+  const [preview, setPreview] = useState<TradePreview | null>(null)
+  const [lastTrade, setLastTrade] = useState<{
+    at: number
+    deltaPts: number
+  } | null>(null)
 
   const currentProbability = market.yesPrice
 
-  const effectiveHistory = useMemo(() => {
-    if (aiProb === null) return market.history
-    return market.history.map((point, index) => {
-      if (index === 0) {
-        return {
-          ...point,
-          yesProbability: aiProb,
-          noProbability: Number((1 - aiProb).toFixed(2)),
-        }
-      }
-      return point
-    })
-  }, [aiProb, market.history])
+  useEffect(() => {
+    setPreview(null)
+    setLastTrade(null)
+  }, [market.id])
 
-  const openingProbability = effectiveHistory[0]?.yesProbability ?? currentProbability
+  useEffect(() => {
+    let timer: number | undefined
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<TradeConfirmedDetail>).detail
+      if (!detail || detail.marketId !== market.id) return
+      setLastTrade({
+        at: Date.now(),
+        deltaPts: (detail.yesProbabilityAfter - market.yesPrice) * 100,
+      })
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setLastTrade(null), 15000)
+    }
+    window.addEventListener(TRADE_CONFIRMED_EVENT, handler)
+    return () => {
+      window.removeEventListener(TRADE_CONFIRMED_EVENT, handler)
+      window.clearTimeout(timer)
+    }
+  }, [market.id, market.yesPrice])
+
+  const history = market.history
+  const openingProbability = history[0]?.yesProbability ?? currentProbability
   const probabilityChange = (currentProbability - openingProbability) * 100
   const totalLiquidity = market.yesLiquidity + market.noLiquidity
   const categoryAccent = CATEGORY_ACCENTS[market.category]
@@ -72,13 +94,18 @@ export default function MarketDetails({
           ← {backLabel ?? market.continent}
         </button>
         <div className="flex items-center gap-2 font-mono text-[8px] uppercase tracking-[0.13em]">
-          <span className="rounded-full border border-white/10 px-2.5 py-1 text-white/35">
-            {market.dataLabel}
-          </span>
           <span className="flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-emerald-200">
             <span className="size-1 rounded-full bg-emerald-300" />
             {market.status}
           </span>
+          {modelProb !== null && (
+            <span
+              className="rounded-full border border-violet-300/25 bg-violet-300/10 px-2.5 py-1 text-violet-100"
+              title="Independent model forecast for this market"
+            >
+              Model {formatProbability(modelProb)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -130,10 +157,10 @@ export default function MarketDetails({
             : market.chainState === "loading"
               ? "Checking Devnet account"
               : market.chainState === "missing"
-                ? "Demo market not on-chain"
+                ? "Market not on-chain"
                 : market.chainState === "error"
                   ? "Devnet state unavailable"
-                  : "Demo metadata only"}
+                  : "On-chain data unavailable"}
         </span>
       </div>
 
@@ -156,6 +183,15 @@ export default function MarketDetails({
               {probabilityChange >= 0 ? "+" : ""}
               {probabilityChange.toFixed(1)} pts
             </span>
+            {lastTrade && (
+              <span
+                className="mb-1 rounded-full bg-sky-300/10 px-2 py-1 font-mono text-[9px] text-sky-200"
+                aria-live="polite"
+              >
+                Odds moved {lastTrade.deltaPts >= 0 ? "+" : ""}
+                {lastTrade.deltaPts.toFixed(1)} pts
+              </span>
+            )}
           </div>
         </div>
         <div className="text-right font-mono text-[9px] uppercase tracking-[0.1em] text-white/30">
@@ -181,15 +217,24 @@ export default function MarketDetails({
             </h3>
           </div>
           <span className="rounded-full border border-white/10 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.1em] text-white/30">
-            Simulated
+            History
           </span>
         </div>
         <div className="mt-2">
-          <MarketChart history={effectiveHistory} tone="dark" />
+          <MarketChart
+            history={history}
+            tone="dark"
+            forecastProb={modelProb}
+            previewProb={preview?.yesProbability ?? null}
+          />
         </div>
       </section>
 
-      <PredictionForm market={market} tone="dark" />
+      <PredictionForm
+        market={market}
+        tone="dark"
+        onPreviewChange={setPreview}
+      />
       {market.status !== "open" && <RedeemPosition market={market} />}
 
       <dl className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 font-mono sm:grid-cols-4">
@@ -268,7 +313,7 @@ export default function MarketDetails({
 
         <details className="group rounded-xl border border-white/10 bg-white/[0.025] open:bg-white/[0.045]">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/50 marker:hidden">
-            Recent simulated trades ({market.recentTrades.length})
+            Recent trades ({market.recentTrades.length})
             <span className="text-white/25 transition group-open:rotate-45">
               +
             </span>

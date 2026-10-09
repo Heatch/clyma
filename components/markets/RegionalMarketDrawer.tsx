@@ -151,7 +151,7 @@ export default function RegionalMarketDrawer() {
                 <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-neutral-400">
                   {isPortfolioMode
                     ? "Your Devnet holdings"
-                    : `${activeCount} active demo market${activeCount === 1 ? "" : "s"} · Devnet`}
+                    : `${activeCount} active market${activeCount === 1 ? "" : "s"} · Devnet`}
                 </p>
               </div>
             </div>
@@ -197,8 +197,7 @@ export default function RegionalMarketDrawer() {
                   </span>
                 </div>
                 <p className="mt-2 max-w-md text-xs leading-5 text-neutral-400">
-                  Browse fictional climate-risk markets mapped to this region.
-                  Pool and chart values are sample data.
+                  Browse climate-risk markets mapped to this region.
                 </p>
 
                 <label className="mt-5 block" htmlFor="region-market-search">

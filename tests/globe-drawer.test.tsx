@@ -11,7 +11,7 @@ import {
   MarketProvider,
   useMarkets,
 } from "@/components/providers/MarketProvider"
-import { demoMarkets } from "@/lib/markets/data"
+import { fixtureMarkets } from "@/lib/markets/data"
 import type { ClimateMarket } from "@/lib/markets/types"
 
 const testMarkets: ClimateMarket[] = [
@@ -50,9 +50,6 @@ const testMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: false,
-    dataLabel: "",
-    dataDisclaimer: "",
   },
   {
     id: "test-europe-heatwave",
@@ -88,9 +85,6 @@ const testMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: false,
-    dataLabel: "",
-    dataDisclaimer: "",
   },
   {
     id: "test-queensland-cyclone",
@@ -127,9 +121,6 @@ const testMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: false,
-    dataLabel: "",
-    dataDisclaimer: "",
   },
 ]
 
@@ -193,7 +184,7 @@ describe("geographic market workflow", () => {
     }
 
     render(
-      <MarketProvider>
+      <MarketProvider initialMarkets={testMarkets}>
         <Harness />
       </MarketProvider>,
     )
@@ -231,7 +222,7 @@ describe("geographic market workflow", () => {
 
   it("reserves the drawer width in the globe viewport after selecting a market", async () => {
     const user = userEvent.setup()
-    const market = demoMarkets.find((item) => item.status === "open")!
+    const market = fixtureMarkets.find((item) => item.status === "open")!
 
     function Harness() {
       const { selectMarket } = useMarkets()

@@ -7,6 +7,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
   ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
@@ -25,6 +26,10 @@ interface MarketChartProps {
   history: MarketHistoryPoint[]
   compact?: boolean
   tone?: ChartTone
+  /** Independent model forecast (0–1): dashed reference line, never rewrites history. */
+  forecastProb?: number | null
+  /** Live what-if preview (0–1): dashed segment from the current point. */
+  previewProb?: number | null
 }
 
 type ChartDatum = {
@@ -137,7 +142,7 @@ function ProbabilityTooltip({
         <span
           className={tone === "dark" ? "text-white/55" : "text-neutral-500"}
         >
-          Sample volume
+          Volume
         </span>
         <span className="tabular font-semibold">
           {VOLUME_FORMATTER.format(datum.totalVolume)} SOL
@@ -194,6 +199,8 @@ export default function MarketChart({
   history,
   compact = false,
   tone = "light",
+  forecastProb = null,
+  previewProb = null,
 }: MarketChartProps) {
   const gradientId = useId().replaceAll(":", "")
   const [requestedRange, setRequestedRange] = useState<ChartRange>("ALL")
@@ -226,6 +233,42 @@ export default function MarketChart({
   const delta =
     firstDatum && currentDatum ? currentDatum.yes - firstDatum.yes : 0
   const hasMeaningfulDelta = Math.abs(delta) >= 0.05
+
+  const forecastValue =
+    typeof forecastProb === "number" &&
+    Number.isFinite(forecastProb) &&
+    forecastProb >= 0 &&
+    forecastProb <= 1
+      ? normalizeProbability(forecastProb)
+      : null
+
+  // Dashed what-if segment: current point → projected point. Kept out of the
+  // ranged data so range buttons keep working on real history.
+  const previewData = useMemo(() => {
+    if (
+      previewProb === null ||
+      previewProb === undefined ||
+      !Number.isFinite(previewProb) ||
+      data.length === 0
+    ) {
+      return null
+    }
+    const lastDatum = data[data.length - 1]!
+    const yes = normalizeProbability(
+      Math.min(1, Math.max(0, previewProb)),
+    )
+    return [
+      { ...lastDatum },
+      {
+        ...lastDatum,
+        timestamp: "preview",
+        time: lastDatum.time + 1,
+        yes,
+        no: Math.round((100 - yes) * 10) / 10,
+        intervalVolume: 0,
+      },
+    ]
+  }, [previewProb, data])
 
   const colors =
     tone === "dark"
@@ -267,7 +310,7 @@ export default function MarketChart({
     hasMeaningfulDelta
       ? `${delta > 0 ? "up" : "down"} ${Math.abs(delta).toFixed(1)} points`
       : "unchanged"
-  } over ${activeRange === "ALL" ? "all available sample history" : activeRange}`
+  } over ${activeRange === "ALL" ? "all history" : activeRange}`
 
   if (compact) {
     return (
@@ -385,7 +428,7 @@ export default function MarketChart({
                 title={
                   isAvailable
                     ? `Show ${label === "ALL" ? "all" : label} history`
-                    : `Not enough sample points for ${label}`
+                    : `Not enough points for ${label}`
                 }
                 onClick={() => setRequestedRange(label)}
                 className={`min-w-10 rounded-full px-2 py-1 text-[9px] font-bold transition ${
@@ -435,9 +478,11 @@ export default function MarketChart({
               axisLine={false}
               tickLine={false}
               minTickGap={32}
-              tickFormatter={(value: string) =>
-                SHORT_DATE_FORMATTER.format(new Date(value))
-              }
+              tickFormatter={(value: string) => {
+                const time = new Date(value).getTime()
+                if (Number.isNaN(time)) return ""
+                return SHORT_DATE_FORMATTER.format(new Date(time))
+              }}
               tick={{ fill: colors.muted, fontSize: 9 }}
             />
             <YAxis
@@ -475,6 +520,27 @@ export default function MarketChart({
               fill="transparent"
               isAnimationActive={false}
             />
+            {forecastValue !== null && (
+              <ReferenceLine
+                y={forecastValue}
+                stroke={tone === "dark" ? "#c4b5fd" : "#7c3aed"}
+                strokeDasharray="5 4"
+                strokeWidth={1.25}
+              />
+            )}
+            {previewData && (
+              <Line
+                type="monotone"
+                data={previewData}
+                dataKey="yes"
+                name="Preview"
+                stroke={tone === "dark" ? "#7dd3fc" : "#0284c7"}
+                strokeDasharray="5 4"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+            )}
             {currentDatum && (
               <ReferenceDot
                 x={currentDatum.timestamp}
@@ -495,7 +561,7 @@ export default function MarketChart({
             tone === "dark" ? "text-white/35" : "text-neutral-400"
           }`}
         >
-          Interval sample volume
+          Interval volume
         </p>
         <div
           className={`flex items-center gap-3 text-[9px] font-semibold ${
@@ -505,6 +571,16 @@ export default function MarketChart({
         >
           <span>━ YES</span>
           <span>┄ NO</span>
+          {forecastValue !== null && (
+            <span className={tone === "dark" ? "text-violet-200" : "text-violet-700"}>
+              ┄ Model
+            </span>
+          )}
+          {previewData && (
+            <span className={tone === "dark" ? "text-sky-200" : "text-sky-700"}>
+              ┄ Preview
+            </span>
+          )}
         </div>
       </div>
       <div className="h-10 w-full" aria-hidden="true">

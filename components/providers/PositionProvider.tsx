@@ -148,21 +148,9 @@ export function PositionProvider({ children }: { children: React.ReactNode }) {
         createdAt: now,
       }
 
-      fetch(`/api/index-transaction`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wallet,
-          marketId: position.marketId,
-          onchainMarketId: 0,
-          type: position.side === "yes" ? "purchase_yes" : "purchase_no",
-          status: "confirmed",
-          side: position.side,
-          amountSol: position.amountSol,
-          transactionSignature: position.signature,
-        }),
-      }).catch(() => {})
-
+      // Indexing is the trade form's job (single POST per signature in
+      // PredictionForm.submit); this stays a local write so retries and
+      // duplicate callers cannot create duplicate positions.
       persist([
         nextPosition,
         ...positions.filter((item) => item.id !== nextPosition.id),

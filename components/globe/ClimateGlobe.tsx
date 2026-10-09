@@ -803,7 +803,7 @@ export default function ClimateGlobe({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question: targetMarket.question.replace(/^\[DEMO\]\s*/i, ""),
+        question: targetMarket.question,
         resolution_rules: targetMarket.resolutionRules,
       }),
     }).catch(() => {})
@@ -994,7 +994,7 @@ export default function ClimateGlobe({
         <canvas
           ref={canvasRef}
           className="block h-full w-full cursor-grab touch-none active:cursor-grabbing"
-          aria-label="Interactive halftone globe with demo climate market markers. Drag or use arrow keys to rotate, scroll or use plus and minus keys to zoom."
+          aria-label="Interactive halftone globe with climate market markers. Drag or use arrow keys to rotate, scroll or use plus and minus keys to zoom."
           role="img"
           tabIndex={0}
           onKeyDown={handleKeyDown}

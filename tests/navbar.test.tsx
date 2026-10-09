@@ -38,7 +38,7 @@ describe("Clyma navigation rail", () => {
 
     expect(navigation).toHaveClass("md:w-52")
     expect(homeLink).toHaveClass("md:mt-auto")
-    expect(within(homeLink).getByTestId("terraform-mark")).toBeInTheDocument()
+    expect(within(homeLink).getByTestId("clyma-mark")).toBeInTheDocument()
     expect(within(homeLink).getByText("Clyma")).toBeInTheDocument()
     expect(screen.queryByText(/klashi/i)).not.toBeInTheDocument()
 

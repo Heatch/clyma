@@ -26,7 +26,6 @@ function transactionDocToActivity(doc: TransactionDoc): UserActivity {
     timestamp: doc.createdAt.toISOString(),
     failureReason: doc.failureReason,
     network: "devnet",
-    isDemo: true,
   }
 }
 
@@ -73,6 +72,14 @@ export async function insertTransaction(params: {
   }
 
   return doc as TransactionDoc
+}
+
+export async function findTransactionBySignature(
+  txSignature: string,
+): Promise<TransactionDoc | null> {
+  const transactions = await getTransactionsCollection()
+  const doc = await transactions.findOne({ txSignature })
+  return (doc as unknown as TransactionDoc | null) ?? null
 }
 
 export async function getActivityByWallet(

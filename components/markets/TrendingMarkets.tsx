@@ -24,7 +24,7 @@ export default function TrendingMarkets() {
           </h2>
         </div>
         <p className="hidden max-w-sm text-right text-[10px] leading-4 text-neutral-500 sm:block">
-          Ranked using fictional demo activity—not an investment recommendation.
+          Ranked by market activity—not an investment recommendation.
         </p>
       </div>
       {isLoading ? (

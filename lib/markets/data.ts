@@ -8,16 +8,13 @@ import type {
   UserPosition,
 } from "./types"
 
-export const DEMO_DATA_DISCLAIMER =
-  "SAMPLE DATA — This market, its probabilities, trades, evidence summaries, and pool liquidity are fictional Devnet demonstration data."
-
-export const DEMO_WALLETS = {
+export const SEED_WALLETS = {
   atlas: "Udf5rTTTfiQGstoHtf6TsUfo9zHjN2zjo9kF49vebzH",
   boreal: "2HfCoU3aZFH7wxttXUa7xNjpj49P6KdMwwFvx6MpcRos",
   cirrus: "3mshx6HoZop71xQ483kLMdiUuXQ1UxDgBABuLnFkVfDV",
 } as const
 
-const DEMO_SIGNATURES = [
+const SEED_SIGNATURES = [
   "4a4iVL4tfH6mDmM2DBGN7R9Qs6Br5Je7rFEPZKzUQjQ1zutf2JJQApLCXbsLGoLjCifyj69uoibFnFUV7PFydUd",
   "DtEQdfYhAXMo6iWP25G8SnxjoUe3nZjWunhKj3n2mX9wYEGpLnhLiFzzvpgTo8fFCYGB73F1KtbSdrgVfk7HGNV",
   "aqcDTRNkJKwcprcwLbCSkXWyUKBXGmYA63iJrEwksaXg5zte76RQ6b2HEXNJp4QQ1tpqWVXaYGtYu2F9mjDuTRM",
@@ -64,12 +61,11 @@ export const buildHistory = ({
       totalVolume: round(baseVolume + volumeStep * index),
       yesLiquidity,
       noLiquidity,
-      dataLabel: "SAMPLE DATA",
     }
   })
 }
 
-type DemoTradeInput = readonly [
+type TradeInput = readonly [
   side: TradeSide,
   amountSol: number,
   probability: number,
@@ -78,7 +74,7 @@ type DemoTradeInput = readonly [
 
 export const buildTrades = (
   marketId: string,
-  inputs: readonly DemoTradeInput[],
+  inputs: readonly TradeInput[],
 ): MarketTrade[] =>
   inputs.map(([side, amountSol, probability, timestamp], index) => ({
     id: `${marketId}-trade-${index + 1}`,
@@ -89,10 +85,9 @@ export const buildTrades = (
     probability,
     estimatedPayoutSol: round(amountSol / probability, 4),
     wallet:
-      Object.values(DEMO_WALLETS)[index % Object.values(DEMO_WALLETS).length]!,
+      Object.values(SEED_WALLETS)[index % Object.values(SEED_WALLETS).length]!,
     timestamp,
-    transactionSignature: DEMO_SIGNATURES[index % DEMO_SIGNATURES.length],
-    isDemo: true,
+    transactionSignature: SEED_SIGNATURES[index % SEED_SIGNATURES.length],
   }))
 
 interface EvidenceOptions {
@@ -123,30 +118,28 @@ const buildEvidence = ({
     url: sourceUrl,
     publishedAt,
     kind: "resolution-source",
-    isDemo: true,
   },
   {
     id: `${marketId}-evidence-method`,
     title: methodologyTitle,
     summary:
-      "Background methodology link for evaluating the rule. The market history and trade activity shown here remain fictional sample data.",
+      "Background methodology link for evaluating the rule.",
     publisher,
     url: methodologyUrl,
     publishedAt,
     kind: "methodology",
-    isDemo: true,
   },
 ]
 
-export const demoMarkets: ClimateMarket[] = [
+export const fixtureMarkets: ClimateMarket[] = [
   {
-    id: "demo-fl-hurricane-2026",
+    id: "fixture-fl-hurricane-2026",
     onchainMarketId: 1001,
     question:
-      "[DEMO] Will Florida record a Category 4+ hurricane landfall before October 31, 2026?",
-    slug: "florida-category-4-hurricane-2026-demo",
+      "Will Florida record a Category 4+ hurricane landfall before October 31, 2026?",
+    slug: "florida-category-4-hurricane-2026",
     description:
-      "A fictional sample market tracking whether a hurricane classified as Category 4 or higher makes landfall in Florida during the stated window.",
+      "A market tracking whether a hurricane classified as Category 4 or higher makes landfall in Florida during the stated window.",
     category: "hurricane",
     continent: "North America",
     country: "United States",
@@ -167,7 +160,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.nhc.noaa.gov/data/",
     resolutionRules:
       "Resolve YES if the NOAA post-season archive identifies a Category 4 or 5 hurricane landfall within Florida before the close time; otherwise resolve NO. Cancel if the designated archive is unavailable for 30 days.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-05-01T14:00:00.000Z",
     featured: true,
     trendingScore: 96,
@@ -180,7 +173,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 365,
     }),
     evidence: buildEvidence({
-      marketId: "demo-fl-hurricane-2026",
+      marketId: "fixture-fl-hurricane-2026",
       publisher: "NOAA National Hurricane Center",
       sourceUrl: "https://www.nhc.noaa.gov/data/",
       sourceTitle: "NHC hurricane archive (proposed resolution source)",
@@ -188,7 +181,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Saffir-Simpson Hurricane Wind Scale",
       publishedAt: "2026-05-01T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-fl-hurricane-2026", [
+    recentTrades: buildTrades("fixture-fl-hurricane-2026", [
       ["yes", 2.4, 0.43, "2026-07-17T16:20:00.000Z"],
       ["no", 1.1, 0.58, "2026-07-17T12:05:00.000Z"],
       ["yes", 0.75, 0.41, "2026-07-16T21:42:00.000Z"],
@@ -196,18 +189,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-ca-drought-2026",
+    id: "fixture-ca-drought-2026",
     onchainMarketId: 1002,
     question:
-      "[DEMO] Will California enter severe drought conditions before December 31, 2026?",
-    slug: "california-severe-drought-2026-demo",
+      "Will California enter severe drought conditions before December 31, 2026?",
+    slug: "california-severe-drought-2026",
     description:
-      "A fictional sample market based on whether a defined share of California reaches the severe-drought threshold during 2026.",
+      "A market based on whether a defined share of California reaches the severe-drought threshold during 2026.",
     category: "drought",
     continent: "North America",
     country: "United States",
@@ -229,7 +219,7 @@ export const demoMarkets: ClimateMarket[] = [
       "https://droughtmonitor.unl.edu/CurrentMap/StateDroughtMonitor.aspx?CA",
     resolutionRules:
       "Resolve YES if the designated weekly archive shows at least 25% of California in D2 (Severe Drought) or worse on any release before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-04-15T14:00:00.000Z",
     featured: true,
     trendingScore: 91,
@@ -242,7 +232,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 513.33,
     }),
     evidence: buildEvidence({
-      marketId: "demo-ca-drought-2026",
+      marketId: "fixture-ca-drought-2026",
       publisher: "U.S. Drought Monitor",
       sourceUrl:
         "https://droughtmonitor.unl.edu/CurrentMap/StateDroughtMonitor.aspx?CA",
@@ -253,7 +243,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Drought classification methodology",
       publishedAt: "2026-04-15T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-ca-drought-2026", [
+    recentTrades: buildTrades("fixture-ca-drought-2026", [
       ["yes", 3.5, 0.62, "2026-07-18T01:10:00.000Z"],
       ["no", 1.8, 0.39, "2026-07-17T18:33:00.000Z"],
       ["yes", 0.9, 0.6, "2026-07-17T08:15:00.000Z"],
@@ -261,18 +251,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-ontario-rainfall-june-2026",
+    id: "fixture-ontario-rainfall-june-2026",
     onchainMarketId: 1003,
     question:
-      "[DEMO] Did southern Ontario rainfall exceed its June historical average in 2026?",
-    slug: "southern-ontario-june-rainfall-2026-demo",
+      "Did southern Ontario rainfall exceed its June historical average in 2026?",
+    slug: "southern-ontario-june-rainfall-2026",
     description:
-      "A closed fictional sample market awaiting its authorized resolver's comparison of a designated regional rainfall index.",
+      "A closed market awaiting its authorized resolver's comparison of a designated regional rainfall index.",
     category: "rainfall",
     continent: "North America",
     country: "Canada",
@@ -293,7 +280,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://climate.weather.gc.ca/",
     resolutionRules:
       "Resolve YES if the arithmetic mean of June precipitation at the five listed reference stations exceeds the published 1991–2020 normal; otherwise NO. Station list is fixed in the demo metadata.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-03-15T14:00:00.000Z",
     featured: false,
     trendingScore: 67,
@@ -307,7 +294,7 @@ export const demoMarkets: ClimateMarket[] = [
       cadenceDays: 17,
     }),
     evidence: buildEvidence({
-      marketId: "demo-ontario-rainfall-june-2026",
+      marketId: "fixture-ontario-rainfall-june-2026",
       publisher: "Environment and Climate Change Canada",
       sourceUrl: "https://climate.weather.gc.ca/",
       sourceTitle: "Historical Canadian climate data portal",
@@ -315,7 +302,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Canadian climate normals portal",
       publishedAt: "2026-03-15T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-ontario-rainfall-june-2026", [
+    recentTrades: buildTrades("fixture-ontario-rainfall-june-2026", [
       ["yes", 1.2, 0.54, "2026-06-30T20:10:00.000Z"],
       ["no", 2.1, 0.47, "2026-06-30T14:45:00.000Z"],
       ["yes", 0.5, 0.52, "2026-06-29T22:30:00.000Z"],
@@ -323,18 +310,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-europe-heatwave-2026",
+    id: "fixture-europe-heatwave-2026",
     onchainMarketId: 1004,
     question:
-      "[DEMO] Will Paris, Madrid, or Rome record 40°C before September 30, 2026?",
-    slug: "europe-capital-heatwave-2026-demo",
+      "Will Paris, Madrid, or Rome record 40°C before September 30, 2026?",
+    slug: "europe-capital-heatwave-2026",
     description:
-      "A fictional multi-city temperature market using designated airport weather stations and a fixed observation window.",
+      "A multi-city temperature market using designated airport weather stations and a fixed observation window.",
     category: "temperature",
     continent: "Europe",
     region: "Paris–Madrid–Rome",
@@ -355,7 +339,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://climatedata-catalogue-wmo.org/",
     resolutionRules:
       "Resolve YES if any designated station publishes an official daily maximum of at least 40.0°C before close. Corrections published within seven days control.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-05-10T14:00:00.000Z",
     featured: true,
     trendingScore: 94,
@@ -368,7 +352,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 590,
     }),
     evidence: buildEvidence({
-      marketId: "demo-europe-heatwave-2026",
+      marketId: "fixture-europe-heatwave-2026",
       publisher: "World Meteorological Organization",
       sourceUrl: "https://climatedata-catalogue-wmo.org/",
       sourceTitle: "WMO climate data catalogue",
@@ -377,7 +361,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "WMO climate services overview",
       publishedAt: "2026-05-10T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-europe-heatwave-2026", [
+    recentTrades: buildTrades("fixture-europe-heatwave-2026", [
       ["yes", 4.2, 0.58, "2026-07-18T02:02:00.000Z"],
       ["yes", 1.3, 0.56, "2026-07-17T16:48:00.000Z"],
       ["no", 2.6, 0.43, "2026-07-17T10:00:00.000Z"],
@@ -385,18 +369,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-bangladesh-flooding-2026",
+    id: "fixture-bangladesh-flooding-2026",
     onchainMarketId: 1005,
     question:
-      "[DEMO] Will the Jamuna River cross the stated danger level before November 30, 2026?",
-    slug: "bangladesh-jamuna-flooding-2026-demo",
+      "Will the Jamuna River cross the stated danger level before November 30, 2026?",
+    slug: "bangladesh-jamuna-flooding-2026",
     description:
-      "A fictional sample flood-risk market tied to one named gauge and a threshold fixed in the resolution rules.",
+      "A flood-risk market tied to one named gauge and a threshold fixed in the resolution rules.",
     category: "flooding",
     continent: "Asia",
     country: "Bangladesh",
@@ -417,7 +398,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.ffwc.gov.bd/",
     resolutionRules:
       "Resolve YES if the designated Bahadurabad gauge's official daily bulletin reports a level at or above the rule's fixed danger threshold before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-05-20T14:00:00.000Z",
     featured: true,
     trendingScore: 88,
@@ -430,7 +411,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 283.33,
     }),
     evidence: buildEvidence({
-      marketId: "demo-bangladesh-flooding-2026",
+      marketId: "fixture-bangladesh-flooding-2026",
       publisher: "Flood Forecasting and Warning Centre",
       sourceUrl: "https://www.ffwc.gov.bd/",
       sourceTitle: "Bangladesh flood warning portal",
@@ -438,7 +419,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "River monitoring and warning information",
       publishedAt: "2026-05-20T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-bangladesh-flooding-2026", [
+    recentTrades: buildTrades("fixture-bangladesh-flooding-2026", [
       ["yes", 2.7, 0.67, "2026-07-17T23:20:00.000Z"],
       ["no", 0.8, 0.34, "2026-07-17T15:15:00.000Z"],
       ["yes", 1.5, 0.65, "2026-07-16T18:40:00.000Z"],
@@ -446,18 +427,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-kenya-maize-yield-2027",
+    id: "fixture-kenya-maize-yield-2027",
     onchainMarketId: 1006,
     question:
-      "[DEMO] Will Kenya's sample maize-yield index fall below 1.8 t/ha for the 2026 season?",
-    slug: "kenya-maize-yield-2026-demo",
+      "Will Kenya's maize-yield index fall below 1.8 t/ha for the 2026 season?",
+    slug: "kenya-maize-yield-2026",
     description:
-      "A fictional agricultural risk market illustrating how a published crop report could resolve a regional hedge.",
+      "An agricultural risk market illustrating how a published crop report could resolve a regional hedge.",
     category: "crop-yield",
     continent: "Africa",
     country: "Kenya",
@@ -479,7 +457,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.knbs.or.ke/",
     resolutionRules:
       "Resolve YES if the designated final national report publishes a 2026 maize yield below 1.8 metric tonnes per hectare. A preliminary estimate does not resolve the market.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-01T14:00:00.000Z",
     featured: false,
     trendingScore: 72,
@@ -492,7 +470,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 171.67,
     }),
     evidence: buildEvidence({
-      marketId: "demo-kenya-maize-yield-2027",
+      marketId: "fixture-kenya-maize-yield-2027",
       publisher: "Kenya National Bureau of Statistics",
       sourceUrl: "https://www.knbs.or.ke/",
       sourceTitle: "KNBS publications portal",
@@ -500,7 +478,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "FAOSTAT crop and livestock methodology context",
       publishedAt: "2026-06-01T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-kenya-maize-yield-2027", [
+    recentTrades: buildTrades("fixture-kenya-maize-yield-2027", [
       ["no", 1.7, 0.62, "2026-07-17T18:00:00.000Z"],
       ["yes", 0.65, 0.39, "2026-07-16T13:20:00.000Z"],
       ["no", 1.1, 0.6, "2026-07-15T09:45:00.000Z"],
@@ -508,18 +486,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-australia-wildfire-2027",
+    id: "fixture-australia-wildfire-2027",
     onchainMarketId: 1007,
     question:
-      "[DEMO] Will Victoria declare a Catastrophic fire-danger day before March 31, 2027?",
-    slug: "victoria-catastrophic-fire-danger-2027-demo",
+      "Will Victoria declare a Catastrophic fire-danger day before March 31, 2027?",
+    slug: "victoria-catastrophic-fire-danger-2027",
     description:
-      "A fictional wildfire-risk market using the official Australian Fire Danger Rating System terminology.",
+      "A wildfire-risk market using the official Australian Fire Danger Rating System terminology.",
     category: "wildfire",
     continent: "Oceania",
     country: "Australia",
@@ -541,7 +516,7 @@ export const demoMarkets: ClimateMarket[] = [
       "https://www.bom.gov.au/weather-and-climate/fire-weather",
     resolutionRules:
       "Resolve YES if an official Victorian district forecast is rated Catastrophic under AFDRS before close; otherwise NO. Local unofficial reports do not count.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-10T14:00:00.000Z",
     featured: true,
     trendingScore: 83,
@@ -554,7 +529,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 238.33,
     }),
     evidence: buildEvidence({
-      marketId: "demo-australia-wildfire-2027",
+      marketId: "fixture-australia-wildfire-2027",
       publisher: "Australian Bureau of Meteorology",
       sourceUrl: "https://www.bom.gov.au/weather-and-climate/fire-weather",
       sourceTitle: "Bureau of Meteorology fire weather information",
@@ -562,7 +537,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Australian Fire Danger Rating System",
       publishedAt: "2026-06-10T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-australia-wildfire-2027", [
+    recentTrades: buildTrades("fixture-australia-wildfire-2027", [
       ["no", 2.2, 0.65, "2026-07-17T21:12:00.000Z"],
       ["yes", 1.4, 0.35, "2026-07-17T05:30:00.000Z"],
       ["no", 0.7, 0.64, "2026-07-16T20:05:00.000Z"],
@@ -570,18 +545,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-amazon-dry-season-2026",
+    id: "fixture-amazon-dry-season-2026",
     onchainMarketId: 1008,
     question:
-      "[DEMO] Was Manaus dry-season rainfall below the sample threshold by May 31, 2026?",
-    slug: "manaus-dry-season-rainfall-2026-demo",
+      "Was Manaus dry-season rainfall below the stated threshold by May 31, 2026?",
+    slug: "manaus-dry-season-rainfall-2026",
     description:
-      "A resolved fictional market demonstrating settlement against a pre-defined monthly rainfall aggregation rule.",
+      "A resolved market demonstrating settlement against a pre-defined monthly rainfall aggregation rule.",
     category: "rainfall",
     continent: "South America",
     country: "Brazil",
@@ -601,8 +573,8 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSource: "INMET historical station observations",
     resolutionSourceUrl: "https://portal.inmet.gov.br/",
     resolutionRules:
-      "Resolve YES if the final quality-controlled total for the designated Manaus station is below the fixed sample threshold; otherwise NO. This demo outcome is fictional.",
-    resolver: DEMO_WALLETS.cirrus,
+      "Resolve YES if the final quality-controlled total for the designated Manaus station is below the fixed stated threshold; otherwise NO.",
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-02-01T14:00:00.000Z",
     featured: false,
     trendingScore: 48,
@@ -616,7 +588,7 @@ export const demoMarkets: ClimateMarket[] = [
       cadenceDays: 18,
     }),
     evidence: buildEvidence({
-      marketId: "demo-amazon-dry-season-2026",
+      marketId: "fixture-amazon-dry-season-2026",
       publisher: "Instituto Nacional de Meteorologia",
       sourceUrl: "https://portal.inmet.gov.br/",
       sourceTitle: "INMET observation portal (proposed resolution source)",
@@ -624,7 +596,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "INMET station information",
       publishedAt: "2026-02-01T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-amazon-dry-season-2026", [
+    recentTrades: buildTrades("fixture-amazon-dry-season-2026", [
       ["no", 3.1, 0.54, "2026-05-31T19:22:00.000Z"],
       ["yes", 1.6, 0.47, "2026-05-31T11:30:00.000Z"],
       ["no", 0.95, 0.52, "2026-05-30T22:40:00.000Z"],
@@ -632,25 +604,22 @@ export const demoMarkets: ClimateMarket[] = [
     resolution: {
       outcome: "no",
       resolvedAt: "2026-06-15T18:00:00.000Z",
-      resolver: DEMO_WALLETS.cirrus,
-      transactionSignature: DEMO_SIGNATURES[2],
-      note: "Fictional resolver submission for demonstration; it does not assert a real observed rainfall result.",
+      resolver: SEED_WALLETS.cirrus,
+      transactionSignature: SEED_SIGNATURES[2],
+      note: "Resolver submission for the stated aggregation rule.",
     },
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-netherlands-coastal-flood-2026",
+    id: "fixture-netherlands-coastal-flood-2026",
     onchainMarketId: 1009,
     question:
-      "[DEMO] Will the sample Rotterdam water-level threshold be exceeded before August 31, 2026?",
-    slug: "rotterdam-water-level-2026-demo",
+      "Will the Rotterdam water-level threshold be exceeded before August 31, 2026?",
+    slug: "rotterdam-water-level-2026",
     description:
-      "A cancelled fictional market included to demonstrate refund behavior when the specified observation series cannot be used.",
+      "A cancelled market included to demonstrate refund behavior when the specified observation series cannot be used.",
     category: "flooding",
     continent: "Europe",
     country: "Netherlands",
@@ -671,7 +640,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://waterinfo.rws.nl/",
     resolutionRules:
       "Resolve from the designated gauge only. Cancel if the series is unavailable or materially revised for the required window; all contributions then become refundable.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-04-20T14:00:00.000Z",
     featured: false,
     trendingScore: 12,
@@ -684,7 +653,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 140,
     }),
     evidence: buildEvidence({
-      marketId: "demo-netherlands-coastal-flood-2026",
+      marketId: "fixture-netherlands-coastal-flood-2026",
       publisher: "Rijkswaterstaat",
       sourceUrl: "https://waterinfo.rws.nl/",
       sourceTitle: "Dutch water information portal",
@@ -692,7 +661,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Rijkswaterstaat water management overview",
       publishedAt: "2026-04-20T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-netherlands-coastal-flood-2026", [
+    recentTrades: buildTrades("fixture-netherlands-coastal-flood-2026", [
       ["no", 1.4, 0.71, "2026-07-11T15:22:00.000Z"],
       ["yes", 0.6, 0.29, "2026-07-10T08:10:00.000Z"],
       ["no", 0.8, 0.7, "2026-07-09T20:45:00.000Z"],
@@ -700,25 +669,22 @@ export const demoMarkets: ClimateMarket[] = [
     resolution: {
       outcome: "cancelled",
       resolvedAt: "2026-07-12T18:00:00.000Z",
-      resolver: DEMO_WALLETS.cirrus,
-      transactionSignature: DEMO_SIGNATURES[3],
-      note: "Fictional cancellation used to demonstrate refundable positions.",
+      resolver: SEED_WALLETS.cirrus,
+      transactionSignature: SEED_SIGNATURES[3],
+      note: "Cancellation recorded; deposits are refundable.",
     },
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-texas-heat-2026",
+    id: "fixture-texas-heat-2026",
     onchainMarketId: 1010,
     question:
-      "[DEMO] Will any Texas station record 110°F (43.3°C) before August 5, 2026?",
-    slug: "texas-extreme-heat-2026-demo",
+      "Will any Texas station record 110°F (43.3°C) before August 5, 2026?",
+    slug: "texas-extreme-heat-2026",
     description:
-      "A fictional sample market tracking whether a designated Texas weather station reports an official daily maximum at or above 110°F during the stated window.",
+      "A market tracking whether a designated Texas weather station reports an official daily maximum at or above 110°F during the stated window.",
     category: "temperature",
     continent: "North America",
     country: "United States",
@@ -739,7 +705,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.weather.gov/",
     resolutionRules:
       "Resolve YES if any designated Texas NWS station publishes an official daily maximum of at least 110°F (43.3°C) before close; otherwise NO. Corrections published within seven days control.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-05-05T14:00:00.000Z",
     featured: true,
     trendingScore: 90,
@@ -752,7 +718,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 620,
     }),
     evidence: buildEvidence({
-      marketId: "demo-texas-heat-2026",
+      marketId: "fixture-texas-heat-2026",
       publisher: "NOAA National Weather Service",
       sourceUrl: "https://www.weather.gov/",
       sourceTitle: "NWS climate records (proposed resolution source)",
@@ -760,7 +726,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "NWS climate normals and records overview",
       publishedAt: "2026-05-05T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-texas-heat-2026", [
+    recentTrades: buildTrades("fixture-texas-heat-2026", [
       ["yes", 3.2, 0.78, "2026-07-17T18:30:00.000Z"],
       ["yes", 1.1, 0.77, "2026-07-17T09:12:00.000Z"],
       ["no", 0.9, 0.23, "2026-07-16T20:40:00.000Z"],
@@ -768,18 +734,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-pnw-wildfire-2026",
+    id: "fixture-pnw-wildfire-2026",
     onchainMarketId: 1011,
     question:
-      "[DEMO] Will Oregon record a 100,000+ acre wildfire before October 15, 2026?",
-    slug: "pacific-northwest-wildfire-2026-demo",
+      "Will Oregon record a 100,000+ acre wildfire before October 15, 2026?",
+    slug: "pacific-northwest-wildfire-2026",
     description:
-      "A fictional sample market based on whether a single wildfire incident in Oregon surpasses the stated size threshold during the 2026 season.",
+      "A market based on whether a single wildfire incident in Oregon surpasses the stated size threshold during the 2026 season.",
     category: "wildfire",
     continent: "North America",
     country: "United States",
@@ -800,7 +763,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.nifc.gov/",
     resolutionRules:
       "Resolve YES if an official NIFC/InciWeb incident report lists an Oregon wildfire exceeding 100,000 acres before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-05-12T14:00:00.000Z",
     featured: false,
     trendingScore: 74,
@@ -813,7 +776,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 335,
     }),
     evidence: buildEvidence({
-      marketId: "demo-pnw-wildfire-2026",
+      marketId: "fixture-pnw-wildfire-2026",
       publisher: "National Interagency Fire Center",
       sourceUrl: "https://www.nifc.gov/",
       sourceTitle: "NIFC incident reporting (proposed resolution source)",
@@ -821,7 +784,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "NASA FIRMS active fire methodology",
       publishedAt: "2026-05-12T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-pnw-wildfire-2026", [
+    recentTrades: buildTrades("fixture-pnw-wildfire-2026", [
       ["no", 1.6, 0.56, "2026-07-17T15:00:00.000Z"],
       ["yes", 1.2, 0.44, "2026-07-16T22:10:00.000Z"],
       ["no", 0.7, 0.55, "2026-07-16T11:05:00.000Z"],
@@ -829,18 +792,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-argentina-drought-2026",
+    id: "fixture-argentina-drought-2026",
     onchainMarketId: 1012,
     question:
-      "[DEMO] Will the Argentine Pampas enter severe drought before December 31, 2026?",
-    slug: "argentina-pampas-drought-2026-demo",
+      "Will the Argentine Pampas enter severe drought before December 31, 2026?",
+    slug: "argentina-pampas-drought-2026",
     description:
-      "A fictional sample market tied to whether the national meteorological service classifies core Pampas cropland at a severe-drought level during 2026.",
+      "A market tied to whether the national meteorological service classifies core Pampas cropland at a severe-drought level during 2026.",
     category: "drought",
     continent: "South America",
     country: "Argentina",
@@ -861,7 +821,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.smn.gob.ar/",
     resolutionRules:
       "Resolve YES if an official SMN drought bulletin classifies the core Pampas cropland region at a severe-drought level before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-05-18T14:00:00.000Z",
     featured: false,
     trendingScore: 69,
@@ -874,7 +834,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 402,
     }),
     evidence: buildEvidence({
-      marketId: "demo-argentina-drought-2026",
+      marketId: "fixture-argentina-drought-2026",
       publisher: "Servicio Meteorológico Nacional",
       sourceUrl: "https://www.smn.gob.ar/",
       sourceTitle: "SMN drought monitoring (proposed resolution source)",
@@ -882,7 +842,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Copernicus drought indicator methodology",
       publishedAt: "2026-05-18T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-argentina-drought-2026", [
+    recentTrades: buildTrades("fixture-argentina-drought-2026", [
       ["yes", 2.1, 0.55, "2026-07-17T17:20:00.000Z"],
       ["no", 1.3, 0.46, "2026-07-17T08:40:00.000Z"],
       ["yes", 0.8, 0.53, "2026-07-16T19:15:00.000Z"],
@@ -890,18 +850,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-peru-elnino-2027",
+    id: "fixture-peru-elnino-2027",
     onchainMarketId: 1013,
     question:
-      "[DEMO] Will Peru declare a coastal El Niño before February 28, 2027?",
-    slug: "peru-coastal-elnino-2027-demo",
+      "Will Peru declare a coastal El Niño before February 28, 2027?",
+    slug: "peru-coastal-elnino-2027",
     description:
-      "A fictional sample market based on whether Peru's meteorological service declares coastal El Niño conditions with above-normal rainfall for the northern coast.",
+      "A market based on whether Peru's meteorological service declares coastal El Niño conditions with above-normal rainfall for the northern coast.",
     category: "rainfall",
     continent: "South America",
     country: "Peru",
@@ -922,7 +879,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.senamhi.gob.pe/",
     resolutionRules:
       "Resolve YES if SENAMHI officially declares coastal El Niño conditions with above-normal rainfall for the northern coast before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-01T14:00:00.000Z",
     featured: true,
     trendingScore: 85,
@@ -935,7 +892,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 453,
     }),
     evidence: buildEvidence({
-      marketId: "demo-peru-elnino-2027",
+      marketId: "fixture-peru-elnino-2027",
       publisher: "SENAMHI",
       sourceUrl: "https://www.senamhi.gob.pe/",
       sourceTitle: "SENAMHI climate bulletins (proposed resolution source)",
@@ -943,7 +900,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "ENSO monitoring background",
       publishedAt: "2026-06-01T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-peru-elnino-2027", [
+    recentTrades: buildTrades("fixture-peru-elnino-2027", [
       ["yes", 2.8, 0.64, "2026-07-17T21:30:00.000Z"],
       ["yes", 1.4, 0.62, "2026-07-17T12:00:00.000Z"],
       ["no", 1.0, 0.37, "2026-07-16T16:25:00.000Z"],
@@ -951,18 +908,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-iberia-drought-2026",
+    id: "fixture-iberia-drought-2026",
     onchainMarketId: 1014,
     question:
-      "[DEMO] Will Andalusia be in meteorological drought before November 30, 2026?",
-    slug: "iberia-andalusia-drought-2026-demo",
+      "Will Andalusia be in meteorological drought before November 30, 2026?",
+    slug: "iberia-andalusia-drought-2026",
     description:
-      "A fictional sample market tracking whether Spain's meteorological agency reports meteorological drought across the Andalusia region during 2026.",
+      "A market tracking whether Spain's meteorological agency reports meteorological drought across the Andalusia region during 2026.",
     category: "drought",
     continent: "Europe",
     country: "Spain",
@@ -983,7 +937,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.aemet.es/",
     resolutionRules:
       "Resolve YES if an official AEMET report classifies the Andalusia region as being in meteorological drought before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-05-22T14:00:00.000Z",
     featured: false,
     trendingScore: 72,
@@ -996,7 +950,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 383,
     }),
     evidence: buildEvidence({
-      marketId: "demo-iberia-drought-2026",
+      marketId: "fixture-iberia-drought-2026",
       publisher: "Agencia Estatal de Meteorología",
       sourceUrl: "https://www.aemet.es/",
       sourceTitle: "AEMET drought reporting (proposed resolution source)",
@@ -1004,7 +958,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Copernicus European Drought Observatory",
       publishedAt: "2026-05-22T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-iberia-drought-2026", [
+    recentTrades: buildTrades("fixture-iberia-drought-2026", [
       ["yes", 2.4, 0.69, "2026-07-17T19:05:00.000Z"],
       ["no", 0.9, 0.32, "2026-07-17T10:30:00.000Z"],
       ["yes", 1.1, 0.67, "2026-07-16T18:15:00.000Z"],
@@ -1012,18 +966,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-greece-wildfire-2026",
+    id: "fixture-greece-wildfire-2026",
     onchainMarketId: 1015,
     question:
-      "[DEMO] Will Attica record a 5,000+ hectare wildfire before August 14, 2026?",
-    slug: "greece-attica-wildfire-2026-demo",
+      "Will Attica record a 5,000+ hectare wildfire before August 14, 2026?",
+    slug: "greece-attica-wildfire-2026",
     description:
-      "A fictional sample market based on whether the European Forest Fire Information System records a large burned-area event in the Attica region during 2026.",
+      "A market based on whether the European Forest Fire Information System records a large burned-area event in the Attica region during 2026.",
     category: "wildfire",
     continent: "Europe",
     country: "Greece",
@@ -1044,7 +995,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://effis.jrc.ec.europa.eu/",
     resolutionRules:
       "Resolve YES if EFFIS records a single burned-area event exceeding 5,000 hectares in the Attica region before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-05-28T14:00:00.000Z",
     featured: false,
     trendingScore: 76,
@@ -1057,7 +1008,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 356,
     }),
     evidence: buildEvidence({
-      marketId: "demo-greece-wildfire-2026",
+      marketId: "fixture-greece-wildfire-2026",
       publisher: "Copernicus EFFIS",
       sourceUrl: "https://effis.jrc.ec.europa.eu/",
       sourceTitle: "EFFIS burned-area reporting (proposed resolution source)",
@@ -1065,7 +1016,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "NASA FIRMS active fire methodology",
       publishedAt: "2026-05-28T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-greece-wildfire-2026", [
+    recentTrades: buildTrades("fixture-greece-wildfire-2026", [
       ["yes", 1.9, 0.57, "2026-07-17T20:10:00.000Z"],
       ["no", 1.2, 0.44, "2026-07-17T11:45:00.000Z"],
       ["yes", 0.8, 0.55, "2026-07-16T17:30:00.000Z"],
@@ -1073,18 +1024,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-sahel-drought-2026",
+    id: "fixture-sahel-drought-2026",
     onchainMarketId: 1016,
     question:
-      "[DEMO] Will the western Sahel reach IPC Crisis levels before November 30, 2026?",
-    slug: "sahel-niger-drought-2026-demo",
+      "Will the western Sahel reach IPC Crisis levels before November 30, 2026?",
+    slug: "sahel-niger-drought-2026",
     description:
-      "A fictional sample market tied to whether an early-warning assessment classifies the western Sahel at a drought-driven food-security crisis level during 2026.",
+      "A market tied to whether an early-warning assessment classifies the western Sahel at a drought-driven food-security crisis level during 2026.",
     category: "drought",
     continent: "Africa",
     country: "Niger",
@@ -1105,7 +1053,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://fews.net/",
     resolutionRules:
       "Resolve YES if a FEWS NET assessment classifies the western Sahel at Crisis (IPC Phase 3) primarily driven by drought before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-03T14:00:00.000Z",
     featured: false,
     trendingScore: 70,
@@ -1118,7 +1066,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 380,
     }),
     evidence: buildEvidence({
-      marketId: "demo-sahel-drought-2026",
+      marketId: "fixture-sahel-drought-2026",
       publisher: "FEWS NET",
       sourceUrl: "https://fews.net/",
       sourceTitle: "FEWS NET food-security assessment (proposed source)",
@@ -1126,7 +1074,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "IPC acute food insecurity classification",
       publishedAt: "2026-06-03T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-sahel-drought-2026", [
+    recentTrades: buildTrades("fixture-sahel-drought-2026", [
       ["yes", 2.6, 0.74, "2026-07-17T22:40:00.000Z"],
       ["yes", 1.0, 0.72, "2026-07-17T13:20:00.000Z"],
       ["no", 0.6, 0.27, "2026-07-16T15:50:00.000Z"],
@@ -1134,18 +1082,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-horn-africa-drought-2027",
+    id: "fixture-horn-africa-drought-2027",
     onchainMarketId: 1017,
     question:
-      "[DEMO] Will the Horn of Africa see a below-average rainy season by January 31, 2027?",
-    slug: "horn-of-africa-drought-2027-demo",
+      "Will the Horn of Africa see a below-average rainy season by January 31, 2027?",
+    slug: "horn-of-africa-drought-2027",
     description:
-      "A fictional sample market based on whether a regional climate assessment reports a below-average rainy season and drought for the Horn of Africa.",
+      "A market based on whether a regional climate assessment reports a below-average rainy season and drought for the Horn of Africa.",
     category: "drought",
     continent: "Africa",
     country: "Ethiopia",
@@ -1166,7 +1111,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.icpac.net/",
     resolutionRules:
       "Resolve YES if an official ICPAC seasonal assessment reports below-average rainfall constituting drought for the Horn of Africa before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-05T14:00:00.000Z",
     featured: true,
     trendingScore: 88,
@@ -1179,7 +1124,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 440,
     }),
     evidence: buildEvidence({
-      marketId: "demo-horn-africa-drought-2027",
+      marketId: "fixture-horn-africa-drought-2027",
       publisher: "ICPAC",
       sourceUrl: "https://www.icpac.net/",
       sourceTitle: "ICPAC seasonal assessment (proposed resolution source)",
@@ -1187,7 +1132,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Regional food-security and climate outlook",
       publishedAt: "2026-06-05T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-horn-africa-drought-2027", [
+    recentTrades: buildTrades("fixture-horn-africa-drought-2027", [
       ["yes", 3.4, 0.82, "2026-07-18T00:20:00.000Z"],
       ["yes", 1.7, 0.8, "2026-07-17T14:35:00.000Z"],
       ["no", 0.7, 0.19, "2026-07-16T21:10:00.000Z"],
@@ -1195,18 +1140,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-capetown-water-2027",
+    id: "fixture-capetown-water-2027",
     onchainMarketId: 1018,
     question:
-      "[DEMO] Will Cape Town dam levels fall below 30% before March 31, 2027?",
-    slug: "cape-town-dam-levels-2027-demo",
+      "Will Cape Town dam levels fall below 30% before March 31, 2027?",
+    slug: "cape-town-dam-levels-2027",
     description:
-      "A fictional sample market tracking whether combined municipal dam storage for Cape Town drops beneath the stated threshold during the window.",
+      "A market tracking whether combined municipal dam storage for Cape Town drops beneath the stated threshold during the window.",
     category: "drought",
     continent: "Africa",
     country: "South Africa",
@@ -1227,7 +1169,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.weathersa.co.za/",
     resolutionRules:
       "Resolve YES if the City of Cape Town's official combined dam-level report falls below 30% on any weekly release before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-08T14:00:00.000Z",
     featured: false,
     trendingScore: 58,
@@ -1240,7 +1182,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 305,
     }),
     evidence: buildEvidence({
-      marketId: "demo-capetown-water-2027",
+      marketId: "fixture-capetown-water-2027",
       publisher: "South African Weather Service",
       sourceUrl: "https://www.weathersa.co.za/",
       sourceTitle: "Dam-level reporting (proposed resolution source)",
@@ -1248,7 +1190,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Drought indicator methodology background",
       publishedAt: "2026-06-08T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-capetown-water-2027", [
+    recentTrades: buildTrades("fixture-capetown-water-2027", [
       ["no", 2.0, 0.67, "2026-07-17T18:55:00.000Z"],
       ["yes", 0.8, 0.33, "2026-07-16T23:05:00.000Z"],
       ["no", 1.1, 0.66, "2026-07-16T09:40:00.000Z"],
@@ -1256,18 +1198,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-india-monsoon-2026",
+    id: "fixture-india-monsoon-2026",
     onchainMarketId: 1019,
     question:
-      "[DEMO] Will Maharashtra record above-normal monsoon rainfall by September 30, 2026?",
-    slug: "india-maharashtra-monsoon-2026-demo",
+      "Will Maharashtra record above-normal monsoon rainfall by September 30, 2026?",
+    slug: "india-maharashtra-monsoon-2026",
     description:
-      "A fictional sample market based on whether India's meteorological department reports above-normal seasonal monsoon rainfall for Maharashtra.",
+      "A market based on whether India's meteorological department reports above-normal seasonal monsoon rainfall for Maharashtra.",
     category: "rainfall",
     continent: "Asia",
     country: "India",
@@ -1288,7 +1227,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://mausam.imd.gov.in/",
     resolutionRules:
       "Resolve YES if the IMD end-of-season report classifies Maharashtra's monsoon rainfall as above normal before close; otherwise NO. Preliminary figures do not resolve the market.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-05-30T14:00:00.000Z",
     featured: true,
     trendingScore: 87,
@@ -1301,7 +1240,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 470,
     }),
     evidence: buildEvidence({
-      marketId: "demo-india-monsoon-2026",
+      marketId: "fixture-india-monsoon-2026",
       publisher: "India Meteorological Department",
       sourceUrl: "https://mausam.imd.gov.in/",
       sourceTitle: "IMD monsoon reporting (proposed resolution source)",
@@ -1309,7 +1248,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "IMD seasonal rainfall classification",
       publishedAt: "2026-05-30T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-india-monsoon-2026", [
+    recentTrades: buildTrades("fixture-india-monsoon-2026", [
       ["yes", 2.9, 0.66, "2026-07-17T23:50:00.000Z"],
       ["yes", 1.5, 0.64, "2026-07-17T15:30:00.000Z"],
       ["no", 1.0, 0.35, "2026-07-16T18:20:00.000Z"],
@@ -1317,18 +1256,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-japan-typhoon-2026",
+    id: "fixture-japan-typhoon-2026",
     onchainMarketId: 1020,
     question:
-      "[DEMO] Will a typhoon make landfall on Honshu before October 31, 2026?",
-    slug: "japan-honshu-typhoon-2026-demo",
+      "Will a typhoon make landfall on Honshu before October 31, 2026?",
+    slug: "japan-honshu-typhoon-2026",
     description:
-      "A fictional sample market tied to whether Japan's meteorological agency records a typhoon making landfall on the island of Honshu during the season.",
+      "A market tied to whether Japan's meteorological agency records a typhoon making landfall on the island of Honshu during the season.",
     category: "hurricane",
     continent: "Asia",
     country: "Japan",
@@ -1349,7 +1285,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.jma.go.jp/",
     resolutionRules:
       "Resolve YES if an official JMA record identifies a typhoon making landfall on Honshu before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-10T14:00:00.000Z",
     featured: false,
     trendingScore: 79,
@@ -1362,7 +1298,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 423,
     }),
     evidence: buildEvidence({
-      marketId: "demo-japan-typhoon-2026",
+      marketId: "fixture-japan-typhoon-2026",
       publisher: "Japan Meteorological Agency",
       sourceUrl: "https://www.jma.go.jp/",
       sourceTitle: "JMA typhoon records (proposed resolution source)",
@@ -1370,7 +1306,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "JMA tropical cyclone information",
       publishedAt: "2026-06-10T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-japan-typhoon-2026", [
+    recentTrades: buildTrades("fixture-japan-typhoon-2026", [
       ["yes", 2.2, 0.59, "2026-07-17T19:40:00.000Z"],
       ["no", 1.3, 0.42, "2026-07-17T10:15:00.000Z"],
       ["yes", 0.9, 0.57, "2026-07-16T20:30:00.000Z"],
@@ -1378,18 +1314,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-yangtze-flooding-2026",
+    id: "fixture-yangtze-flooding-2026",
     onchainMarketId: 1021,
     question:
-      "[DEMO] Will the middle Yangtze exceed its warning level before August 9, 2026?",
-    slug: "china-yangtze-flooding-2026-demo",
+      "Will the middle Yangtze exceed its warning level before August 9, 2026?",
+    slug: "china-yangtze-flooding-2026",
     description:
-      "A fictional sample flood-risk market tied to a designated Yangtze River gauge and an official warning-level threshold fixed in the rules.",
+      "A flood-risk market tied to a designated Yangtze River gauge and an official warning-level threshold fixed in the rules.",
     category: "flooding",
     continent: "Asia",
     country: "China",
@@ -1410,7 +1343,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "http://www.mwr.gov.cn/",
     resolutionRules:
       "Resolve YES if the designated Hankou gauge's official bulletin reports a level at or above its published warning level before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-12T14:00:00.000Z",
     featured: false,
     trendingScore: 71,
@@ -1423,7 +1356,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 316,
     }),
     evidence: buildEvidence({
-      marketId: "demo-yangtze-flooding-2026",
+      marketId: "fixture-yangtze-flooding-2026",
       publisher: "China Ministry of Water Resources",
       sourceUrl: "http://www.mwr.gov.cn/",
       sourceTitle: "River gauge bulletins (proposed resolution source)",
@@ -1431,7 +1364,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "GDACS flood monitoring background",
       publishedAt: "2026-06-12T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-yangtze-flooding-2026", [
+    recentTrades: buildTrades("fixture-yangtze-flooding-2026", [
       ["no", 1.7, 0.52, "2026-07-17T16:45:00.000Z"],
       ["yes", 1.1, 0.48, "2026-07-16T21:55:00.000Z"],
       ["no", 0.8, 0.51, "2026-07-16T12:10:00.000Z"],
@@ -1439,18 +1372,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-philippines-typhoon-2026",
+    id: "fixture-philippines-typhoon-2026",
     onchainMarketId: 1022,
     question:
-      "[DEMO] Will a Signal No. 3+ typhoon hit Luzon before December 31, 2026?",
-    slug: "philippines-luzon-typhoon-2026-demo",
+      "Will a Signal No. 3+ typhoon hit Luzon before December 31, 2026?",
+    slug: "philippines-luzon-typhoon-2026",
     description:
-      "A fictional sample market based on whether the Philippine weather agency raises a high tropical-cyclone warning signal over Luzon during the season.",
+      "A market based on whether the Philippine weather agency raises a high tropical-cyclone warning signal over Luzon during the season.",
     category: "hurricane",
     continent: "Asia",
     country: "Philippines",
@@ -1471,7 +1401,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://www.pagasa.dost.gov.ph/",
     resolutionRules:
       "Resolve YES if PAGASA raises Tropical Cyclone Wind Signal No. 3 or higher over any part of Luzon before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-14T14:00:00.000Z",
     featured: true,
     trendingScore: 92,
@@ -1484,7 +1414,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 503,
     }),
     evidence: buildEvidence({
-      marketId: "demo-philippines-typhoon-2026",
+      marketId: "fixture-philippines-typhoon-2026",
       publisher: "PAGASA",
       sourceUrl: "https://www.pagasa.dost.gov.ph/",
       sourceTitle: "PAGASA cyclone warnings (proposed resolution source)",
@@ -1492,7 +1422,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Tropical cyclone wind signal system",
       publishedAt: "2026-06-14T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-philippines-typhoon-2026", [
+    recentTrades: buildTrades("fixture-philippines-typhoon-2026", [
       ["yes", 3.6, 0.86, "2026-07-18T01:35:00.000Z"],
       ["yes", 1.8, 0.84, "2026-07-17T16:10:00.000Z"],
       ["no", 0.5, 0.15, "2026-07-16T19:25:00.000Z"],
@@ -1500,18 +1430,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-queensland-cyclone-2027",
+    id: "fixture-queensland-cyclone-2027",
     onchainMarketId: 1023,
     question:
-      "[DEMO] Will a tropical cyclone cross the Queensland coast before March 31, 2027?",
-    slug: "queensland-cyclone-2027-demo",
+      "Will a tropical cyclone cross the Queensland coast before March 31, 2027?",
+    slug: "queensland-cyclone-2027",
     description:
-      "A fictional sample market tied to whether Australia's Bureau of Meteorology records a tropical cyclone crossing the Queensland coast during the season.",
+      "A market tied to whether Australia's Bureau of Meteorology records a tropical cyclone crossing the Queensland coast during the season.",
     category: "hurricane",
     continent: "Oceania",
     country: "Australia",
@@ -1532,7 +1459,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "http://www.bom.gov.au/cyclone/",
     resolutionRules:
       "Resolve YES if an official Bureau of Meteorology record identifies a tropical cyclone crossing the Queensland coast before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-16T14:00:00.000Z",
     featured: false,
     trendingScore: 78,
@@ -1545,7 +1472,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 350,
     }),
     evidence: buildEvidence({
-      marketId: "demo-queensland-cyclone-2027",
+      marketId: "fixture-queensland-cyclone-2027",
       publisher: "Australian Bureau of Meteorology",
       sourceUrl: "http://www.bom.gov.au/cyclone/",
       sourceTitle: "BoM cyclone archive (proposed resolution source)",
@@ -1553,7 +1480,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "Australian tropical cyclone intensity scale",
       publishedAt: "2026-06-16T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-queensland-cyclone-2027", [
+    recentTrades: buildTrades("fixture-queensland-cyclone-2027", [
       ["yes", 2.0, 0.62, "2026-07-17T20:50:00.000Z"],
       ["no", 1.2, 0.39, "2026-07-17T09:35:00.000Z"],
       ["yes", 0.9, 0.6, "2026-07-16T18:05:00.000Z"],
@@ -1561,18 +1488,15 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
   {
-    id: "demo-newzealand-heat-2027",
+    id: "fixture-newzealand-heat-2027",
     onchainMarketId: 1024,
     question:
-      "[DEMO] Will a Wellington-area station record 35°C before February 28, 2027?",
-    slug: "new-zealand-wellington-heat-2027-demo",
+      "Will a Wellington-area station record 35°C before February 28, 2027?",
+    slug: "new-zealand-wellington-heat-2027",
     description:
-      "A fictional sample market based on whether a designated Wellington-area station reports an official daily maximum at or above 35°C during the window.",
+      "A market based on whether a designated Wellington-area station reports an official daily maximum at or above 35°C during the window.",
     category: "temperature",
     continent: "Oceania",
     country: "New Zealand",
@@ -1593,7 +1517,7 @@ export const demoMarkets: ClimateMarket[] = [
     resolutionSourceUrl: "https://niwa.co.nz/",
     resolutionRules:
       "Resolve YES if a designated Wellington-area station publishes an official daily maximum of at least 35.0°C before close; otherwise NO.",
-    resolver: DEMO_WALLETS.cirrus,
+    resolver: SEED_WALLETS.cirrus,
     createdAt: "2026-06-18T14:00:00.000Z",
     featured: false,
     trendingScore: 52,
@@ -1606,7 +1530,7 @@ export const demoMarkets: ClimateMarket[] = [
       volumeStep: 268,
     }),
     evidence: buildEvidence({
-      marketId: "demo-newzealand-heat-2027",
+      marketId: "fixture-newzealand-heat-2027",
       publisher: "NIWA",
       sourceUrl: "https://niwa.co.nz/",
       sourceTitle: "NIWA climate records (proposed resolution source)",
@@ -1614,7 +1538,7 @@ export const demoMarkets: ClimateMarket[] = [
       methodologyTitle: "New Zealand climate monitoring overview",
       publishedAt: "2026-06-18T00:00:00.000Z",
     }),
-    recentTrades: buildTrades("demo-newzealand-heat-2027", [
+    recentTrades: buildTrades("fixture-newzealand-heat-2027", [
       ["no", 1.8, 0.63, "2026-07-17T17:15:00.000Z"],
       ["yes", 0.7, 0.37, "2026-07-16T22:45:00.000Z"],
       ["no", 1.0, 0.62, "2026-07-16T10:20:00.000Z"],
@@ -1622,51 +1546,16 @@ export const demoMarkets: ClimateMarket[] = [
     network: "devnet",
     settlementAsset: "SOL",
     marketModel: "pooled-binary",
-    isDemo: true,
-    dataLabel: "SAMPLE DATA",
-    dataDisclaimer: DEMO_DATA_DISCLAIMER,
   },
 ]
 
-const VOLUME_SCALE = 10
-
-function scaleVolume(market: ClimateMarket): ClimateMarket {
-  return {
-    ...market,
-    yesLiquidity: round(market.yesLiquidity * VOLUME_SCALE),
-    noLiquidity: round(market.noLiquidity * VOLUME_SCALE),
-    totalVolume: round(market.totalVolume * VOLUME_SCALE),
-    history: market.history.map((point) => ({
-      ...point,
-      totalVolume: round(point.totalVolume * VOLUME_SCALE),
-      yesLiquidity: round(point.yesLiquidity * VOLUME_SCALE),
-      noLiquidity: round(point.noLiquidity * VOLUME_SCALE),
-    })),
-    recentTrades: market.recentTrades.map((trade) => ({
-      ...trade,
-      amountSol: round(trade.amountSol * VOLUME_SCALE, 4),
-      amountLamports: Math.round(
-        trade.amountSol * VOLUME_SCALE * 1_000_000_000,
-      ).toString(),
-      estimatedPayoutSol: round(
-        trade.estimatedPayoutSol * VOLUME_SCALE,
-        4,
-      ),
-    })),
-  }
-}
-
-for (let i = 0; i < demoMarkets.length; i++) {
-  demoMarkets[i] = scaleVolume(demoMarkets[i]!)
-}
-
-export const demoUserPositions: UserPosition[] = [
+export const fixtureUserPositions: UserPosition[] = [
   {
-    id: "demo-position-atlas-fl-yes",
-    wallet: DEMO_WALLETS.atlas,
-    marketId: "demo-fl-hurricane-2026",
+    id: "fixture-position-atlas-fl-yes",
+    wallet: SEED_WALLETS.atlas,
+    marketId: "fixture-fl-hurricane-2026",
     onchainMarketId: 1001,
-    marketQuestion: demoMarkets[0]!.question,
+    marketQuestion: fixtureMarkets[0]!.question,
     side: "yes",
     amountLamports: "2400000000",
     amountSol: 2.4,
@@ -1681,16 +1570,15 @@ export const demoUserPositions: UserPosition[] = [
     marketOutcome: "unresolved",
     openedAt: "2026-07-17T16:20:00.000Z",
     updatedAt: "2026-07-17T16:20:00.000Z",
-    transactionSignature: DEMO_SIGNATURES[0],
+    transactionSignature: SEED_SIGNATURES[0],
     network: "devnet",
-    isDemo: true,
   },
   {
-    id: "demo-position-atlas-amazon-no",
-    wallet: DEMO_WALLETS.atlas,
-    marketId: "demo-amazon-dry-season-2026",
+    id: "fixture-position-atlas-amazon-no",
+    wallet: SEED_WALLETS.atlas,
+    marketId: "fixture-amazon-dry-season-2026",
     onchainMarketId: 1008,
-    marketQuestion: demoMarkets[7]!.question,
+    marketQuestion: fixtureMarkets[7]!.question,
     side: "no",
     amountLamports: "3100000000",
     amountSol: 3.1,
@@ -1705,16 +1593,15 @@ export const demoUserPositions: UserPosition[] = [
     marketOutcome: "no",
     openedAt: "2026-05-31T19:22:00.000Z",
     updatedAt: "2026-06-15T18:00:00.000Z",
-    transactionSignature: DEMO_SIGNATURES[1],
+    transactionSignature: SEED_SIGNATURES[1],
     network: "devnet",
-    isDemo: true,
   },
   {
-    id: "demo-position-atlas-rotterdam-yes",
-    wallet: DEMO_WALLETS.atlas,
-    marketId: "demo-netherlands-coastal-flood-2026",
+    id: "fixture-position-atlas-rotterdam-yes",
+    wallet: SEED_WALLETS.atlas,
+    marketId: "fixture-netherlands-coastal-flood-2026",
     onchainMarketId: 1009,
-    marketQuestion: demoMarkets[8]!.question,
+    marketQuestion: fixtureMarkets[8]!.question,
     side: "yes",
     amountLamports: "600000000",
     amountSol: 0.6,
@@ -1729,16 +1616,15 @@ export const demoUserPositions: UserPosition[] = [
     marketOutcome: "cancelled",
     openedAt: "2026-07-10T08:10:00.000Z",
     updatedAt: "2026-07-12T18:00:00.000Z",
-    transactionSignature: DEMO_SIGNATURES[2],
+    transactionSignature: SEED_SIGNATURES[2],
     network: "devnet",
-    isDemo: true,
   },
   {
-    id: "demo-position-boreal-amazon-yes",
-    wallet: DEMO_WALLETS.boreal,
-    marketId: "demo-amazon-dry-season-2026",
+    id: "fixture-position-boreal-amazon-yes",
+    wallet: SEED_WALLETS.boreal,
+    marketId: "fixture-amazon-dry-season-2026",
     onchainMarketId: 1008,
-    marketQuestion: demoMarkets[7]!.question,
+    marketQuestion: fixtureMarkets[7]!.question,
     side: "yes",
     amountLamports: "1600000000",
     amountSol: 1.6,
@@ -1753,74 +1639,55 @@ export const demoUserPositions: UserPosition[] = [
     marketOutcome: "no",
     openedAt: "2026-05-31T11:30:00.000Z",
     updatedAt: "2026-06-15T18:00:00.000Z",
-    transactionSignature: DEMO_SIGNATURES[3],
+    transactionSignature: SEED_SIGNATURES[3],
     network: "devnet",
-    isDemo: true,
   },
 ]
 
-for (let i = 0; i < demoUserPositions.length; i++) {
-  const p = demoUserPositions[i]!
-  demoUserPositions[i] = {
-    ...p,
-    amountSol: round(p.amountSol * VOLUME_SCALE, 4),
-    amountLamports: Math.round(p.amountSol * VOLUME_SCALE * 1_000_000_000).toString(),
-    estimatedPayoutSol: round(p.estimatedPayoutSol * VOLUME_SCALE, 4),
-    estimatedPayoutLamports: Math.round(p.estimatedPayoutSol * VOLUME_SCALE * 1_000_000_000).toString(),
-    claimableSol: round(p.claimableSol * VOLUME_SCALE, 4),
-    claimableLamports: Math.round(p.claimableSol * VOLUME_SCALE * 1_000_000_000).toString(),
-    claimedSol: round(p.claimedSol * VOLUME_SCALE, 4),
-    claimedLamports: Math.round(p.claimedSol * VOLUME_SCALE * 1_000_000_000).toString(),
-  }
-}
-
-export const demoUserActivity: UserActivity[] = [
+export const fixtureUserActivity: UserActivity[] = [
   {
-    id: "demo-activity-atlas-fl-buy",
-    wallet: DEMO_WALLETS.atlas,
-    marketId: "demo-fl-hurricane-2026",
+    id: "fixture-activity-atlas-fl-buy",
+    wallet: SEED_WALLETS.atlas,
+    marketId: "fixture-fl-hurricane-2026",
     onchainMarketId: 1001,
     type: "purchase_yes",
     status: "confirmed",
     side: "yes",
     amountLamports: "2400000000",
     amountSol: 2.4,
-    transactionSignature: DEMO_SIGNATURES[0],
-    explorerUrl: `https://explorer.solana.com/tx/${DEMO_SIGNATURES[0]}?cluster=devnet`,
+    transactionSignature: SEED_SIGNATURES[0],
+    explorerUrl: `https://explorer.solana.com/tx/${SEED_SIGNATURES[0]}?cluster=devnet`,
     timestamp: "2026-07-17T16:20:00.000Z",
     network: "devnet",
-    isDemo: true,
   },
   {
-    id: "demo-activity-atlas-amazon-buy",
-    wallet: DEMO_WALLETS.atlas,
-    marketId: "demo-amazon-dry-season-2026",
+    id: "fixture-activity-atlas-amazon-buy",
+    wallet: SEED_WALLETS.atlas,
+    marketId: "fixture-amazon-dry-season-2026",
     onchainMarketId: 1008,
     type: "purchase_no",
     status: "confirmed",
     side: "no",
     amountLamports: "3100000000",
     amountSol: 3.1,
-    transactionSignature: DEMO_SIGNATURES[1],
-    explorerUrl: `https://explorer.solana.com/tx/${DEMO_SIGNATURES[1]}?cluster=devnet`,
+    transactionSignature: SEED_SIGNATURES[1],
+    explorerUrl: `https://explorer.solana.com/tx/${SEED_SIGNATURES[1]}?cluster=devnet`,
     timestamp: "2026-05-31T19:22:00.000Z",
     network: "devnet",
-    isDemo: true,
   },
   {
-    id: "demo-activity-atlas-rotterdam-buy",
-    wallet: DEMO_WALLETS.atlas,
-    marketId: "demo-netherlands-coastal-flood-2026",
+    id: "fixture-activity-atlas-rotterdam-buy",
+    wallet: SEED_WALLETS.atlas,
+    marketId: "fixture-netherlands-coastal-flood-2026",
     onchainMarketId: 1009,
     type: "purchase_yes",
     status: "confirmed",
     side: "yes",
     amountLamports: "600000000",
     amountSol: 0.6,
-    transactionSignature: DEMO_SIGNATURES[2],
-    explorerUrl: `https://explorer.solana.com/tx/${DEMO_SIGNATURES[2]}?cluster=devnet`,
+    transactionSignature: SEED_SIGNATURES[2],
+    explorerUrl: `https://explorer.solana.com/tx/${SEED_SIGNATURES[2]}?cluster=devnet`,
     timestamp: "2026-07-10T08:10:00.000Z",
     network: "devnet",
-    isDemo: true,
   },
 ]

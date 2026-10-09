@@ -136,9 +136,6 @@ const openMarket: ClimateMarket = {
   network: "devnet",
   settlementAsset: "SOL",
   marketModel: "pooled-binary",
-  isDemo: false,
-  dataLabel: "",
-  dataDisclaimer: "",
   chainState: "synced",
 }
 
@@ -210,6 +207,19 @@ describe("prediction purchase controls", () => {
     expect(
       screen.getByText(/wallet rejected the demo transaction/i),
     ).toBeInTheDocument()
+  })
+
+  it("previews post-trade odds and impact severity from the pooled quote", async () => {
+    const user = userEvent.setup()
+    render(<PredictionForm market={openMarket} />)
+    const input = screen.getByTestId("trade-amount")
+    await user.clear(input)
+    // 50 YES into 430/570 pools moves ~271bp: a "moderate" impact.
+    await user.type(input, "50")
+    expect(
+      screen.getByText("Odds after this trade"),
+    ).toBeInTheDocument()
+    expect(screen.getByText("moderate")).toBeInTheDocument()
   })
 
   it("prevents purchases on a closed market", () => {

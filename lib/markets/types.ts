@@ -40,7 +40,7 @@ export type TradeSide = "yes" | "no"
 
 
 export type MarketChainState =
-  "demo-only" | "loading" | "synced" | "missing" | "error"
+  "unconfigured" | "loading" | "synced" | "missing" | "error"
 
 export interface MarketHistoryPoint {
   timestamp: string
@@ -49,7 +49,6 @@ export interface MarketHistoryPoint {
   totalVolume: number
   yesLiquidity: number
   noLiquidity: number
-  dataLabel: string
 }
 
 export type EvidenceKind =
@@ -67,7 +66,6 @@ export interface MarketEvidence {
   url: string
   publishedAt: string
   kind: EvidenceKind
-  isDemo: boolean
 }
 
 export interface MarketTrade {
@@ -81,7 +79,6 @@ export interface MarketTrade {
   wallet: string
   timestamp: string
   transactionSignature?: string
-  isDemo: boolean
 }
 
 export interface MarketResolution {
@@ -93,11 +90,10 @@ export interface MarketResolution {
 }
 
 /**
- * Off-chain market metadata used by the demo application.
+ * Off-chain market metadata.
  *
  * Pool balances, positions, status, outcome, and claims remain authoritative on
- * the Solana program once a configured program is available. Values in this
- * interface are explicitly seeded sample data for the Devnet prototype.
+ * the Solana program once a configured program is available.
  */
 export interface ClimateMarket {
   id: string
@@ -135,15 +131,22 @@ export interface ClimateMarket {
   network: "devnet"
   settlementAsset: "SOL"
   marketModel: "pooled-binary"
-  isDemo: boolean
-  dataLabel: string
-  dataDisclaimer: string
   /** Client-only status for the matching Devnet market PDA. */
   chainState?: MarketChainState
   /** Exact client-only pool values read from the Devnet market account. */
   chainYesLamports?: string
   chainNoLamports?: string
   chainTotalLamports?: string
+}
+
+export const TRADE_CONFIRMED_EVENT = "clyma:trade-confirmed"
+
+export interface TradeConfirmedDetail {
+  marketId: string
+  side: TradeSide
+  amountSol: number
+  yesProbabilityAfter: number
+  noProbabilityAfter: number
 }
 
 export type PositionStatus =
@@ -171,7 +174,6 @@ export interface UserPosition {
   updatedAt: string
   transactionSignature?: string
   network: "devnet"
-  isDemo: boolean
 }
 
 export const ACTIVITY_TYPES = [
@@ -203,7 +205,6 @@ export interface UserActivity {
   timestamp: string
   failureReason?: string
   network: "devnet"
-  isDemo: boolean
 }
 
 export interface IndexedTransactionInput {
@@ -240,6 +241,4 @@ export interface MarketHistoryResult {
   marketId: string
   question: string
   history: MarketHistoryPoint[]
-  isDemo: boolean
-  dataLabel: string
 }

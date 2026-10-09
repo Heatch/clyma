@@ -77,7 +77,6 @@ export const marketHistoryPointSchema = z
     totalVolume: z.number().nonnegative(),
     yesLiquidity: z.number().nonnegative(),
     noLiquidity: z.number().nonnegative(),
-    dataLabel: z.string(),
   })
   .superRefine((point, context) => {
     if (Math.abs(point.yesProbability + point.noProbability - 1) > 0.0001) {
@@ -103,7 +102,6 @@ export const marketEvidenceSchema = z.object({
     "resolution-source",
     "background",
   ]),
-  isDemo: z.boolean(),
 })
 
 export const marketTradeSchema = z.object({
@@ -117,7 +115,6 @@ export const marketTradeSchema = z.object({
   wallet: solanaPublicKeySchema,
   timestamp: z.string().datetime({ offset: true }),
   transactionSignature: solanaTransactionSignatureSchema.optional(),
-  isDemo: z.boolean(),
 })
 
 const marketResolutionSchema = z.object({
@@ -168,9 +165,6 @@ export const climateMarketSchema = z
     network: z.literal("devnet"),
     settlementAsset: z.literal("SOL"),
     marketModel: z.literal("pooled-binary"),
-    isDemo: z.boolean(),
-    dataLabel: z.string(),
-    dataDisclaimer: z.string().trim(),
   })
   .superRefine((market, context) => {
     if (Math.abs(market.yesPrice + market.noPrice - 1) > 0.0001) {
@@ -303,6 +297,8 @@ export const indexTransactionSchema = z
     transactionSignature: solanaTransactionSignatureSchema,
     timestamp: z.string().datetime({ offset: true }).optional(),
     failureReason: z.string().trim().min(1).max(500).optional(),
+    yesPrice: z.number().min(0).max(1).optional(),
+    noPrice: z.number().min(0).max(1).optional(),
   })
   .strict()
   .superRefine((transaction, context) => {
