@@ -184,7 +184,7 @@ export default function PortfolioPanel() {
 
       <p className="mt-4 text-[9px] leading-4 text-neutral-600">
         Positions are indexed from your confirmed Solana transactions and stored
-        in MongoDB. On-chain program accounts remain the source of truth.
+        locally. On-chain program accounts remain the source of truth.
       </p>
     </section>
   )

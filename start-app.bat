@@ -63,13 +63,12 @@ if exist ".env" (
 ) else (
     if exist ".env.example" (
         copy /y ".env.example" ".env" >nul
-        echo  [3/4] .env created from .env.example - fill in your keys for prod mode
+        echo  [3/4] .env created from .env.example - fill in BACKBOARD_API_KEY
     ) else (
-        echo  [3/4] no .env found - demo mode only
+        echo  [3/4] no .env found - markets will be unavailable
     )
 )
-call :check_env MONGODB_URI
-call :check_env GEMINI_API_KEY
+call :check_env BACKBOARD_API_KEY
 
 rem --- [4/4] Start ----------------------------------------------------------------
 powershell -NoProfile -Command "try { $c = New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1', %PORT%); $c.Close(); exit 0 } catch { exit 1 }" >nul 2>&1

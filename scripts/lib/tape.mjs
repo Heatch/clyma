@@ -8,7 +8,7 @@
 //
 // Consumers:
 //   - scripts/lifecycle.mjs `seed` (funds on-chain pools to the tape totals,
-//     writes the tape to MongoDB)
+//     writes the tape to SQLite)
 //   - tests/tape.test.ts (invariant tests; vitest imports this .mjs directly)
 //
 // The tape is off-chain history ("trades that happened before you arrived"):

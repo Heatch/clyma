@@ -6,8 +6,9 @@ interface ProbabilityPayload {
 }
 
 /**
- * Fetches the opening probability from the Gemini-backed forecast route.
- * Returns a fallback of 0.5 if the route is unreachable or fails.
+ * Fetches the opening probability from the model-backed forecast route.
+ * Throws when the route is unreachable or fails — callers surface the error
+ * instead of silently opening at 0.5.
  */
 export async function fetchOpeningProbability(
   payload: ProbabilityPayload
@@ -27,10 +28,9 @@ export async function fetchOpeningProbability(
     });
 
     if (!response.ok) {
-      console.warn(
-        `Forecast route returned status: ${response.status}. Using fallback probability.`
+      throw new Error(
+        `Forecast route returned status: ${response.status}`
       );
-      return 0.5;
     }
 
     const data = await response.json();
@@ -39,10 +39,9 @@ export async function fetchOpeningProbability(
       return data.probability;
     }
 
-    console.warn("Invalid response format from forecast route. Using fallback.");
-    return 0.5;
+    throw new Error("Invalid response format from forecast route.");
   } catch (error) {
-    console.error("Failed to reach forecast route. Using fallback:", error);
-    return 0.5;
+    console.error("Failed to reach forecast route:", error);
+    throw error instanceof Error ? error : new Error(String(error));
   }
 }

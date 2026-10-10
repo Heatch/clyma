@@ -8,7 +8,7 @@ redirect prediction-market mechanics toward climate hedging — users take YES/N
 positions in Devnet SOL on real climate events (droughts, hurricanes, floods,
 wildfires), generating a tradeable risk signal instead of pure speculation.
 
-Core loop: explore Gemini-generated markets on an interactive D3 globe →
+Core loop: explore model-generated markets on an interactive D3 globe →
 inspect evidence + resolution rules + probability chart → connect Phantom wallet →
 buy YES/NO → claim/refund after permissioned resolution.
 
@@ -22,8 +22,10 @@ The Devpost page is stale in two places:
 - **No Freesolo / GRPO anymore.** Devpost describes a fine-tuned FreeSolo
   oddsmaker. That stack has been fully removed (`ml/`, Tavily, `FREESOLO_API_KEY`,
   `GRPO_ADAPTER_ID` are gone). **The model does both jobs now**: market generation
-  (`lib/markets/generation.ts`) and probability forecasts (`POST /api/predict`,
-  `app/api/predict/route.ts`, via the `lib/forecast/` seam).
+  and probability forecasts (`POST /api/predict`, via the `lib/forecast/` seam).
+- **Devpost predates the Luna migration.** It names Gemini as the model;
+  both jobs now run on GPT Luna (`gpt-5.6-luna`) via Backboard
+  (`lib/llm/backboard.mjs`). No Gemini code, keys, or dependencies remain.
 - **"Fully automated resolution" is aspirational.** Resolution is a permissioned
   `resolve_market` instruction called by a resolver key, not an oracle.
 
@@ -31,7 +33,7 @@ The Devpost page is stale in two places:
 
 ```bash
 npm install
-cp .env.example .env   # fill in GEMINI_API_KEY (SQLITE_PATH defaults work)
+cp .env.example .env   # fill in BACKBOARD_API_KEY (SQLITE_PATH defaults work)
 npm run dev            # http://localhost:3000
 ```
 
@@ -150,17 +152,19 @@ POST /api/auth/verify               verify Solana sig (tweetnacl/bs58), sign JWT
 GET  /api/me/positions | /api/me/activity   JWT-gated self views
 ```
 
-### `POST /api/predict` (Gemini, `app/api/predict/route.ts`)
+### `POST /api/predict` (Model via Backboard, `app/api/predict/route.ts`)
 
-Body `{ question, resolution_rules?, news_context? }`. Requires `GEMINI_API_KEY`
-(500 `server_misconfigured` otherwise). Calls `ai.interactions.create` with
-`GEMINI_MODEL` (default `gemini-3.5-flash`), 15s timeout. Parses strict
-`0.42`-format first, then any lone decimal, else `fallback: 0.5` (502
-`inference_unavailable`). Returns
+Body `{ question, resolution_rules?, news_context? }`. Requires
+`BACKBOARD_API_KEY` (500 `server_misconfigured` otherwise). Calls Luna
+(`LLM_MODEL`, default `gpt-5.6-luna`) through `lib/llm/backboard.mjs`, 30s
+timeout. Parses strict `0.42`-format first, then any lone decimal, else
+`fallback: 0.5` (502 `inference_unavailable`, no `fallback` field — no
+fallback provider). Returns
 `{ probability, raw_output, forecaster: "model", format_valid, news_context_used }`.
 No live web retrieval — callers pass their own `news_context`. Same credentials
-as market generation. Callers: `useAIForecast` (chart point), `openingPrice.ts`
-(new-market opening, via `POST /api/markets/create`), globe hover prefetch.
+as market generation. Callers: `useAIForecast` (chart reference line),
+`openingPrice.ts` (new-market opening, via `POST /api/markets/create` —
+throws on failure so creation fails visibly), globe hover prefetch.
 Provider naming never reaches the UI or API consumers.
 
 ## Solana program (`programs/climate_market/`)
@@ -219,15 +223,15 @@ Provider naming never reaches the UI or API consumers.
   signature, so retries and duplicate client POSTs are safe. The chart reads
   embedded history; `getMarketHistory` additionally merges `market_prices`.
 
-## Model market generation (`lib/markets/generation.ts`)
+## Model market generation (GPT Luna via Backboard)
 
-`callGemini()` (90s timeout) → `extractJson()` → `mapMarket()` (category/
+`scripts/lifecycle.mjs callModel()` (600s timeout, `json_output: true`,
+`--batch-size` default 25) → `extractJson()` → `validateRaw()` (category/
 continent allow-lists, lat/lon ranges, real-URL check, prob clamp 0.05–0.95,
-`climateMarketSchema.safeParse`, invalid dropped with warn) → disk cache
-(`os.tmpdir()/clyma/gemini-markets.json`, 24h TTL, 5-min failure backoff).
-`getInitialClimateMarkets()` falls back to `{ markets: [], source: "fallback" }`
-— currently **dead code** (nothing imports it; `app/page.tsx` queries SQLite
-directly).
+de-dupe by slug, invalid dropped) → saved definitions JSON in
+`os.tmpdir()/clyma/` for offline replay (`--fixture-file`). Per-round fault
+tolerance: a failed batch is logged and skipped, not fatal (aborts only on
+zero valid). No request caps, no fallback provider by project decision.
 
 ## Scripts
 
@@ -236,8 +240,8 @@ directly).
   this repo's layout, wallet balance reported. Run before any seeding.
 - `scripts/lifecycle.mjs seed` — unified seeder: batched model generation
   (≤40 per call) → deterministic tapes (`scripts/lib/tape.mjs`) → asymmetric
-  on-chain funding at exact tape totals → MongoDB indexing (market docs with
-  embedded history/trades + `market_prices` creation snapshots). Flags:
+  on-chain funding at exact tape totals → SQLite indexing (market rows with
+  history/trades + `market_prices` creation snapshots). Flags:
   `--markets` (default 100), `--budget` pool SOL (default 6.5), `--base-id`
   (default 3001), `--fixture-file` (replay saved definitions offline),
   `--reset` (drop market collections, recreate indexes), `--skip-chain`,
@@ -267,15 +271,14 @@ directly).
 | `NEXT_PUBLIC_SOLANA_RPC_URL` | Optional override; defaults to public Devnet |
 | `NEXT_PUBLIC_PROGRAM_ID` | Program address; unset → trading blocked ("program is not configured") |
 | `SQLITE_PATH` | App database file (default `./data/clyma.db`) |
-| `GEMINI_API_KEY` | AI Studio key; gates market generation + `/api/predict` |
-| `GEMINI_MODEL` | Default `gemini-3.5-flash` |
-| `GEMINI_MARKET_COUNT` | Default 24, max 40 |
+| `BACKBOARD_API_KEY` | Backboard key for GPT Luna (generation + forecasts) |
+| `BACKBOARD_BASE_URL` | Optional override (default `https://app.backboard.io/api`) |
+| `BACKBOARD_LLM_PROVIDER` | Optional override (default `openai`) |
+| `LLM_MODEL` | Model id (default `gpt-5.6-luna`) |
 
-Serving markets requires `GEMINI_API_KEY` (generation + forecasts). No DB
+Serving markets requires `BACKBOARD_API_KEY` (generation + forecasts). No DB
 server: SQLite file via `node:sqlite` (flag-gated on Node 22.5.x — `.npmrc`
 forwards `--experimental-sqlite` to all npm scripts).
-Note: the SDK prefers a `GOOGLE_API_KEY` env var over `GEMINI_API_KEY` if both
-are set — check there on auth confusion.
 
 ## Testing
 

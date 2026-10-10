@@ -12,8 +12,6 @@ import { getForecast, INFERENCE_TIMEOUT_MS } from "@/lib/forecast"
  * Body: { question: string, resolution_rules?: string, news_context?: string }
  */
 
-const FALLBACK_PROBABILITY = 0.5
-
 interface PredictBody {
   question?: string
   resolution_rules?: string
@@ -49,7 +47,7 @@ export async function POST(request: NextRequest) {
       news_context_used: newsContext,
     })
   } catch (err: unknown) {
-    if (err instanceof Error && err.message.includes("GEMINI_API_KEY")) {
+    if (err instanceof Error && err.message.includes("BACKBOARD_API_KEY")) {
       return NextResponse.json(
         {
           error: "server_misconfigured",
@@ -62,13 +60,13 @@ export async function POST(request: NextRequest) {
     const isTimeout = err instanceof Error && err.message.includes("timed out")
     console.error(`[/api/predict] ${isTimeout ? "Timeout" : "Error"}: ${err}`)
 
+    // No fallback provider: the Model forecast is simply unavailable.
     return NextResponse.json(
       {
         error: "inference_unavailable",
         detail: isTimeout
           ? `Request timed out after ${INFERENCE_TIMEOUT_MS}ms`
           : String(err),
-        fallback: FALLBACK_PROBABILITY,
       },
       { status: 502 },
     )

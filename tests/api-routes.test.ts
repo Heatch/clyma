@@ -110,7 +110,7 @@ beforeEach(() => {
     fixtureUserActivity.filter((activity) => activity.wallet === wallet),
   )
   dbMocks.insertTransaction.mockResolvedValue({
-    _id: "mongo-transaction-id",
+    _id: "sqlite-transaction-id",
   })
   dbMocks.insertPosition.mockResolvedValue({})
   dbMocks.insertPriceSnapshot.mockResolvedValue(undefined)
@@ -120,7 +120,7 @@ beforeEach(() => {
 })
 
 describe("market API routes", () => {
-  it("lists and filters MongoDB-backed markets with consistent metadata", async () => {
+  it("lists and filters SQLite-backed markets with consistent metadata", async () => {
     const response = await getMarkets(
       new Request("http://localhost/api/markets?category=drought&status=open"),
     )
@@ -267,7 +267,7 @@ describe("wallet and transaction API routes", () => {
 
     expect(response.status).toBe(200)
     expect(body.data).toEqual({
-      id: "mongo-transaction-id",
+      id: "sqlite-transaction-id",
       signature,
     })
     expect(dbMocks.insertTransaction).toHaveBeenCalledWith(
@@ -297,7 +297,7 @@ describe("wallet and transaction API routes", () => {
 
     // Same signature again: deduped, no duplicate writes.
     dbMocks.findTransactionBySignature.mockResolvedValue({
-      _id: "mongo-transaction-id",
+      _id: "sqlite-transaction-id",
     })
     const retry = await post()
     const retryBody = (await retry.json()) as {

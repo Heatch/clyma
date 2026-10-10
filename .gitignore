@@ -18,13 +18,6 @@ data/
 *.db
 *.db-wal
 *.db-shm
-
-# Local Gemini API test scratch (not part of the app)
-.venv/
-/test.py
-/geminitest.py
-DEPLOY-PLAN.md
-diagnose.mjs
-*.txt
 fake_modules/
-
+backboard.md
+docs/

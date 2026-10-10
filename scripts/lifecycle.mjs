@@ -26,7 +26,7 @@
 //      after --reset (which drops markets/positions/transactions/
 //      market_prices/resolutions but keeps users/auth_challenges).
 
-import { GoogleGenAI } from "@google/genai"
+import { complete } from "../lib/llm/backboard.mjs"
 import {
   Connection,
   Keypair,
@@ -132,7 +132,7 @@ const EVIDENCE_KINDS = [
   "forecast", "observation", "methodology", "resolution-source", "background",
 ]
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash"
+const LUNA_MODEL = process.env.LLM_MODEL?.trim() || "gpt-5.6-luna"
 
 function promptFor(count) {
   return `You are curating ${count} binary (YES/NO) climate prediction markets. Spread them across all six inhabited continents and vary the hazard categories.
@@ -213,23 +213,15 @@ function unitUniform(seedStr) {
 // Generation + validation (model output -> definition)
 // ---------------------------------------------------------------------------
 
-async function callGemini(count, apiKey) {
-  const ai = new GoogleGenAI({ apiKey })
+async function callModel(count) {
   const today = new Date().toISOString().slice(0, 10)
-  const request = ai.interactions.create({
-    model: GEMINI_MODEL,
-    input: `Today's date is ${today}.\n\n${promptFor(count)}`,
+  const result = await complete({
+    model: LUNA_MODEL,
+    userContent: `Today's date is ${today}.\n\n${promptFor(count)}`,
+    json: true,
+    timeoutMs: GENERATION_TIMEOUT_MS,
   })
-  const interaction = await Promise.race([
-    request,
-    new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Generation timed out after ${GENERATION_TIMEOUT_MS}ms`)),
-        GENERATION_TIMEOUT_MS,
-      ),
-    ),
-  ])
-  const text = interaction.output_text
+  const text = result.text
   if (!text) throw new Error("Model returned an empty response")
   const parsed = JSON.parse(extractJson(text))
   if (!Array.isArray(parsed.markets) || parsed.markets.length === 0) {
@@ -292,7 +284,7 @@ function validateRaw(raw) {
   }
 }
 
-async function loadDefinitions(args, apiKey) {
+async function loadDefinitions(args) {
   if (args.fixtureFile) {
     console.log(`Loading definitions from ${args.fixtureFile}...`)
     const parsed = JSON.parse(await readFile(args.fixtureFile, "utf-8"))
@@ -305,9 +297,9 @@ async function loadDefinitions(args, apiKey) {
     return valid
   }
 
-  if (!apiKey) {
+  if (!process.env.BACKBOARD_API_KEY?.trim()) {
     throw new Error(
-      "GEMINI_API_KEY is not set and no --fixture-file given. Generate once with quota, then replay offline via --fixture-file.",
+      "BACKBOARD_API_KEY is not set and no --fixture-file given. Generate once, then replay offline via --fixture-file.",
     )
   }
   const valid = []
@@ -320,7 +312,7 @@ async function loadDefinitions(args, apiKey) {
     )
     let raw
     try {
-      raw = await callGemini(need, apiKey)
+      raw = await callModel(need)
     } catch (err) {
       console.error(`  round ${round + 1} failed: ${err.message} — continuing`)
       continue
@@ -424,7 +416,7 @@ function assembleMarket(def, globalIndex, onchainMarketId, depthSol, resolver, n
 }
 
 // ---------------------------------------------------------------------------
-// Solana builders (ported from setup.mjs; discriminator layout unchanged)
+// Solana builders (instruction discriminators match programs/climate_market)
 // ---------------------------------------------------------------------------
 
 let PROGRAM_ID
@@ -670,7 +662,7 @@ async function requireFunds(wallet, needLamports, force) {
 }
 
 /**
- * Fund on-chain pools + index to MongoDB. Shared by `seed` and `roll` top-up.
+ * Fund on-chain pools + index to SQLite. Shared by `seed` and `roll` top-up.
  */
 async function fundAndIndex(markets, { wallet, indexDb, reset }) {
   // Bulk existence check up front: one RPC call per 100 markets instead of
@@ -876,12 +868,10 @@ async function seed(args) {
   PROGRAM_ID = requireProgramId()
   connection = new Connection(resolveRpcUrl(), "confirmed")
 
-  const apiKey = process.env.GEMINI_API_KEY?.trim()
-
   const wallet = loadWallet(!args.skipChain)
 
   // --- Phase 1: definitions ---
-  const defs = await loadDefinitions(args, apiKey)
+  const defs = await loadDefinitions(args)
   const count = args.fixtureFile ? defs.length : Math.min(defs.length, args.markets)
   const chosen = defs.slice(0, count)
 
@@ -984,7 +974,6 @@ async function rollCommand(args) {
   connection = new Connection(resolveRpcUrl(), "confirmed")
 
   const target = Number.isFinite(args.markets) ? args.markets : 100
-  const apiKey = process.env.GEMINI_API_KEY?.trim()
   const wallet = loadWallet(true)
 
   console.log("Step 1: closing expired markets...")
@@ -1001,7 +990,7 @@ async function rollCommand(args) {
   }
 
   console.log(`Step 3: topping up ${needed} markets...`)
-  const defs = await loadDefinitions({ ...args, markets: needed }, apiKey)
+  const defs = await loadDefinitions({ ...args, markets: needed })
   const chosen = defs.slice(0, needed)
   if (chosen.length < needed) {
     console.warn(`Only ${chosen.length} definitions for ${needed} needed — proceeding`)
