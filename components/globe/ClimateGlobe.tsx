@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import * as d3 from "d3"
 import type { Feature, Geometry } from "geojson"
 import { feature } from "topojson-client"
@@ -20,7 +20,6 @@ import {
   hazardGroupMarkup,
 } from "@/components/globe/hazard-glyphs"
 import {
-  CONTINENTS,
   REGION_CENTERS,
   closestContinent,
   isContinentName,
@@ -66,10 +65,27 @@ export function shortestLongitudeDelta(
   return ((((toLongitude - fromLongitude) % 360) + 540) % 360) - 180
 }
 
+/**
+ * Whether idle auto-rotation is allowed. The drawer takes visual priority,
+ * and a zoomed-in view is treated as active inspection even without recent
+ * pointer input. Pointer activity, focus animation, and reduced motion are
+ * checked separately in the frame loop.
+ */
+export function shouldIdleRotate({
+  drawerOpen,
+  zoom,
+}: {
+  drawerOpen: boolean
+  zoom: number
+}): boolean {
+  return !drawerOpen && zoom < IDLE_ROTATION_MAX_ZOOM
+}
+
 interface ClimateGlobeProps {
   markets: ClimateMarket[]
   selectedRegion: string | null
   selectedMarketId?: string | null
+  isDrawerOpen: boolean
   onRegionSelect: (region: string) => void
   onMarketSelect: (market: ClimateMarket) => void
   onClusterSelect: (markets: ClimateMarket[]) => void
@@ -82,6 +98,9 @@ const MIN_ZOOM = 0.68
 const MAX_ZOOM = 2.35
 const IDLE_DELAY_MS = 3200
 const IDLE_ROTATION_DEGREES_PER_MS = 0.004
+const IDLE_ROTATION_ZOOM_FRACTION = 0.5
+export const IDLE_ROTATION_MAX_ZOOM =
+  MIN_ZOOM + (MAX_ZOOM - MIN_ZOOM) * IDLE_ROTATION_ZOOM_FRACTION
 const TARGET_FRAME_INTERVAL_MS = 1000 / 30
 const VIEWPORT_TRANSITION_MS = 520
 const VIEWPORT_TRANSITION_MIN_DELTA_PX = 48
@@ -152,6 +171,7 @@ export default function ClimateGlobe({
   markets,
   selectedRegion,
   selectedMarketId,
+  isDrawerOpen,
   onRegionSelect,
   onMarketSelect,
   onClusterSelect,
@@ -172,6 +192,7 @@ export default function ClimateGlobe({
   const marketsRef = useRef(markets)
   const selectedRegionRef = useRef(selectedRegion)
   const selectedMarketIdRef = useRef(selectedMarketId)
+  const isDrawerOpenRef = useRef(isDrawerOpen)
   const idleUntilRef = useRef(0)
   const focusAnimationRef = useRef<{
     startedAt: number
@@ -181,38 +202,34 @@ export default function ClimateGlobe({
   const pointersRef = useRef(new Map<number, PointerState>())
   const pinchDistanceRef = useRef<number | null>(null)
   const draggedRef = useRef(false)
-  const callbacksRef = useRef({ onRegionSelect, onMarketSelect, onClusterSelect })
+  const callbacksRef = useRef({
+    onRegionSelect,
+    onMarketSelect,
+    onClusterSelect,
+  })
   const [isReady, setIsReady] = useState(false)
-  const [hoverLabel, setHoverLabel] = useState<string | null>(null)
+  const [hoverLabel, setHoverLabel] = useState<{
+    text: string
+    x: number
+    y: number
+  } | null>(null)
 
   useEffect(() => {
     marketsRef.current = markets
     selectedRegionRef.current = selectedRegion
     selectedMarketIdRef.current = selectedMarketId
+    isDrawerOpenRef.current = isDrawerOpen
     callbacksRef.current = { onRegionSelect, onMarketSelect, onClusterSelect }
     renderVersionRef.current += 1
   }, [
     markets,
+    isDrawerOpen,
     onClusterSelect,
     onMarketSelect,
     onRegionSelect,
     selectedMarketId,
     selectedRegion,
   ])
-
-  const marketCounts = useMemo(
-    () =>
-      new Map(
-        CONTINENTS.map((continent) => [
-          continent,
-          markets.filter(
-            (market) =>
-              market.continent === continent && market.status === "open",
-          ).length,
-        ]),
-      ),
-    [markets],
-  )
 
   const pauseRotation = useCallback(() => {
     idleUntilRef.current = performance.now() + IDLE_DELAY_MS
@@ -651,7 +668,14 @@ export default function ClimateGlobe({
         context.clearRect(0, 0, width, height)
         context.drawImage(staticLayer, 0, 0, width, height)
       } else {
-        paintStaticLayers(context, path, landPattern, radius, center, scaleFactor)
+        paintStaticLayers(
+          context,
+          path,
+          landPattern,
+          radius,
+          center,
+          scaleFactor,
+        )
       }
 
       // Project and cluster visible open markets. The result drives both the
@@ -700,7 +724,11 @@ export default function ClimateGlobe({
       } else if (
         !prefersReducedMotion.matches &&
         pointersRef.current.size === 0 &&
-        now > idleUntilRef.current
+        now > idleUntilRef.current &&
+        shouldIdleRotate({
+          drawerOpen: isDrawerOpenRef.current,
+          zoom: zoomRef.current,
+        })
       ) {
         rotationRef.current[0] =
           (rotationRef.current[0] + elapsed * IDLE_ROTATION_DEGREES_PER_MS) %
@@ -804,7 +832,7 @@ export default function ClimateGlobe({
     prefetchedRegionsRef.current.add(regionName)
 
     const targetMarket = marketsRef.current.find(
-      (m) => m.continent === regionName || m.region === regionName
+      (m) => m.continent === regionName || m.region === regionName,
     )
     if (!targetMarket) return
 
@@ -822,24 +850,32 @@ export default function ClimateGlobe({
     const pointer = pointersRef.current.get(event.pointerId)
     if (!pointer) {
       const target = findTarget(event.clientX, event.clientY)
+      const wrapperRectangle = wrapperRef.current?.getBoundingClientRect()
+      const position = wrapperRectangle
+        ? {
+            x: event.clientX - wrapperRectangle.left,
+            y: event.clientY - wrapperRectangle.top,
+          }
+        : null
       if (target?.type === "cluster") {
         const singleMarket = target.cluster.markets[0]
         if (singleMarket) {
           prefetchRegionModel(singleMarket.continent)
         }
         hoveredCanvasMarketIdRef.current = singleMarket?.id ?? null
-        setHoverLabel(
+        const text =
           target.cluster.markets.length > 1
             ? `${target.cluster.markets.length} overlapping markets · click to list`
             : singleMarket
               ? `${CATEGORY_LABELS[singleMarket.category]} · ${singleMarket.region} · YES ${Math.round(
                   clampProbability(singleMarket.yesPrice) * 100,
                 )}%`
-              : null,
-        )
+              : null
+        setHoverLabel(text && position ? { text, ...position } : null)
       } else if (target?.type === "region") {
         hoveredCanvasMarketIdRef.current = null
-        setHoverLabel(`${target.region} · select region`)
+        const text = `${target.region} · select region`
+        setHoverLabel(position ? { text, ...position } : null)
         prefetchRegionModel(target.region)
       } else {
         hoveredCanvasMarketIdRef.current = null
@@ -959,23 +995,6 @@ export default function ClimateGlobe({
     pauseRotation()
   }
 
-  const resetView = () => {
-    if (prefersReducedMotion()) {
-      rotationRef.current = [...DEFAULT_ROTATION]
-      focusAnimationRef.current = null
-      zoomRef.current = 1
-      pauseRotation()
-      return
-    }
-    focusAnimationRef.current = {
-      startedAt: performance.now(),
-      from: [...rotationRef.current],
-      to: [...DEFAULT_ROTATION],
-    }
-    zoomRef.current = 1
-    pauseRotation()
-  }
-
   return (
     <section
       className={`relative flex flex-col overflow-hidden bg-transparent text-white ${
@@ -1023,46 +1042,13 @@ export default function ClimateGlobe({
           aria-hidden="true"
         />
         {hoverLabel && (
-          <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 max-w-[82%] -translate-x-1/2 rounded-full border border-white/15 bg-black/85 px-3 py-1.5 text-center font-mono text-[9px] uppercase tracking-[0.08em] text-white/80 backdrop-blur-xl">
-            {hoverLabel}
+          <div
+            style={{ left: hoverLabel.x, top: hoverLabel.y }}
+            className="pointer-events-none absolute z-20 max-w-[16rem] -translate-x-1/2 translate-y-3 rounded-lg border border-white/15 bg-black/85 px-2.5 py-1.5 text-center text-[11px] text-white/85"
+          >
+            {hoverLabel.text}
           </div>
         )}
-      </div>
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-3">
-        <div className="pointer-events-auto flex w-full max-w-[430px] items-center gap-1.5 rounded-2xl border border-white/15 bg-black/75 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.4)] backdrop-blur-xl sm:rounded-full">
-          <label htmlFor="globe-region" className="sr-only">
-            Explore markets by region
-          </label>
-          <select
-            id="globe-region"
-            aria-label="Explore markets by region"
-            value={selectedRegion ?? ""}
-            onChange={(event) => {
-              if (!event.target.value) return
-              callbacksRef.current.onRegionSelect(event.target.value)
-              focusRegion(event.target.value)
-            }}
-            className="min-w-0 flex-1 rounded-xl border border-transparent bg-white/[0.07] px-3 py-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-white outline-none transition-[border-color,background-color] hover:bg-white/10 focus:border-white/35 focus-visible:ring-2 focus-visible:ring-white sm:rounded-full"
-          >
-            <option value="" className="text-black">
-              Jump to region
-            </option>
-            {CONTINENTS.map((continent) => (
-              <option key={continent} value={continent} className="text-black">
-                {continent} · {marketCounts.get(continent) ?? 0} active
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={resetView}
-            className="shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 font-mono text-[9px] uppercase tracking-[0.08em] text-white/60 transition hover:border-white/25 hover:bg-white/10 hover:text-white sm:rounded-full"
-            aria-label="Reset globe view and zoom"
-          >
-            Reset
-          </button>
-        </div>
       </div>
     </section>
   )

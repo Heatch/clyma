@@ -68,13 +68,13 @@ Requires Node `>=22.13.0` (`package.json:60-62`). Anchor program pinned to 1.1.2
 app/                          Next.js App Router: page + layout + API routes
 app/api/markets|users|me|auth|predict|index-transaction
 components/
-  Dashboard.tsx               client composer (providers + Navbar + globe + drawer)
-  globe/                      ClimateGlobe (D3 canvas), GlobeHero (filters/legend)
-  markets/                    board, list items, details, chart, drawer, trending
+  Dashboard.tsx               client composer (providers + account dock + globe + drawer)
+  globe/                      ClimateGlobe (D3 canvas), GlobeHero (overview + viewport sizing)
+  markets/                    list items, details, chart, drawer
   trading/                    PredictionForm (buy), RedeemPosition (claim/refund)
   providers/                  SolanaProvider, MarketProvider, PositionProvider, GlobeLinkProvider
-  layout/                     Navbar (search, wallet, demo/prod toggle)
-  wallet/ ui/ icons/          connect button, balance, skeletons, logo, hazard glyphs
+  layout/                     AccountDock (wallet + open-position count)
+  wallet/ ui/                   connect button, balance, skeletons
 hooks/                        useAIForecast, useMarketProgram (Anchor client)
 lib/
   markets/                    types, calculations, generation, data (fixtures), openingPrice
@@ -106,7 +106,11 @@ only in code, env vars, and this doc.
 ## Frontend
 
 - `app/page.tsx` is `force-dynamic`, queries SQLite, renders
-  `<Dashboard initialMarkets>`.
+  `<Dashboard initialMarkets>`. `Dashboard` renders the full-window globe,
+  bottom-left `AccountDock`, and right-side drawer; there is no sidebar.
+- `GlobeHero` shows a two-line overview and reserves `--drawer-width` for the
+  open drawer at the `md` breakpoint and above. Category, status, and sort
+  state remain available in `MarketProvider` for future drawer navigation.
 - `MarketProvider.tsx:145-230` enriches the catalogue from chain PDAs on mount,
   on a 30s interval, and on `terraform:market-state-changed` events.
 - `MarketDetails.tsx:46-58` renders `market.history`, overriding only the
@@ -114,16 +118,17 @@ only in code, env vars, and this doc.
 - `PredictionForm.tsx` computes its quote with `calculatePooledTradeQuote()`
   (`lib/markets/calculations.ts:272`): before/after probabilities, avg
   execution price, payout, and `priceImpactLevel` (`none/low/moderate/high`)
-  shown as a chip next to the pts impact (≥5 pts warning banner). The
-  what-if size slider drives the same quote; `onPreviewChange` feeds the
-  chart's dashed preview segment. Confirmed trades dispatch
-  `clyma:trade-confirmed` (`TradeConfirmedDetail` in `lib/markets/types.ts`).
+  shown as plain text beside the pts impact. The amount input drives the same
+  quote; `onPreviewChange` feeds the chart's dashed preview segment.
+  Confirmed trades dispatch `clyma:trade-confirmed`
+  (`TradeConfirmedDetail` in `lib/markets/types.ts`).
 - Globe hover prefetches `/api/predict` fire-and-forget, deduped by region
   (`ClimateGlobe.tsx:791-810`).
-- `MarketDetails` renders market history as-is plus a dashed Model reference
-  line (`forecastProb`) and the preview segment (`previewProb`); the forecast
-  never rewrites history points. A transient "Odds moved ±X pts" chip shows
-  for 15s after a confirmed trade.
+- `MarketDetails` shows probability once in the chart header, plus a dashed
+  Model reference line (`forecastProb`) and the preview segment
+  (`previewProb`); the forecast never rewrites history points. A transient
+  "Odds moved ±X pts" message shows beside the chart delta for 15s after a
+  confirmed trade.
 - `MarketProvider` keeps confirmed-trade points in an `optimisticRef` map and
   re-applies them on top of every chain refresh (pools stay chain-owned);
   `POST /api/index-transaction` is the durable path (snapshot + capped
@@ -174,8 +179,8 @@ Provider naming never reaches the UI or API consumers.
   `fund_market`, `buy_yes` / `buy_no`, `close_market`, `resolve_market`,
   `claim_winnings`, `refund_cancelled`.
 - PDAs (`constants.rs`, `state.rs`): `protocol` (`authority, resolver,
-  market_count`); `market` (`market_id, question_hash[32], timestamps, status,
-  outcome, total_yes/no/pool/paid_amount`); `vault` (native SOL,
+market_count`); `market` (`market_id, question_hash[32], timestamps, status,
+outcome, total_yes/no/pool/paid_amount`); `vault` (native SOL,
   SystemProgram transfers); per-(market, owner) `yes_position` + `no_position`;
   per-(market, claimant) `claim` (double-claim guard).
 - Pooled binary math: `YES prob = YES pool / total pool` (on-chain `u128`
@@ -265,16 +270,16 @@ zero valid). No request caps, no fallback provider by project decision.
 
 ## Environment (`.env.example`)
 
-| Variable | Purpose |
-| --- | --- |
-| `NEXT_PUBLIC_SOLANA_NETWORK` | Must be `devnet` |
-| `NEXT_PUBLIC_SOLANA_RPC_URL` | Optional override; defaults to public Devnet |
-| `NEXT_PUBLIC_PROGRAM_ID` | Program address; unset → trading blocked ("program is not configured") |
-| `SQLITE_PATH` | App database file (default `./data/clyma.db`) |
-| `BACKBOARD_API_KEY` | Backboard key for GPT Luna (generation + forecasts) |
-| `BACKBOARD_BASE_URL` | Optional override (default `https://app.backboard.io/api`) |
-| `BACKBOARD_LLM_PROVIDER` | Optional override (default `openai`) |
-| `LLM_MODEL` | Model id (default `gpt-5.6-luna`) |
+| Variable                     | Purpose                                                                |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SOLANA_NETWORK` | Must be `devnet`                                                       |
+| `NEXT_PUBLIC_SOLANA_RPC_URL` | Optional override; defaults to public Devnet                           |
+| `NEXT_PUBLIC_PROGRAM_ID`     | Program address; unset → trading blocked ("program is not configured") |
+| `SQLITE_PATH`                | App database file (default `./data/clyma.db`)                          |
+| `BACKBOARD_API_KEY`          | Backboard key for GPT Luna (generation + forecasts)                    |
+| `BACKBOARD_BASE_URL`         | Optional override (default `https://app.backboard.io/api`)             |
+| `BACKBOARD_LLM_PROVIDER`     | Optional override (default `openai`)                                   |
+| `LLM_MODEL`                  | Model id (default `gpt-5.6-luna`)                                      |
 
 Serving markets requires `BACKBOARD_API_KEY` (generation + forecasts). No DB
 server: SQLite file via `node:sqlite` (flag-gated on Node 22.5.x — `.npmrc`
@@ -283,18 +288,18 @@ forwards `--experimental-sqlite` to all npm scripts).
 ## Testing
 
 - `npm test` → `vitest run`, jsdom, `tests/setup.ts` shims. Includes
-  `tests/*.test.tsx` (api-routes, globe-drawer, navbar, prediction-form,
-  hazard-icons, store, tape, lifecycle, market-history) + co-located
-  `lib/solana/*.test.ts` (accounts, encoding, errors, instructions).
-  Store tests run against real in-memory SQLite (`:memory:`).
+  `tests/*.test.tsx` (account-dock, api-routes, globe-drawer,
+  prediction-form, store, tape, lifecycle, market-history) +
+  co-located `lib/solana/*.test.ts` (accounts, encoding, errors,
+  instructions). Store tests run against real in-memory SQLite (`:memory:`).
 - `tests/climate-market.ts` is Anchor integration — runs via
   `npm run test:anchor` only, not vitest.
 - `fixtureUserPositions` / `fixtureUserActivity` in `lib/markets/data.ts` are
   **test fixtures only** (`tests/api-routes.test.ts`) — the My Positions UI
   does not consume them, so the portfolio can appear empty with a fresh DB.
-- No known failures: `tests/navbar.test.tsx` (`clyma-mark` testid) and the
-  `tests/globe-drawer.test.tsx` continent-filter case were fixed in Batch 1
-  (missing `initialMarkets` prop + stale testid).
+- Region, cluster, and portfolio drawer flows are covered in
+  `tests/globe-drawer.test.tsx`; bottom-left wallet and position-count behavior
+  is covered in `tests/account-dock.test.tsx`.
 
 ## Conventions
 

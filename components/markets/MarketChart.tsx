@@ -30,6 +30,8 @@ interface MarketChartProps {
   forecastProb?: number | null
   /** Live what-if preview (0–1): dashed segment from the current point. */
   previewProb?: number | null
+  /** Most recent confirmed-trade move, shown briefly beside the chart delta. */
+  recentTradeDeltaPts?: number | null
 }
 
 type ChartDatum = {
@@ -201,6 +203,7 @@ export default function MarketChart({
   tone = "light",
   forecastProb = null,
   previewProb = null,
+  recentTradeDeltaPts = null,
 }: MarketChartProps) {
   const gradientId = useId().replaceAll(":", "")
   const [requestedRange, setRequestedRange] = useState<ChartRange>("ALL")
@@ -254,9 +257,7 @@ export default function MarketChart({
       return null
     }
     const lastDatum = data[data.length - 1]!
-    const yes = normalizeProbability(
-      Math.min(1, Math.max(0, previewProb)),
-    )
+    const yes = normalizeProbability(Math.min(1, Math.max(0, previewProb)))
     return [
       { ...lastDatum },
       {
@@ -385,35 +386,27 @@ export default function MarketChart({
     >
       <div className="flex items-end justify-between gap-4">
         <div>
-          <p
-            className={`text-[9px] font-bold uppercase tracking-[0.14em] ${
-              tone === "dark" ? "text-white/45" : "text-neutral-500"
-            }`}
-          >
-            Current YES probability
-          </p>
-          <div className="mt-1 flex items-baseline gap-2">
+          <h3 className="text-sm font-medium text-white/85">YES probability</h3>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <p className="tabular text-3xl font-semibold tracking-[-0.04em]">
               {formatProbability(currentDatum?.yes ?? 0)}
             </p>
-            <p
-              className={`tabular text-[11px] font-semibold ${
-                tone === "dark" ? "text-white/55" : "text-neutral-500"
-              }`}
-            >
+            <p className="tabular text-[11px] font-semibold text-white/55">
               {hasMeaningfulDelta
                 ? `${delta > 0 ? "+" : ""}${delta.toFixed(1)} pts`
                 : "0.0 pts"}
             </p>
+            {recentTradeDeltaPts !== null && (
+              <p className="text-[11px] text-sky-200" aria-live="polite">
+                Odds moved {recentTradeDeltaPts >= 0 ? "+" : ""}
+                {recentTradeDeltaPts.toFixed(1)} pts
+              </p>
+            )}
           </div>
         </div>
 
         <div
-          className={`flex rounded-full border p-0.5 ${
-            tone === "dark"
-              ? "border-white/10 bg-white/5"
-              : "border-neutral-200 bg-neutral-100"
-          }`}
+          className="flex items-center gap-3"
           aria-label="Probability history range"
         >
           {RANGE_OPTIONS.map(({ label }) => {
@@ -431,14 +424,10 @@ export default function MarketChart({
                     : `Not enough points for ${label}`
                 }
                 onClick={() => setRequestedRange(label)}
-                className={`min-w-10 rounded-full px-2 py-1 text-[9px] font-bold transition ${
+                className={`px-1 py-1 text-[11px] font-semibold transition ${
                   isActive
-                    ? tone === "dark"
-                      ? "bg-white text-black"
-                      : "bg-ink text-white"
-                    : tone === "dark"
-                      ? "text-white/55 hover:text-white"
-                      : "text-neutral-500 hover:text-ink"
+                    ? "text-white underline decoration-white/60 underline-offset-4"
+                    : "text-white/45 hover:text-white"
                 }`}
               >
                 {label}
@@ -572,7 +561,11 @@ export default function MarketChart({
           <span>━ YES</span>
           <span>┄ NO</span>
           {forecastValue !== null && (
-            <span className={tone === "dark" ? "text-violet-200" : "text-violet-700"}>
+            <span
+              className={
+                tone === "dark" ? "text-violet-200" : "text-violet-700"
+              }
+            >
               ┄ Model
             </span>
           )}

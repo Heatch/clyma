@@ -11,28 +11,6 @@ export const CATEGORY_LABELS: Record<MarketCategory, string> = {
   other: "Other",
 }
 
-export const CATEGORY_ACCENTS: Record<MarketCategory, string> = {
-  hurricane: "#a78bfa",
-  drought: "#fbbf24",
-  temperature: "#fb7185",
-  rainfall: "#67e8f9",
-  flooding: "#60a5fa",
-  "crop-yield": "#a3e635",
-  wildfire: "#fb923c",
-  other: "#cbd5e1",
-}
-
-export const CATEGORY_SYMBOLS: Record<MarketCategory, string> = {
-  hurricane: "cyclone",
-  drought: "sun-crack",
-  temperature: "thermometer",
-  rainfall: "rain-cloud",
-  flooding: "flooded-house",
-  "crop-yield": "wheat",
-  wildfire: "flame",
-  other: "warning",
-}
-
 type CategorizedMarket = {
   id: string
   category: MarketCategory

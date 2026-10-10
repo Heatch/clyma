@@ -18,7 +18,6 @@ import {
 import { getExplorerTransactionUrl } from "@/lib/solana/config"
 import { formatProbability, formatSol } from "@/lib/utils/format"
 
-const QUICK_AMOUNTS = [0.05, 0.1, 0.25, 0.5]
 const DEFAULT_NETWORK_FEE_SOL = 0.000005
 
 interface PredictionFormProps {
@@ -165,9 +164,7 @@ export default function PredictionForm({
   // Drive the parent chart's what-if projection segment.
   useEffect(() => {
     onPreviewChange?.(
-      quote
-        ? { side, yesProbability: quote.yesProbabilityAfter }
-        : null,
+      quote ? { side, yesProbability: quote.yesProbabilityAfter } : null,
     )
   }, [quote, side, onPreviewChange])
 
@@ -254,9 +251,7 @@ export default function PredictionForm({
         yesProbabilityAfter: quote?.yesProbabilityAfter ?? market.yesPrice,
         noProbabilityAfter: quote?.noProbabilityAfter ?? market.noPrice,
       }
-      window.dispatchEvent(
-        new CustomEvent(TRADE_CONFIRMED_EVENT, { detail }),
-      )
+      window.dispatchEvent(new CustomEvent(TRADE_CONFIRMED_EVENT, { detail }))
     } catch {
       // The hook maps and exposes a user-safe error in state.
     }
@@ -276,36 +271,10 @@ export default function PredictionForm({
           ? "border-white/10 bg-white/[0.035] text-white"
           : "border-neutral-300 bg-white"
       }`}
-      aria-labelledby="position-heading"
+      aria-label="Trade"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p
-            className={
-              isDark
-                ? "font-mono text-[8px] uppercase tracking-[0.15em] text-white/30"
-                : "eyebrow"
-            }
-          >
-            Take a position
-          </p>
-          <h3 id="position-heading" className="mt-1 text-lg font-semibold">
-            Trade with Devnet SOL
-          </h3>
-        </div>
-        <span
-          className={`rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider ${
-            isDark
-              ? "border border-white/10 bg-white/[0.05] text-white/35"
-              : "bg-neutral-100 text-neutral-500"
-          }`}
-        >
-          Pooled MVP
-        </span>
-      </div>
-
       <div
-        className="mt-4 grid grid-cols-2 gap-2"
+        className="mt-1 grid grid-cols-2 gap-2"
         role="group"
         aria-label="Select a market outcome"
       >
@@ -342,9 +311,6 @@ export default function PredictionForm({
               </span>
               <span className="tabular mt-1 block text-xl font-semibold">
                 {formatProbability(probability)}
-              </span>
-              <span className="mt-1 block text-[9px] opacity-70">
-                {outcome === "yes" ? "Solid marker" : "Outlined marker"}
               </span>
             </button>
           )
@@ -401,146 +367,14 @@ export default function PredictionForm({
             SOL
           </span>
         </div>
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
-          {QUICK_AMOUNTS.map((quickAmount) => (
-            <button
-              type="button"
-              key={quickAmount}
-              disabled={isPending}
-              onClick={() => {
-                setAmount(String(quickAmount))
-                reset()
-              }}
-              className={`rounded-lg border py-1.5 text-[10px] font-semibold transition ${
-                isDark
-                  ? "border-white/10 bg-white/[0.025] text-white/45 hover:border-white/25 hover:bg-white/[0.07] hover:text-white"
-                  : "border-neutral-200 hover:border-ink hover:bg-neutral-50"
-              }`}
-            >
-              {quickAmount}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <div className="flex items-center justify-between gap-3">
-          <label
-            htmlFor={`size-preview-${market.id}`}
-            className={`text-[10px] font-bold uppercase tracking-wider ${
-              isDark ? "text-white/35" : "text-neutral-500"
-            }`}
-          >
-            What-if size
-          </label>
-          <span
-            className={`tabular text-[10px] font-semibold ${
-              isDark ? "text-white/60" : "text-neutral-600"
+        {marketPositions.length > 0 && (
+          <p
+            className={`mt-2 text-xs ${
+              isDark ? "text-white/50" : "text-neutral-500"
             }`}
             aria-live="polite"
           >
-            {quote
-              ? `YES ${formatProbability(market.yesPrice)} → ${formatProbability(quote.yesProbabilityAfter)}`
-              : "Enter an amount"}
-          </span>
-        </div>
-        <input
-          id={`size-preview-${market.id}`}
-          type="range"
-          min={0.01}
-          max={2}
-          step={0.01}
-          value={Math.min(2, Math.max(0.01, Number.isFinite(amountSol) ? amountSol : 0.01))}
-          disabled={isPending}
-          onChange={(event) => {
-            setAmount(event.target.value)
-            reset()
-          }}
-          className="mt-1.5 w-full"
-        />
-      </div>
-
-      <dl
-        className={`mt-4 space-y-2 rounded-xl p-3 text-[10px] ${
-          isDark ? "border border-white/10 bg-black/20" : "bg-neutral-100"
-        }`}
-      >
-        <div className="flex justify-between gap-3">
-          <dt className={isDark ? "text-white/35" : "text-neutral-500"}>
-            Estimated position units
-          </dt>
-          <dd className="tabular font-semibold">
-            {(quote?.amountSol ?? 0).toFixed(4)} {side.toUpperCase()}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className={isDark ? "text-white/35" : "text-neutral-500"}>
-            Average execution probability
-          </dt>
-          <dd className="tabular font-semibold">
-            {formatProbability(quote?.averageExecutionPrice ?? 0)}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className={isDark ? "text-white/35" : "text-neutral-500"}>
-            Potential payout if correct
-          </dt>
-          <dd className="tabular font-semibold">
-            {formatSol(quote?.potentialPayoutSol ?? 0, 4)}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className={isDark ? "text-white/35" : "text-neutral-500"}>
-            Odds after this trade
-          </dt>
-          <dd className="tabular font-semibold">
-            {quote ? formatProbability(quote.yesProbabilityAfter) : "—"}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className={isDark ? "text-white/35" : "text-neutral-500"}>
-            Estimated price impact
-          </dt>
-          <dd className="tabular flex items-center gap-1.5 font-semibold">
-            +{priceImpactPts.toFixed(2)} pts
-            {quote && quote.priceImpactLevel !== "none" && (
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
-                  quote.priceImpactLevel === "low"
-                    ? "bg-emerald-300/15 text-emerald-200"
-                    : quote.priceImpactLevel === "moderate"
-                      ? "bg-amber-300/15 text-amber-200"
-                      : "bg-rose-300/15 text-rose-200"
-                }`}
-              >
-                {quote.priceImpactLevel}
-              </span>
-            )}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className={isDark ? "text-white/35" : "text-neutral-500"}>
-            Estimated Solana fee
-          </dt>
-          <dd className="tabular font-semibold">
-            ≈ {formatSol((state.feeLamports ?? 5000) / 1_000_000_000, 6)}
-          </dd>
-        </div>
-      </dl>
-
-      {marketPositions.length > 0 && (
-        <div
-          className={`mt-3 rounded-xl border px-3 py-2.5 text-[10px] ${
-            isDark
-              ? "border-white/[0.12] bg-white/[0.04] text-white/60"
-              : "border-neutral-200 bg-neutral-50 text-neutral-600"
-          }`}
-          aria-live="polite"
-        >
-          <p className="font-bold uppercase tracking-[0.12em]">
-            Your indexed position
-          </p>
-          <p className="tabular mt-1">
+            You hold{" "}
             {indexedPositionSummary.yes > 0
               ? `${formatSol(indexedPositionSummary.yes, 4)} YES`
               : ""}
@@ -551,40 +385,92 @@ export default function PredictionForm({
               ? `${formatSol(indexedPositionSummary.no, 4)} NO`
               : ""}
           </p>
-          <p
-            className={`mt-1 ${isDark ? "text-white/35" : "text-neutral-500"}`}
+        )}
+      </div>
+
+      <dl
+        className={`mt-4 grid grid-cols-2 gap-x-4 gap-y-5 rounded-xl p-4 sm:grid-cols-3 ${
+          isDark ? "border border-white/10 bg-black/20" : "bg-neutral-100"
+        }`}
+      >
+        <div>
+          <dt
+            className={
+              isDark ? "text-xs text-white/45" : "text-xs text-neutral-500"
+            }
           >
-            Reconciled with program accounts when a Devnet deployment is
-            configured.
-          </p>
+            Position
+          </dt>
+          <dd className="tabular mt-1 text-lg font-semibold">
+            {(quote?.amountSol ?? 0).toFixed(4)} {side.toUpperCase()}
+          </dd>
         </div>
-      )}
-
-      {priceImpactPts >= 5 && amountSol > 0 && (
-        <p
-          className={`mt-3 rounded-lg border px-3 py-2 text-[10px] font-semibold ${
-            isDark
-              ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
-              : "border-ink bg-neutral-100"
-          }`}
-          role="alert"
-        >
-          High price impact: this deposit materially changes the pool
-          probability.
-        </p>
-      )}
-
-      {validationError && (
-        <p
-          id={`amount-error-${market.id}`}
-          className={`mt-3 text-[10px] font-medium ${
-            isDark ? "text-white/45" : "text-neutral-600"
-          }`}
-          role="status"
-        >
-          {validationError}
-        </p>
-      )}
+        <div>
+          <dt
+            className={
+              isDark ? "text-xs text-white/45" : "text-xs text-neutral-500"
+            }
+          >
+            Avg. entry
+          </dt>
+          <dd className="tabular mt-1 text-lg font-semibold">
+            {formatProbability(quote?.averageExecutionPrice ?? 0)}
+          </dd>
+        </div>
+        <div>
+          <dt
+            className={
+              isDark ? "text-xs text-white/45" : "text-xs text-neutral-500"
+            }
+          >
+            Payout if correct
+          </dt>
+          <dd className="tabular mt-1 text-lg font-semibold">
+            {formatSol(quote?.potentialPayoutSol ?? 0, 4)}
+          </dd>
+        </div>
+        <div>
+          <dt
+            className={
+              isDark ? "text-xs text-white/45" : "text-xs text-neutral-500"
+            }
+          >
+            Odds after
+          </dt>
+          <dd className="tabular mt-1 text-lg font-semibold">
+            {quote ? formatProbability(quote.yesProbabilityAfter) : "—"}
+          </dd>
+        </div>
+        <div>
+          <dt
+            className={
+              isDark ? "text-xs text-white/45" : "text-xs text-neutral-500"
+            }
+          >
+            Impact
+          </dt>
+          <dd className="tabular mt-1 text-lg font-semibold">
+            +{priceImpactPts.toFixed(2)} pts
+            {quote && quote.priceImpactLevel !== "none" && (
+              <span className="ml-2 text-sm font-medium text-white/50">
+                {quote.priceImpactLevel}
+              </span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt
+            className={
+              isDark ? "text-xs text-white/45" : "text-xs text-neutral-500"
+            }
+          >
+            Network fee
+          </dt>
+          <dd className="tabular mt-1 text-lg font-semibold">
+            ≈ {formatSol((state.feeLamports ?? 5000) / 1_000_000_000, 6)}
+          </dd>
+        </div>
+      </dl>
 
       <button
         type="button"
@@ -600,17 +486,22 @@ export default function PredictionForm({
             : "bg-ink text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-neutral-500"
         }`}
       >
-        Review {side.toUpperCase()} position
+        {!connected || !publicKey
+          ? "Connect wallet to trade"
+          : `Review ${side.toUpperCase()} position`}
       </button>
 
-      <p
-        className={`mt-3 text-center text-[9px] leading-4 ${
-          isDark ? "text-white/25" : "text-neutral-500"
-        }`}
-      >
-        Your wallet will show the exact Devnet instruction. Never approve a
-        transaction you do not understand.
-      </p>
+      {validationError && (
+        <p
+          id={`amount-error-${market.id}`}
+          className={`mt-3 text-xs font-medium ${
+            isDark ? "text-white/55" : "text-neutral-600"
+          }`}
+          role="status"
+        >
+          {validationError}
+        </p>
+      )}
 
       {isReviewOpen && (
         <div

@@ -104,7 +104,8 @@ vi.mock("@/hooks/useMarketProgram", async () => {
 const openMarket: ClimateMarket = {
   id: "test-market-1",
   onchainMarketId: 1001,
-  question: "Will Florida record a Category 4+ hurricane landfall before October 31, 2026?",
+  question:
+    "Will Florida record a Category 4+ hurricane landfall before October 31, 2026?",
   slug: "fl-test",
   description: "A test market.",
   category: "hurricane",
@@ -125,7 +126,8 @@ const openMarket: ClimateMarket = {
   participants: 184,
   resolutionSource: "NOAA",
   resolutionSourceUrl: "https://www.nhc.noaa.gov/",
-  resolutionRules: "Resolve YES if a Category 4+ hurricane makes landfall in Florida before the close time.",
+  resolutionRules:
+    "Resolve YES if a Category 4+ hurricane makes landfall in Florida before the close time.",
   resolver: "3mshx6HoZop71xQ483kLMdiUuXQ1UxDgBABuLnFkVfDV",
   createdAt: "2026-05-01T14:00:00.000Z",
   featured: true,
@@ -152,9 +154,11 @@ describe("prediction purchase controls", () => {
     controls.connected = false
     render(<PredictionForm market={openMarket} />)
     expect(
-      screen.getByText(/connect a solana wallet to purchase/i),
-    ).toBeInTheDocument()
-    expect(screen.getByTestId("review-transaction")).toBeDisabled()
+      screen.getByRole("button", { name: /connect wallet to trade/i }),
+    ).toBeDisabled()
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /connect a solana wallet to purchase/i,
+    )
   })
 
   it("validates zero and over-balance amounts", async () => {
@@ -216,9 +220,7 @@ describe("prediction purchase controls", () => {
     await user.clear(input)
     // 50 YES into 430/570 pools moves ~271bp: a "moderate" impact.
     await user.type(input, "50")
-    expect(
-      screen.getByText("Odds after this trade"),
-    ).toBeInTheDocument()
+    expect(screen.getByText("Odds after")).toBeInTheDocument()
     expect(screen.getByText("moderate")).toBeInTheDocument()
   })
 

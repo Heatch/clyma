@@ -1,6 +1,38 @@
 import { describe, expect, it } from "vitest"
 
-import { shortestLongitudeDelta } from "@/components/globe/ClimateGlobe"
+import {
+  IDLE_ROTATION_MAX_ZOOM,
+  shortestLongitudeDelta,
+  shouldIdleRotate,
+} from "@/components/globe/ClimateGlobe"
+
+describe("shouldIdleRotate", () => {
+  it("allows rotation when the drawer is closed and zoomed out", () => {
+    expect(shouldIdleRotate({ drawerOpen: false, zoom: 1 })).toBe(true)
+  })
+
+  it("stops rotation while the drawer is open", () => {
+    expect(shouldIdleRotate({ drawerOpen: true, zoom: 1 })).toBe(false)
+  })
+
+  it("stops rotation at or above half of the available zoom range", () => {
+    expect(
+      shouldIdleRotate({ drawerOpen: false, zoom: IDLE_ROTATION_MAX_ZOOM }),
+    ).toBe(false)
+    expect(
+      shouldIdleRotate({
+        drawerOpen: false,
+        zoom: IDLE_ROTATION_MAX_ZOOM + 0.01,
+      }),
+    ).toBe(false)
+    expect(
+      shouldIdleRotate({
+        drawerOpen: false,
+        zoom: IDLE_ROTATION_MAX_ZOOM - 0.01,
+      }),
+    ).toBe(true)
+  })
+})
 
 describe("shortestLongitudeDelta", () => {
   it("returns small deltas unchanged", () => {

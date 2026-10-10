@@ -2,23 +2,18 @@
 
 import { useEffect, useState } from "react"
 
-import HazardIcon from "@/components/icons/HazardIcon"
 import MarketChart from "@/components/markets/MarketChart"
 import PredictionForm, {
   type TradePreview,
 } from "@/components/trading/PredictionForm"
 import RedeemPosition from "@/components/trading/RedeemPosition"
 import { useAIForecast } from "@/hooks/useAIForecast"
-import { CATEGORY_ACCENTS, CATEGORY_LABELS } from "@/lib/markets/categories"
-import type {
-  ClimateMarket,
-  TradeConfirmedDetail,
-} from "@/lib/markets/types"
+import { CATEGORY_LABELS } from "@/lib/markets/categories"
+import type { ClimateMarket, TradeConfirmedDetail } from "@/lib/markets/types"
 import { TRADE_CONFIRMED_EVENT } from "@/lib/markets/types"
 import {
   formatCompact,
   formatCountdown,
-  formatDateTime,
   formatProbability,
   formatSol,
   shortenAddress,
@@ -26,15 +21,9 @@ import {
 
 interface MarketDetailsProps {
   market: ClimateMarket
-  onBack: () => void
-  backLabel?: string
 }
 
-export default function MarketDetails({
-  market,
-  onBack,
-  backLabel,
-}: MarketDetailsProps) {
+export default function MarketDetails({ market }: MarketDetailsProps) {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -52,7 +41,8 @@ export default function MarketDetails({
     deltaPts: number
   } | null>(null)
 
-  const currentProbability = market.yesPrice
+  const history = market.history
+  const totalLiquidity = market.yesLiquidity + market.noLiquidity
 
   useEffect(() => {
     setPreview(null)
@@ -78,63 +68,16 @@ export default function MarketDetails({
     }
   }, [market.id, market.yesPrice])
 
-  const history = market.history
-  const openingProbability = history[0]?.yesProbability ?? currentProbability
-  const probabilityChange = (currentProbability - openingProbability) * 100
-  const totalLiquidity = market.yesLiquidity + market.noLiquidity
-  const categoryAccent = CATEGORY_ACCENTS[market.category]
   return (
     <article aria-labelledby="market-question" className="pb-8 text-white">
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-white/55 transition hover:border-white/35 hover:bg-white/10 hover:text-white"
-        >
-          ← {backLabel ?? market.continent}
-        </button>
-        <div className="flex items-center gap-2 font-mono text-[8px] uppercase tracking-[0.13em]">
-          <span className="flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-emerald-200">
-            <span className="size-1 rounded-full bg-emerald-300" />
-            {market.status}
-          </span>
-          {modelProb !== null && (
-            <span
-              className="rounded-full border border-violet-300/25 bg-violet-300/10 px-2.5 py-1 text-violet-100"
-              title="Independent model forecast for this market"
-            >
-              Model {formatProbability(modelProb)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-5 flex items-start gap-3">
-        <span
-          className="grid size-10 shrink-0 place-items-center rounded-xl border"
-          style={{
-            backgroundColor: `${categoryAccent}12`,
-            borderColor: `${categoryAccent}4d`,
-            boxShadow: `0 0 14px ${categoryAccent}24`,
-          }}
-          aria-hidden="true"
-        >
-          <HazardIcon category={market.category} className="size-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">
-            {market.region} · {CATEGORY_LABELS[market.category]}
-          </p>
-          <p className="mt-1 text-[10px] text-white/30">
-            {market.country ?? market.continent} · Closes{" "}
-            {formatCountdown(market.closeTime, now)}
-          </p>
-        </div>
-      </div>
+      <p className="text-xs text-white/50">
+        {market.region} · {CATEGORY_LABELS[market.category]} · Closes{" "}
+        {formatCountdown(market.closeTime, now)}
+      </p>
 
       <h2
         id="market-question"
-        className="mt-4 text-[1.55rem] font-medium leading-[1.12] tracking-[-0.04em] text-white sm:text-[1.75rem]"
+        className="mt-3 text-[1.55rem] font-medium leading-[1.12] tracking-[-0.04em] text-white sm:text-[1.75rem]"
       >
         {market.question}
       </h2>
@@ -142,92 +85,19 @@ export default function MarketDetails({
         {market.description}
       </p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-[8px] uppercase tracking-[0.12em]">
-        <span
-          className={`rounded-full border px-2.5 py-1 ${
-            market.chainState === "synced"
-              ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
-              : market.chainState === "missing" || market.chainState === "error"
-                ? "border-amber-300/25 bg-amber-300/10 text-amber-100"
-                : "border-white/10 bg-white/[0.04] text-white/45"
-          }`}
-        >
-          {market.chainState === "synced"
-            ? "Devnet account verified"
-            : market.chainState === "loading"
-              ? "Checking Devnet account"
-              : market.chainState === "missing"
-                ? "Market not on-chain"
-                : market.chainState === "error"
-                  ? "Devnet state unavailable"
-                  : "On-chain data unavailable"}
-        </span>
-      </div>
-
-      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 border-y border-white/10 py-4">
-        <div>
-          <p className="font-mono text-[8px] uppercase tracking-[0.15em] text-white/35">
-            Market probability
-          </p>
-          <div className="mt-1 flex items-end gap-2">
-            <span className="tabular text-5xl font-medium leading-none tracking-[-0.06em] text-white">
-              {formatProbability(currentProbability)}
-            </span>
-            <span
-              className={`mb-1 rounded-full px-2 py-1 font-mono text-[9px] ${
-                probabilityChange >= 0
-                  ? "bg-emerald-300/10 text-emerald-200"
-                  : "bg-rose-300/10 text-rose-200"
-              }`}
-            >
-              {probabilityChange >= 0 ? "+" : ""}
-              {probabilityChange.toFixed(1)} pts
-            </span>
-            {lastTrade && (
-              <span
-                className="mb-1 rounded-full bg-sky-300/10 px-2 py-1 font-mono text-[9px] text-sky-200"
-                aria-live="polite"
-              >
-                Odds moved {lastTrade.deltaPts >= 0 ? "+" : ""}
-                {lastTrade.deltaPts.toFixed(1)} pts
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="text-right font-mono text-[9px] uppercase tracking-[0.1em] text-white/30">
-          <p>{formatCompact(market.participants)} traders</p>
-          <p className="mt-1">{formatCompact(market.totalVolume)} SOL vol.</p>
-        </div>
-      </div>
-
-      <section
-        className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] p-3.5 sm:p-4"
-        aria-labelledby="history-heading"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="font-mono text-[8px] uppercase tracking-[0.15em] text-white/30">
-              Prediction analysis
-            </p>
-            <h3
-              id="history-heading"
-              className="mt-1 text-xs font-medium text-white/80"
-            >
-              Implied probability over time
-            </h3>
-          </div>
-          <span className="rounded-full border border-white/10 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.1em] text-white/30">
-            History
-          </span>
-        </div>
-        <div className="mt-2">
-          <MarketChart
-            history={history}
-            tone="dark"
-            forecastProb={modelProb}
-            previewProb={preview?.yesProbability ?? null}
-          />
-        </div>
+      <section className="mt-5" aria-label="Probability history">
+        <MarketChart
+          history={history}
+          tone="dark"
+          forecastProb={modelProb}
+          previewProb={preview?.yesProbability ?? null}
+          recentTradeDeltaPts={lastTrade?.deltaPts ?? null}
+        />
+        <p className="mt-3 text-[11px] text-white/40">
+          {formatCompact(market.participants)} traders ·{" "}
+          {formatCompact(market.totalVolume)} SOL traded ·{" "}
+          {formatSol(totalLiquidity)} pool
+        </p>
       </section>
 
       <PredictionForm
@@ -237,82 +107,51 @@ export default function MarketDetails({
       />
       {market.status !== "open" && <RedeemPosition market={market} />}
 
-      <dl className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 font-mono sm:grid-cols-4">
-        {[
-          ["YES pool", formatSol(market.yesLiquidity)],
-          ["NO pool", formatSol(market.noLiquidity)],
-          ["Liquidity", formatSol(totalLiquidity)],
-          ["Closes", formatCountdown(market.closeTime, now)],
-        ].map(([label, value]) => (
-          <div key={label} className="bg-[#0a0e0d] p-3">
-            <dt className="text-[8px] uppercase tracking-[0.12em] text-white/30">
-              {label}
-            </dt>
-            <dd className="tabular mt-1.5 text-[10px] text-white/75">
-              {value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-
       <div className="mt-5 space-y-2">
         <details className="group rounded-xl border border-white/10 bg-white/[0.025] open:bg-white/[0.045]">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/50 marker:hidden">
-            Resolution protocol
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3.5 text-xs font-medium text-white/70 marker:hidden">
+            Resolution & evidence
             <span className="text-white/25 transition group-open:rotate-45">
               +
             </span>
           </summary>
-          <div className="border-t border-white/10 px-3.5 py-4 text-[11px] leading-5 text-white/45">
+          <div className="border-t border-white/10 px-3.5 py-4 text-[12px] leading-6 text-white/55">
             <p>{market.resolutionRules}</p>
             <p className="mt-3">
-              <span className="text-white/70">Resolver:</span>{" "}
+              <span className="text-white/80">Resolver:</span>{" "}
               {shortenAddress(market.resolver, 6)}
-            </p>
-            <p className="mt-1">
-              <span className="text-white/70">Scheduled close:</span>{" "}
-              {formatDateTime(market.closeTime)}
             </p>
             <a
               href={market.resolutionSourceUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-3 inline-block text-white/75 underline decoration-white/25 underline-offset-4 hover:text-white"
+              className="mt-3 inline-block text-white/80 underline decoration-white/25 underline-offset-4 hover:text-white"
             >
               {market.resolutionSource} ↗
             </a>
+            <div className="mt-4 space-y-2">
+              {market.evidence.map((item) => (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-lg border border-white/10 bg-black/20 p-3 transition hover:border-white/25"
+                >
+                  <p className="text-[12px] font-medium text-white/80">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-5 text-white/45">
+                    {item.summary}
+                  </p>
+                </a>
+              ))}
+            </div>
           </div>
         </details>
 
         <details className="group rounded-xl border border-white/10 bg-white/[0.025] open:bg-white/[0.045]">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/50 marker:hidden">
-            Evidence & methodology
-            <span className="text-white/25 transition group-open:rotate-45">
-              +
-            </span>
-          </summary>
-          <div className="space-y-2 border-t border-white/10 p-3">
-            {market.evidence.map((item) => (
-              <a
-                key={item.id}
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
-                className="block rounded-lg border border-white/10 bg-black/20 p-3 transition hover:border-white/25"
-              >
-                <p className="text-[11px] font-medium text-white/75">
-                  {item.title}
-                </p>
-                <p className="mt-1 text-[10px] leading-4 text-white/35">
-                  {item.summary}
-                </p>
-              </a>
-            ))}
-          </div>
-        </details>
-
-        <details className="group rounded-xl border border-white/10 bg-white/[0.025] open:bg-white/[0.045]">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/50 marker:hidden">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3.5 text-xs font-medium text-white/70 marker:hidden">
             Recent trades ({market.recentTrades.length})
             <span className="text-white/25 transition group-open:rotate-45">
               +
@@ -322,21 +161,19 @@ export default function MarketDetails({
             {market.recentTrades.slice(0, 5).map((trade) => (
               <div
                 key={trade.id}
-                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3 font-mono text-[9px]"
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3 text-[11px]"
               >
                 <span
-                  className={`rounded px-2 py-1 ${
-                    trade.side === "yes"
-                      ? "bg-emerald-300/10 text-emerald-200"
-                      : "bg-rose-300/10 text-rose-200"
-                  }`}
+                  className={
+                    trade.side === "yes" ? "text-emerald-200" : "text-rose-200"
+                  }
                 >
                   {trade.side.toUpperCase()}
                 </span>
-                <span className="truncate text-white/30">
+                <span className="truncate text-white/40">
                   {shortenAddress(trade.wallet)}
                 </span>
-                <span className="tabular text-white/65">
+                <span className="tabular text-white/70">
                   {formatSol(trade.amountSol, 3)} @{" "}
                   {formatProbability(trade.probability)}
                 </span>

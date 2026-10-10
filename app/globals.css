@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  --drawer-width: clamp(520px, 50vw, 920px);
   --paper: #f7f7f3;
   --panel: #ffffff;
   --ink: #111111;

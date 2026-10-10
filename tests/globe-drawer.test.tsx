@@ -18,7 +18,8 @@ const testMarkets: ClimateMarket[] = [
   {
     id: "test-fl-hurricane",
     onchainMarketId: 1001,
-    question: "Will Florida record a Category 4+ hurricane landfall before October 31, 2026?",
+    question:
+      "Will Florida record a Category 4+ hurricane landfall before October 31, 2026?",
     slug: "fl-test",
     description: "Test market.",
     category: "hurricane",
@@ -54,7 +55,8 @@ const testMarkets: ClimateMarket[] = [
   {
     id: "test-europe-heatwave",
     onchainMarketId: 1004,
-    question: "Will Paris, Madrid, or Rome record 40°C before September 30, 2026?",
+    question:
+      "Will Paris, Madrid, or Rome record 40°C before September 30, 2026?",
     slug: "europe-heatwave",
     description: "Test market.",
     category: "temperature",
@@ -89,7 +91,8 @@ const testMarkets: ClimateMarket[] = [
   {
     id: "test-queensland-cyclone",
     onchainMarketId: 1023,
-    question: "Will a tropical cyclone cross the Queensland coast before March 31, 2027?",
+    question:
+      "Will a tropical cyclone cross the Queensland coast before March 31, 2027?",
     slug: "queensland-cyclone",
     description: "Test market.",
     category: "hurricane",
@@ -141,32 +144,26 @@ vi.mock("@/components/portfolio/PortfolioPanel", () => ({
 }))
 
 describe("geographic market workflow", () => {
-  it("opens a region from the globe's accessible selector", async () => {
-    const user = userEvent.setup()
-    const onRegionSelect = vi.fn()
+  it("renders the globe without the removed navigation chrome", () => {
     render(
       <ClimateGlobe
         markets={testMarkets}
         selectedRegion={null}
-        onRegionSelect={onRegionSelect}
+        isDrawerOpen={false}
+        onRegionSelect={vi.fn()}
         onMarketSelect={vi.fn()}
         onClusterSelect={vi.fn()}
       />,
     )
 
-    await user.selectOptions(
-      screen.getByLabelText(/explore markets by region/i),
-      "North America",
-    )
-    expect(onRegionSelect).toHaveBeenCalledWith("North America")
-    expect(
-      screen.getByRole("button", { name: /reset globe view/i }),
-    ).toBeEnabled()
-    expect(
-      screen.queryByRole("button", { name: /likelihood heat map/i }),
-    ).not.toBeInTheDocument()
-    expect(screen.queryByText(/live simulation/i)).not.toBeInTheDocument()
     expect(screen.getByRole("img")).toHaveAccessibleName(/halftone globe/i)
+    expect(
+      screen.queryByLabelText(/explore markets by region/i),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: /reset globe view/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/drag to rotate/i)).not.toBeInTheDocument()
   })
 
   it("filters markets by selected continent and opens an individual market", async () => {
@@ -219,6 +216,16 @@ describe("geographic market workflow", () => {
     expect(within(drawer).getByTestId("selected-market")).toHaveTextContent(
       europeMarket!.question,
     )
+
+    await user.click(
+      within(drawer).getByRole("button", { name: /back to region markets/i }),
+    )
+    expect(
+      within(drawer).getByRole("heading", { name: "Europe" }),
+    ).toBeInTheDocument()
+    expect(
+      within(drawer).queryByTestId("selected-market"),
+    ).not.toBeInTheDocument()
   })
 
   it("lists only the clicked cluster markets instead of the whole continent", async () => {
@@ -279,10 +286,12 @@ describe("geographic market workflow", () => {
     )
 
     expect(screen.getByTestId("globe-viewport")).not.toHaveClass(
-      "lg:right-[484px]",
+      "md:right-[var(--drawer-width)]",
     )
     await user.click(screen.getByRole("button", { name: "Select market" }))
-    expect(screen.getByTestId("globe-viewport")).toHaveClass("lg:right-[484px]")
+    expect(screen.getByTestId("globe-viewport")).toHaveClass(
+      "md:right-[var(--drawer-width)]",
+    )
   })
 
   it("labels the wallet portfolio drawer independently of a region", async () => {

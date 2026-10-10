@@ -1,10 +1,9 @@
 "use client"
 
 import { MiniMarketChart } from "@/components/markets/MarketChart"
-import HazardIcon from "@/components/icons/HazardIcon"
 import { useGlobeLink } from "@/components/providers/GlobeLinkProvider"
 import { useMarkets } from "@/components/providers/MarketProvider"
-import { CATEGORY_ACCENTS, CATEGORY_LABELS } from "@/lib/markets/categories"
+import { CATEGORY_LABELS } from "@/lib/markets/categories"
 import type { ClimateMarket } from "@/lib/markets/types"
 import {
   formatCompact,
@@ -47,7 +46,6 @@ export default function MarketListItem({
   const daysSinceCreated = (now - Date.parse(market.createdAt)) / DAY_MS
   const isNew = now > 0 && daysSinceCreated >= 0 && daysSinceCreated <= NEW_DAYS
   const isDark = tone === "dark"
-  const categoryAccent = CATEGORY_ACCENTS[market.category]
 
   return (
     <button
@@ -65,18 +63,6 @@ export default function MarketListItem({
       aria-label={`Open market: ${market.question}. Hazard type ${CATEGORY_LABELS[market.category]}. YES ${yesProbability}, NO ${noProbability}.`}
     >
       <div className="flex items-start gap-3">
-        <span
-          className={`grid size-9 shrink-0 place-items-center rounded-full border ${
-            isDark ? "bg-white/[0.04]" : "bg-neutral-950"
-          }`}
-          style={{
-            borderColor: `${categoryAccent}55`,
-            boxShadow: `0 0 12px ${categoryAccent}24`,
-          }}
-          aria-hidden="true"
-        >
-          <HazardIcon category={market.category} className="size-[18px]" />
-        </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 overflow-hidden">
             <span
