@@ -58,7 +58,7 @@ const testMarkets: ClimateMarket[] = [
     question:
       "Will Paris, Madrid, or Rome record 40°C before September 30, 2026?",
     slug: "europe-heatwave",
-    description: "Test market.",
+    description: "Paris heat and valley conditions shape this outlook.",
     category: "temperature",
     continent: "Europe",
     region: "Paris–Madrid–Rome",
@@ -166,7 +166,7 @@ describe("geographic market workflow", () => {
     expect(screen.queryByText(/drag to rotate/i)).not.toBeInTheDocument()
   })
 
-  it("filters markets by selected continent and opens an individual market", async () => {
+  it("opens the globe region in the central browse view", async () => {
     const user = userEvent.setup()
 
     function Harness() {
@@ -190,11 +190,15 @@ describe("geographic market workflow", () => {
     await user.click(screen.getByRole("button", { name: "Open Europe" }))
     const drawer = screen.getByTestId("market-drawer")
     expect(
-      within(drawer).getByRole("heading", { name: "Europe" }),
+      within(drawer).getByRole("heading", { name: "Search markets" }),
     ).toBeInTheDocument()
     expect(
-      within(drawer).getAllByRole("button", { name: /open market:/i }).length,
-    ).toBeGreaterThan(0)
+      within(drawer).getByRole("checkbox", { name: "Europe" }),
+    ).toBeChecked()
+    // The provider holds 3 markets; only the European market may show.
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(1)
     expect(
       within(drawer).queryByText(/florida experience/i),
     ).not.toBeInTheDocument()
@@ -204,10 +208,7 @@ describe("geographic market workflow", () => {
         market.continent === "Europe" && market.category === "temperature",
     )
     expect(europeMarket).toBeDefined()
-    await user.type(
-      within(drawer).getByLabelText(/search within europe/i),
-      "Paris",
-    )
+    await user.type(within(drawer).getByLabelText(/search markets/i), "Paris")
     const parisMarketButton = within(drawer).getByRole("button", {
       name: /open market:.*paris/i,
     })
@@ -218,17 +219,17 @@ describe("geographic market workflow", () => {
     )
 
     await user.click(
-      within(drawer).getByRole("button", { name: /back to region markets/i }),
+      within(drawer).getByRole("button", { name: /back to results/i }),
     )
     expect(
-      within(drawer).getByRole("heading", { name: "Europe" }),
+      within(drawer).getByRole("heading", { name: "Search markets" }),
     ).toBeInTheDocument()
     expect(
       within(drawer).queryByTestId("selected-market"),
     ).not.toBeInTheDocument()
   })
 
-  it("lists only the clicked cluster markets instead of the whole continent", async () => {
+  it("pins a clicked cluster with a removable scope", async () => {
     const user = userEvent.setup()
     const cluster = testMarkets.slice(0, 2)
 
@@ -253,12 +254,184 @@ describe("geographic market workflow", () => {
     await user.click(screen.getByRole("button", { name: "Open cluster" }))
     const drawer = screen.getByTestId("market-drawer")
     expect(
-      within(drawer).getByRole("heading", { name: "2 nearby markets" }),
+      within(drawer).getByText("2 markets at this spot"),
     ).toBeInTheDocument()
     // The provider holds 3 markets; only the 2 cluster members may show.
     expect(
       within(drawer).getAllByRole("button", { name: /open market:/i }),
     ).toHaveLength(2)
+
+    await user.click(
+      within(drawer).getByRole("button", { name: /remove spot filter/i }),
+    )
+    expect(
+      within(drawer).queryByText("2 markets at this spot"),
+    ).not.toBeInTheDocument()
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(3)
+  })
+
+  it("searches market titles, regions, and market types", async () => {
+    const user = userEvent.setup()
+
+    function Harness() {
+      const { showBrowse } = useMarkets()
+      return (
+        <>
+          <button type="button" onClick={() => showBrowse()}>
+            Browse markets
+          </button>
+          <RegionalMarketDrawer />
+        </>
+      )
+    }
+
+    render(
+      <MarketProvider initialMarkets={testMarkets}>
+        <Harness />
+      </MarketProvider>,
+    )
+
+    await user.click(screen.getByRole("button", { name: "Browse markets" }))
+    const drawer = screen.getByTestId("market-drawer")
+    const search = within(drawer).getByLabelText(/search markets/i)
+
+    await user.type(search, "Hurricanes")
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(2)
+
+    await user.clear(search)
+    await user.type(search, "Florida")
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(1)
+    expect(
+      within(drawer).getByRole("button", { name: /open market:/i }),
+    ).toHaveAccessibleName(/florida/i)
+
+    await user.clear(search)
+    await user.type(search, "valley")
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(1)
+    expect(
+      within(drawer).getByRole("button", { name: /open market:/i }),
+    ).toHaveAccessibleName(/paris/i)
+
+    await user.clear(search)
+    await user.type(search, "Oceania")
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(1)
+    expect(
+      within(drawer).getByRole("button", { name: /open market:/i }),
+    ).toHaveAccessibleName(/queensland/i)
+  })
+
+  it("combines market-type and region filters", async () => {
+    const user = userEvent.setup()
+
+    function Harness() {
+      const { showBrowse } = useMarkets()
+      return (
+        <>
+          <button type="button" onClick={() => showBrowse()}>
+            Browse markets
+          </button>
+          <RegionalMarketDrawer />
+        </>
+      )
+    }
+
+    render(
+      <MarketProvider initialMarkets={testMarkets}>
+        <Harness />
+      </MarketProvider>,
+    )
+
+    await user.click(screen.getByRole("button", { name: "Browse markets" }))
+    const drawer = screen.getByTestId("market-drawer")
+
+    await user.click(
+      within(drawer).getByRole("checkbox", { name: "Hurricanes" }),
+    )
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(2)
+
+    await user.click(within(drawer).getByRole("checkbox", { name: "Oceania" }))
+    const results = within(drawer).getAllByRole("button", {
+      name: /open market:/i,
+    })
+    expect(results).toHaveLength(1)
+    expect(results[0]).toHaveAccessibleName(/queensland/i)
+
+    await user.click(within(drawer).getByRole("checkbox", { name: "Oceania" }))
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(2)
+  })
+
+  it("orders results with the selected sort", async () => {
+    const user = userEvent.setup()
+
+    function Harness() {
+      const { showBrowse } = useMarkets()
+      return (
+        <>
+          <button type="button" onClick={() => showBrowse()}>
+            Browse markets
+          </button>
+          <RegionalMarketDrawer />
+        </>
+      )
+    }
+
+    render(
+      <MarketProvider initialMarkets={testMarkets}>
+        <Harness />
+      </MarketProvider>,
+    )
+
+    await user.click(screen.getByRole("button", { name: "Browse markets" }))
+    const drawer = screen.getByTestId("market-drawer")
+    await user.selectOptions(within(drawer).getByLabelText(/sort/i), "volume")
+    expect(
+      within(drawer)
+        .getAllByRole("button", { name: /open market:/i })[0]
+        ?.getAttribute("aria-label"),
+    ).toMatch(/paris/i)
+
+    await user.selectOptions(within(drawer).getByLabelText(/sort/i), "yes")
+    expect(
+      within(drawer)
+        .getAllByRole("button", { name: /open market:/i })[0]
+        ?.getAttribute("aria-label"),
+    ).toMatch(/queensland/i)
+  })
+
+  it("opens the central browse view from the globe magnifier", async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MarketProvider initialMarkets={testMarkets}>
+        <GlobeLinkProvider>
+          <GlobeHero />
+          <RegionalMarketDrawer />
+        </GlobeLinkProvider>
+      </MarketProvider>,
+    )
+
+    await user.click(screen.getByRole("button", { name: /search markets/i }))
+    const drawer = screen.getByTestId("market-drawer")
+    expect(
+      within(drawer).getByRole("heading", { name: "Search markets" }),
+    ).toBeInTheDocument()
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(3)
   })
 
   it("reserves the drawer width in the globe viewport after selecting a market", async () => {

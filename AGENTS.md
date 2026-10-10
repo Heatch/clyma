@@ -70,7 +70,7 @@ app/api/markets|users|me|auth|predict|index-transaction
 components/
   Dashboard.tsx               client composer (providers + account dock + globe + drawer)
   globe/                      ClimateGlobe (D3 canvas), GlobeHero (overview + viewport sizing)
-  markets/                    list items, details, chart, drawer
+  markets/                    browser, list items, details, chart, drawer
   trading/                    PredictionForm (buy), RedeemPosition (claim/refund)
   providers/                  SolanaProvider, MarketProvider, PositionProvider, GlobeLinkProvider
   layout/                     AccountDock (wallet + open-position count)
@@ -108,9 +108,14 @@ only in code, env vars, and this doc.
 - `app/page.tsx` is `force-dynamic`, queries SQLite, renders
   `<Dashboard initialMarkets>`. `Dashboard` renders the full-window globe,
   bottom-left `AccountDock`, and right-side drawer; there is no sidebar.
-- `GlobeHero` shows a two-line overview and reserves `--drawer-width` for the
-  open drawer at the `md` breakpoint and above. Category, status, and sort
-  state remain available in `MarketProvider` for future drawer navigation.
+- `GlobeHero` shows a two-line overview, a top-right search trigger, and
+  reserves `--drawer-width` for the open drawer at the `md` breakpoint and
+  above. The globe always renders open markets and is independent of drawer
+  browsing.
+- `MarketBrowser` is the drawer’s only list view: text search, multi-select
+  market-type and region filters, sorting, and an exact cluster scope when a
+  globe cluster was clicked. Region clicks preset the region filter; cluster
+  clicks preset an exact market-ID scope.
 - `MarketProvider.tsx:145-230` enriches the catalogue from chain PDAs on mount,
   on a 30s interval, and on `terraform:market-state-changed` events.
 - `MarketDetails.tsx:46-58` renders `market.history`, overriding only the
@@ -297,9 +302,9 @@ forwards `--experimental-sqlite` to all npm scripts).
 - `fixtureUserPositions` / `fixtureUserActivity` in `lib/markets/data.ts` are
   **test fixtures only** (`tests/api-routes.test.ts`) — the My Positions UI
   does not consume them, so the portfolio can appear empty with a fresh DB.
-- Region, cluster, and portfolio drawer flows are covered in
-  `tests/globe-drawer.test.tsx`; bottom-left wallet and position-count behavior
-  is covered in `tests/account-dock.test.tsx`.
+- Region, cluster, search, filter, sort, magnifier, and portfolio drawer
+  flows are covered in `tests/globe-drawer.test.tsx`; bottom-left wallet and
+  position-count behavior is covered in `tests/account-dock.test.tsx`.
 
 ## Conventions
 

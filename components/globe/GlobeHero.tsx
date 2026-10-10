@@ -5,18 +5,17 @@ import { useMarkets } from "@/components/providers/MarketProvider"
 
 export default function GlobeHero() {
   const {
-    visibleMarkets,
+    markets,
     selectedRegion,
     selectedMarket,
     isDrawerOpen,
     selectRegion,
     selectMarket,
     selectCluster,
+    showBrowse,
   } = useMarkets()
 
-  const openMarkets = visibleMarkets.filter(
-    (market) => market.status === "open",
-  )
+  const openMarkets = markets.filter((market) => market.status === "open")
 
   return (
     <section
@@ -50,6 +49,27 @@ export default function GlobeHero() {
           onClusterSelect={selectCluster}
         />
 
+        {!isDrawerOpen && (
+          <button
+            type="button"
+            onClick={() => showBrowse()}
+            aria-label="Search markets"
+            className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-30 grid size-10 place-items-center text-white/70 transition hover:text-white sm:right-6 sm:top-6"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="size-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16 16 4.5 4.5" />
+            </svg>
+          </button>
+        )}
         <div className="pointer-events-none absolute left-4 top-[max(1rem,env(safe-area-inset-top))] z-20 max-w-[260px] sm:left-6 sm:top-6">
           <h1 className="text-xl font-medium leading-[1.05] tracking-[-0.04em] text-white lg:text-2xl">
             Forecast the world as it changes.

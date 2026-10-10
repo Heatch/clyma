@@ -1,31 +1,22 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 
+import MarketBrowser from "@/components/markets/MarketBrowser"
 import MarketDetails from "@/components/markets/MarketDetails"
-import MarketFilters from "@/components/markets/MarketFilters"
-import MarketListItem from "@/components/markets/MarketListItem"
 import PortfolioPanel from "@/components/portfolio/PortfolioPanel"
 import { useMarkets } from "@/components/providers/MarketProvider"
-import type { MarketCategory } from "@/lib/markets/types"
 
 export default function RegionalMarketDrawer() {
   const {
-    markets,
-    selectedRegion,
     selectedMarket,
-    clusterMarkets,
     isDrawerOpen,
     isPortfolioMode,
     detailReturnView,
-    selectMarket,
-    showRegionMarkets,
-    showClusterMarkets,
+    showBrowse,
     showPortfolio,
     closeDrawer,
   } = useMarkets()
-  const [search, setSearch] = useState("")
-  const [category, setCategory] = useState<MarketCategory | "all">("all")
   const drawerRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
@@ -76,44 +67,16 @@ export default function RegionalMarketDrawer() {
     }
   }, [closeDrawer, isDrawerOpen])
 
-  useEffect(() => {
-    setSearch("")
-    setCategory("all")
-  }, [selectedRegion])
-
-  const regionMarkets = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase()
-    return markets.filter(
-      (market) =>
-        market.continent === selectedRegion &&
-        (category === "all" || market.category === category) &&
-        (!normalizedSearch ||
-          `${market.question} ${market.region} ${market.category}`
-            .toLocaleLowerCase()
-            .includes(normalizedSearch)),
-    )
-  }, [category, markets, search, selectedRegion])
-
   const shouldShowPortfolio =
     isPortfolioMode ||
-    (!selectedMarket && !selectedRegion && !clusterMarkets && isDrawerOpen)
+    (!selectedMarket && isDrawerOpen && detailReturnView === "portfolio")
 
   if (!isDrawerOpen) return null
-  if (!shouldShowPortfolio && !selectedRegion && !clusterMarkets) return null
 
-  const clusterHeadline = clusterMarkets?.[0]
   const backAction =
-    detailReturnView === "portfolio"
-      ? showPortfolio
-      : detailReturnView === "cluster"
-        ? showClusterMarkets
-        : showRegionMarkets
+    detailReturnView === "portfolio" ? showPortfolio : () => showBrowse()
   const backLabel =
-    detailReturnView === "portfolio"
-      ? "Back to positions"
-      : detailReturnView === "cluster"
-        ? "Back to nearby markets"
-        : "Back to region markets"
+    detailReturnView === "portfolio" ? "Back to positions" : "Back to results"
 
   return (
     <>
@@ -132,9 +95,7 @@ export default function RegionalMarketDrawer() {
             ? "My Positions"
             : selectedMarket
               ? `Market details: ${selectedMarket.question}`
-              : clusterMarkets
-                ? `${clusterMarkets.length} nearby markets`
-                : `${selectedRegion} markets`
+              : "Browse markets"
         }
         data-testid="market-drawer"
         className="fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-hidden rounded-t-[1.75rem] border border-white/15 bg-[#0b0d0f]/95 text-white shadow-[0_24px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl md:inset-y-0 md:bottom-0 md:left-auto md:right-0 md:top-0 md:max-h-none md:w-[var(--drawer-width)] md:rounded-none md:border-y-0 md:border-r-0 md:shadow-none"
@@ -175,110 +136,8 @@ export default function RegionalMarketDrawer() {
               <PortfolioPanel />
             ) : selectedMarket ? (
               <MarketDetails market={selectedMarket} />
-            ) : clusterMarkets ? (
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
-                  Overlapping signals
-                </p>
-                <div className="mt-1 flex items-end justify-between gap-4">
-                  <h2 className="text-2xl font-semibold tracking-[-0.03em]">
-                    {clusterMarkets.length} nearby markets
-                  </h2>
-                  <span className="text-[10px] font-semibold text-neutral-400">
-                    {clusterHeadline?.region}
-                  </span>
-                </div>
-                <p className="mt-2 max-w-md text-xs leading-5 text-neutral-400">
-                  These markets share this spot on the globe.
-                </p>
-
-                <div
-                  className="mt-5 space-y-3"
-                  data-testid="cluster-market-list"
-                >
-                  {clusterMarkets.map((market) => (
-                    <MarketListItem
-                      key={market.id}
-                      market={market}
-                      onSelect={(selected) => selectMarket(selected, "cluster")}
-                      tone="dark"
-                    />
-                  ))}
-                </div>
-              </div>
             ) : (
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
-                  Regional desk
-                </p>
-                <div className="mt-1 flex items-end justify-between gap-4">
-                  <h2 className="text-2xl font-semibold tracking-[-0.03em]">
-                    {selectedRegion}
-                  </h2>
-                  <span className="text-[10px] font-semibold text-neutral-400">
-                    {regionMarkets.length} shown
-                  </span>
-                </div>
-                <p className="mt-2 max-w-md text-xs leading-5 text-neutral-400">
-                  Browse climate-risk markets mapped to this region.
-                </p>
-
-                <label className="mt-5 block" htmlFor="region-market-search">
-                  <span className="sr-only">
-                    Search within {selectedRegion}
-                  </span>
-                  <input
-                    id="region-market-search"
-                    type="search"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder={`Search ${selectedRegion}`}
-                    className="h-10 w-full rounded-full border border-white/15 bg-white/[0.06] px-4 text-xs text-white outline-none transition placeholder:text-neutral-500 hover:border-white/30 focus:border-white/60 focus:ring-1 focus:ring-white/40"
-                  />
-                </label>
-                <div className="mt-3">
-                  <MarketFilters
-                    compact
-                    tone="dark"
-                    value={category}
-                    onChange={setCategory}
-                  />
-                </div>
-
-                <div
-                  className="mt-5 space-y-3"
-                  data-testid="regional-market-list"
-                >
-                  {regionMarkets.map((market) => (
-                    <MarketListItem
-                      key={market.id}
-                      market={market}
-                      onSelect={selectMarket}
-                      tone="dark"
-                    />
-                  ))}
-                  {regionMarkets.length === 0 && (
-                    <div className="rounded-2xl border border-dashed border-white/20 bg-white/[0.03] px-5 py-12 text-center">
-                      <p className="text-sm font-semibold">
-                        No matching markets
-                      </p>
-                      <p className="mt-1 text-xs text-neutral-400">
-                        Try a different risk category or search phrase.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearch("")
-                          setCategory("all")
-                        }}
-                        className="mt-4 rounded-full border border-white/25 px-3 py-1.5 text-[11px] font-bold transition hover:border-white hover:bg-white hover:text-neutral-950"
-                      >
-                        Clear filters
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MarketBrowser />
             )}
           </div>
         </div>

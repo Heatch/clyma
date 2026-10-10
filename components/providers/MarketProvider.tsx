@@ -16,6 +16,7 @@ import {
   calculateImpliedProbabilities,
   lamportsToSolNumber,
 } from "@/lib/markets/calculations"
+import { CATEGORY_LABELS } from "@/lib/markets/categories"
 import type {
   ClimateMarket,
   MarketCategory,
@@ -28,37 +29,36 @@ import { decodeMarketAccount } from "@/lib/solana/accounts"
 import { SOLANA_COMMITMENT, SOLANA_PROGRAM_ID } from "@/lib/solana/config"
 import { deriveMarketPda, deriveProtocolConfigPda } from "@/lib/solana/pdas"
 
-export type MarketSort = "trending" | "volume" | "closing" | "yes" | "category"
-export type StatusFilter = MarketStatus | "all"
+export type MarketSort = "trending" | "volume" | "closing" | "yes"
+
+export interface BrowseFilters {
+  query: string
+  categories: MarketCategory[]
+  regions: string[]
+  sort: MarketSort
+}
 
 type MarketContextValue = {
   markets: ClimateMarket[]
-  visibleMarkets: ClimateMarket[]
-  boardMarkets: ClimateMarket[]
   selectedRegion: string | null
   selectedMarket: ClimateMarket | null
-  clusterMarkets: ClimateMarket[] | null
+  browseFilters: BrowseFilters
+  browseScopeIds: string[] | null
+  browseResults: ClimateMarket[]
   isDrawerOpen: boolean
   isPortfolioMode: boolean
-  detailReturnView: "portfolio" | "region" | "cluster" | null
+  detailReturnView: "portfolio" | "browse" | null
   isLoading: boolean
   now: number
-  search: string
-  category: MarketCategory | "all"
-  status: StatusFilter
-  sort: MarketSort
-  setSearch: (value: string) => void
-  setCategory: (value: MarketCategory | "all") => void
-  setStatus: (value: StatusFilter) => void
-  setSort: (value: MarketSort) => void
+  updateBrowseFilters: (filters: Partial<BrowseFilters>) => void
+  toggleBrowseCategory: (category: MarketCategory) => void
+  toggleBrowseRegion: (region: string) => void
+  clearBrowseScope: () => void
+  resetBrowseFilters: () => void
   selectRegion: (region: string) => void
-  selectMarket: (
-    market: ClimateMarket,
-    source?: "portfolio" | "region" | "cluster",
-  ) => void
+  selectMarket: (market: ClimateMarket, source?: "portfolio" | "browse") => void
   selectCluster: (markets: ClimateMarket[]) => void
-  showRegionMarkets: () => void
-  showClusterMarkets: () => void
+  showBrowse: (options?: { reset?: boolean }) => void
   showPortfolio: () => void
   closeDrawer: () => void
 }
@@ -110,6 +110,21 @@ const STATUS_ORDER: Record<MarketStatus, number> = {
   cancelled: 3,
 }
 
+const DEFAULT_BROWSE_FILTERS: BrowseFilters = {
+  query: "",
+  categories: [],
+  regions: [],
+  sort: "closing",
+}
+
+function freshBrowseFilters(): BrowseFilters {
+  return {
+    ...DEFAULT_BROWSE_FILTERS,
+    categories: [],
+    regions: [],
+  }
+}
+
 function matchesSearch(market: ClimateMarket, search: string) {
   const normalized = search.trim().toLocaleLowerCase()
   if (!normalized) return true
@@ -120,6 +135,7 @@ function matchesSearch(market: ClimateMarket, search: string) {
     market.country,
     market.continent,
     market.category,
+    CATEGORY_LABELS[market.category],
   ]
     .filter((value): value is string => Boolean(value))
     .some((value) => value.toLocaleLowerCase().includes(normalized))
@@ -137,7 +153,6 @@ function comparatorFor(sort: MarketSort) {
       return (first: ClimateMarket, second: ClimateMarket) =>
         second.yesPrice - first.yesPrice
     case "trending":
-    case "category":
     default:
       return (first: ClimateMarket, second: ClimateMarket) =>
         second.trendingScore - first.trendingScore
@@ -168,18 +183,14 @@ export function MarketProvider({
   const [selectedMarket, setSelectedMarket] = useState<ClimateMarket | null>(
     null,
   )
-  const [clusterMarkets, setClusterMarkets] = useState<ClimateMarket[] | null>(
-    null,
-  )
+  const [browseFilters, setBrowseFilters] =
+    useState<BrowseFilters>(freshBrowseFilters)
+  const [browseScopeIds, setBrowseScopeIds] = useState<string[] | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isPortfolioMode, setIsPortfolioMode] = useState(false)
   const [detailReturnView, setDetailReturnView] = useState<
-    "portfolio" | "region" | "cluster" | null
+    "portfolio" | "browse" | null
   >(null)
-  const [search, setSearch] = useState("")
-  const [category, setCategory] = useState<MarketCategory | "all">("all")
-  const [status, setStatus] = useState<StatusFilter>("all")
-  const [sort, setSort] = useState<MarketSort>("trending")
   const [isLoading, setIsLoading] = useState(true)
   const refreshRequestRef = useRef(0)
   // Reference "now" resolved after mount (never during render) so time-based
@@ -209,69 +220,74 @@ export function MarketProvider({
     const [protocolAddress] = deriveProtocolConfigPda(programId)
 
     try {
-      const accounts = await connection.getMultipleAccountsInfo(addresses, SOLANA_COMMITMENT)
+      const accounts = await connection.getMultipleAccountsInfo(
+        addresses,
+        SOLANA_COMMITMENT,
+      )
       if (requestId !== refreshRequestRef.current) return
       setMarkets(
-        marketCatalog.map((market, index) => {
-          const account = accounts[index]
-          if (!account) return { ...market, chainState: "missing" as const }
-          if (!account.owner.equals(programId)) {
-            return { ...market, chainState: "error" as const }
-          }
-
-          try {
-            const decoded = decodeMarketAccount(account.data)
-            if (
-              decoded.marketId !== BigInt(market.onchainMarketId) ||
-              !decoded.protocol.equals(protocolAddress) ||
-              decoded.totalYesAmount + decoded.totalNoAmount !==
-                decoded.totalPoolAmount ||
-              (decoded.status === "resolved" &&
-                decoded.outcome === "unresolved") ||
-              (decoded.status !== "resolved" &&
-                decoded.outcome !== "unresolved")
-            ) {
+        marketCatalog
+          .map((market, index) => {
+            const account = accounts[index]
+            if (!account) return { ...market, chainState: "missing" as const }
+            if (!account.owner.equals(programId)) {
               return { ...market, chainState: "error" as const }
             }
-            const probabilities = calculateImpliedProbabilities(
-              decoded.totalYesAmount,
-              decoded.totalNoAmount,
-            )
-            const closeTime = new Date(
-              Number(decoded.closeTimestamp) * 1_000,
-            ).toISOString()
-            const resolutionTime = new Date(
-              Number(decoded.resolutionTimestamp) * 1_000,
-            ).toISOString()
 
-            return {
-              ...market,
-              closeTime,
-              resolutionTime,
-              status: decoded.status,
-              outcome:
-                decoded.status === "cancelled"
-                  ? ("cancelled" as const)
-                  : decoded.outcome,
-              yesPrice: probabilities.yes,
-              noPrice: probabilities.no,
-              yesLiquidity: lamportsToSolNumber(decoded.totalYesAmount),
-              noLiquidity: lamportsToSolNumber(decoded.totalNoAmount),
-              resolver: decoded.resolver.toBase58(),
-              chainState: "synced" as const,
-              chainYesLamports: decoded.totalYesAmount.toString(),
-              chainNoLamports: decoded.totalNoAmount.toString(),
-              chainTotalLamports: decoded.totalPoolAmount.toString(),
+            try {
+              const decoded = decodeMarketAccount(account.data)
+              if (
+                decoded.marketId !== BigInt(market.onchainMarketId) ||
+                !decoded.protocol.equals(protocolAddress) ||
+                decoded.totalYesAmount + decoded.totalNoAmount !==
+                  decoded.totalPoolAmount ||
+                (decoded.status === "resolved" &&
+                  decoded.outcome === "unresolved") ||
+                (decoded.status !== "resolved" &&
+                  decoded.outcome !== "unresolved")
+              ) {
+                return { ...market, chainState: "error" as const }
+              }
+              const probabilities = calculateImpliedProbabilities(
+                decoded.totalYesAmount,
+                decoded.totalNoAmount,
+              )
+              const closeTime = new Date(
+                Number(decoded.closeTimestamp) * 1_000,
+              ).toISOString()
+              const resolutionTime = new Date(
+                Number(decoded.resolutionTimestamp) * 1_000,
+              ).toISOString()
+
+              return {
+                ...market,
+                closeTime,
+                resolutionTime,
+                status: decoded.status,
+                outcome:
+                  decoded.status === "cancelled"
+                    ? ("cancelled" as const)
+                    : decoded.outcome,
+                yesPrice: probabilities.yes,
+                noPrice: probabilities.no,
+                yesLiquidity: lamportsToSolNumber(decoded.totalYesAmount),
+                noLiquidity: lamportsToSolNumber(decoded.totalNoAmount),
+                resolver: decoded.resolver.toBase58(),
+                chainState: "synced" as const,
+                chainYesLamports: decoded.totalYesAmount.toString(),
+                chainNoLamports: decoded.totalNoAmount.toString(),
+                chainTotalLamports: decoded.totalPoolAmount.toString(),
+              }
+            } catch {
+              return { ...market, chainState: "error" as const }
             }
-          } catch {
-            return { ...market, chainState: "error" as const }
-          }
-        }).map((market) =>
-          withOptimisticPoints(
-            market,
-            optimisticRef.current.get(market.id) ?? [],
+          })
+          .map((market) =>
+            withOptimisticPoints(
+              market,
+              optimisticRef.current.get(market.id) ?? [],
+            ),
           ),
-        ),
       )
     } catch {
       if (requestId !== refreshRequestRef.current) return
@@ -341,80 +357,123 @@ export function MarketProvider({
     )
   }, [markets])
 
-  // Deferring search keeps the input responsive while the globe and large
-  // market grid recompute off the debounced value.
-  const deferredSearch = useDeferredValue(search)
+  // Deferring the query keeps the input responsive while the large result
+  // list recomputes off the debounced value.
+  const deferredQuery = useDeferredValue(browseFilters.query)
 
-  const visibleMarkets = useMemo(
-    () =>
-      markets.filter(
+  const browseResults = useMemo(() => {
+    const scope = browseScopeIds ? new Set(browseScopeIds) : null
+    const comparator = comparatorFor(browseFilters.sort)
+    return [...markets]
+      .filter(
         (market) =>
-          matchesSearch(market, deferredSearch) &&
-          (category === "all" || market.category === category),
-      ),
-    [category, deferredSearch, markets],
-  )
-
-  const boardMarkets = useMemo(() => {
-    const filtered =
-      status === "all"
-        ? visibleMarkets
-        : visibleMarkets.filter((market) => market.status === status)
-    const comparator = comparatorFor(sort)
-    return [...filtered].sort((first, second) => {
-      const statusDelta =
-        STATUS_ORDER[first.status] - STATUS_ORDER[second.status]
-      if (statusDelta !== 0) return statusDelta
-      return (
-        comparator(first, second) ||
-        first.question.localeCompare(second.question)
+          (!scope || scope.has(market.id)) &&
+          matchesSearch(market, deferredQuery) &&
+          (browseFilters.categories.length === 0 ||
+            browseFilters.categories.includes(market.category)) &&
+          (browseFilters.regions.length === 0 ||
+            browseFilters.regions.includes(market.continent)),
       )
-    })
-  }, [visibleMarkets, status, sort])
+      .sort((first, second) => {
+        const statusDelta =
+          STATUS_ORDER[first.status] - STATUS_ORDER[second.status]
+        if (statusDelta !== 0) return statusDelta
+        return (
+          comparator(first, second) ||
+          first.question.localeCompare(second.question)
+        )
+      })
+  }, [browseFilters, browseScopeIds, deferredQuery, markets])
 
-  const selectRegion = useCallback((region: string) => {
-    setSelectedRegion(region)
-    setSelectedMarket(null)
-    setClusterMarkets(null)
-    setDetailReturnView(null)
-    setIsDrawerOpen(true)
+  const updateBrowseFilters = useCallback((filters: Partial<BrowseFilters>) => {
+    setBrowseFilters((previous) => ({ ...previous, ...filters }))
   }, [])
 
-  const selectMarket = useCallback(
-    (market: ClimateMarket, source: "portfolio" | "region" | "cluster" = "region") => {
-      setSelectedRegion(market.continent)
-      setSelectedMarket(market)
+  const toggleBrowseCategory = useCallback((category: MarketCategory) => {
+    setBrowseFilters((previous) => ({
+      ...previous,
+      categories: previous.categories.includes(category)
+        ? previous.categories.filter((item) => item !== category)
+        : [...previous.categories, category],
+    }))
+  }, [])
+
+  const toggleBrowseRegion = useCallback((region: string) => {
+    setBrowseFilters((previous) => ({
+      ...previous,
+      regions: previous.regions.includes(region)
+        ? previous.regions.filter((item) => item !== region)
+        : [...previous.regions, region],
+    }))
+  }, [])
+
+  const clearBrowseScope = useCallback(() => {
+    setBrowseScopeIds(null)
+  }, [])
+
+  const resetBrowseFilters = useCallback(() => {
+    setBrowseFilters(freshBrowseFilters())
+    setBrowseScopeIds(null)
+  }, [])
+
+  const openBrowse = useCallback(
+    ({ region, scopeIds }: { region?: string; scopeIds?: string[] }) => {
+      setBrowseFilters((previous) => ({
+        query: "",
+        categories: [],
+        regions: region ? [region] : [],
+        sort: previous.sort,
+      }))
+      setBrowseScopeIds(scopeIds ? [...scopeIds] : null)
+      setSelectedMarket(null)
+      setSelectedRegion((previous) => region ?? (scopeIds ? null : previous))
       setIsPortfolioMode(false)
-      if (source !== "cluster") setClusterMarkets(null)
-      setDetailReturnView(source === "portfolio" ? "portfolio" : source)
+      setDetailReturnView("browse")
       setIsDrawerOpen(true)
     },
     [],
   )
 
-  const selectCluster = useCallback((markets: ClimateMarket[]) => {
-    setClusterMarkets(markets)
-    setSelectedMarket(null)
-    setSelectedRegion(null)
-    setIsPortfolioMode(false)
-    setDetailReturnView("cluster")
-    setIsDrawerOpen(true)
-  }, [])
+  const selectRegion = useCallback(
+    (region: string) => {
+      openBrowse({ region })
+    },
+    [openBrowse],
+  )
 
-  const showRegionMarkets = useCallback(() => {
-    setSelectedMarket(null)
-    setClusterMarkets(null)
-    setIsPortfolioMode(false)
-    setDetailReturnView(null)
-  }, [])
-  const showClusterMarkets = useCallback(() => {
-    setSelectedMarket(null)
-    setIsPortfolioMode(false)
-    setDetailReturnView("cluster")
-  }, [])
+  const selectMarket = useCallback(
+    (market: ClimateMarket, source: "portfolio" | "browse" = "browse") => {
+      setSelectedRegion(market.continent)
+      setSelectedMarket(market)
+      setIsPortfolioMode(false)
+      if (source !== "browse") setBrowseScopeIds(null)
+      setDetailReturnView(source === "portfolio" ? "portfolio" : "browse")
+      setIsDrawerOpen(true)
+    },
+    [],
+  )
+
+  const selectCluster = useCallback(
+    (markets: ClimateMarket[]) => {
+      openBrowse({ scopeIds: markets.map((market) => market.id) })
+    },
+    [openBrowse],
+  )
+
+  const showBrowse = useCallback(
+    (options?: { reset?: boolean }) => {
+      setSelectedMarket(null)
+      setSelectedRegion(null)
+      setIsPortfolioMode(false)
+      setDetailReturnView("browse")
+      if (options?.reset) resetBrowseFilters()
+      setIsDrawerOpen(true)
+    },
+    [resetBrowseFilters],
+  )
   const showPortfolio = useCallback(() => {
     setSelectedMarket(null)
-    setClusterMarkets(null)
+    setBrowseScopeIds(null)
     setIsPortfolioMode(true)
     setDetailReturnView(null)
     setIsDrawerOpen(true)
@@ -423,63 +482,60 @@ export function MarketProvider({
     setIsDrawerOpen(false)
     setSelectedMarket(null)
     setSelectedRegion(null)
-    setClusterMarkets(null)
+    setBrowseScopeIds(null)
     setIsPortfolioMode(false)
     setDetailReturnView(null)
-  }, [])
+    resetBrowseFilters()
+  }, [resetBrowseFilters])
 
   const value = useMemo<MarketContextValue>(
     () => ({
       markets,
-      visibleMarkets,
-      boardMarkets,
       selectedRegion,
       selectedMarket,
-      clusterMarkets,
+      browseFilters,
+      browseScopeIds,
+      browseResults,
       isDrawerOpen,
       isPortfolioMode,
       detailReturnView,
       isLoading,
       now,
-      search,
-      category,
-      status,
-      sort,
-      setSearch,
-      setCategory,
-      setStatus,
-      setSort,
+      updateBrowseFilters,
+      toggleBrowseCategory,
+      toggleBrowseRegion,
+      clearBrowseScope,
+      resetBrowseFilters,
       selectRegion,
       selectMarket,
       selectCluster,
-      showRegionMarkets,
-      showClusterMarkets,
+      showBrowse,
       showPortfolio,
       closeDrawer,
     }),
     [
-      boardMarkets,
-      category,
+      browseFilters,
+      browseResults,
+      browseScopeIds,
+      clearBrowseScope,
       closeDrawer,
-      clusterMarkets,
       isDrawerOpen,
       isPortfolioMode,
       detailReturnView,
       isLoading,
       markets,
       now,
-      search,
+      resetBrowseFilters,
       selectedMarket,
       selectedRegion,
       selectCluster,
       selectMarket,
       selectRegion,
-      showClusterMarkets,
-      showRegionMarkets,
+      showBrowse,
       showPortfolio,
-      sort,
-      status,
-      visibleMarkets,
+      toggleBrowseCategory,
+      toggleBrowseRegion,
+      updateBrowseFilters,
     ],
   )
 
