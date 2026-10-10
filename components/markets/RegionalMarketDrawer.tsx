@@ -14,11 +14,13 @@ export default function RegionalMarketDrawer() {
     markets,
     selectedRegion,
     selectedMarket,
+    clusterMarkets,
     isDrawerOpen,
     isPortfolioMode,
     detailReturnView,
     selectMarket,
     showRegionMarkets,
+    showClusterMarkets,
     showPortfolio,
     closeDrawer,
   } = useMarkets()
@@ -93,17 +95,18 @@ export default function RegionalMarketDrawer() {
   }, [category, markets, search, selectedRegion])
 
   const shouldShowPortfolio =
-    isPortfolioMode || (!selectedMarket && !selectedRegion && isDrawerOpen)
+    isPortfolioMode || (!selectedMarket && !selectedRegion && !clusterMarkets && isDrawerOpen)
 
   if (!isDrawerOpen) return null
-  if (!shouldShowPortfolio && !selectedRegion) return null
+  if (!shouldShowPortfolio && !selectedRegion && !clusterMarkets) return null
 
+  const clusterHeadline = clusterMarkets?.[0]
   const activeCount = selectedRegion
     ? markets.filter(
         (market) =>
           market.continent === selectedRegion && market.status === "open",
       ).length
-    : 0
+    : (clusterMarkets?.length ?? 0)
 
   return (
     <>
@@ -122,7 +125,9 @@ export default function RegionalMarketDrawer() {
             ? "My Positions"
             : selectedMarket
               ? `Market details: ${selectedMarket.question}`
-              : `${selectedRegion} markets`
+              : clusterMarkets
+                ? `${clusterMarkets.length} nearby markets`
+                : `${selectedRegion} markets`
         }
         data-testid="market-drawer"
         className="fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-hidden rounded-t-[1.75rem] border border-white/15 bg-[#0b0d0f]/95 text-white shadow-[0_24px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl md:inset-y-4 md:left-auto md:right-4 md:max-h-none md:w-[min(460px,calc(100vw-2rem))] md:rounded-[1.5rem] lg:right-6"
@@ -146,7 +151,9 @@ export default function RegionalMarketDrawer() {
                     ? "My Positions"
                     : selectedMarket
                       ? selectedMarket.region
-                      : selectedRegion}
+                      : (clusterMarkets
+                          ? `${clusterMarkets.length} nearby markets`
+                          : selectedRegion)}
                 </p>
                 <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-neutral-400">
                   {isPortfolioMode
@@ -175,14 +182,49 @@ export default function RegionalMarketDrawer() {
                 onBack={
                   detailReturnView === "portfolio"
                     ? showPortfolio
-                    : showRegionMarkets
+                    : detailReturnView === "cluster"
+                      ? showClusterMarkets
+                      : showRegionMarkets
                 }
                 backLabel={
                   detailReturnView === "portfolio"
                     ? "My Positions"
-                    : selectedRegion ?? selectedMarket.continent
+                    : detailReturnView === "cluster"
+                      ? `${clusterMarkets?.length ?? 0} nearby markets`
+                      : selectedRegion ?? selectedMarket.continent
                 }
               />
+            ) : clusterMarkets ? (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
+                  Overlapping signals
+                </p>
+                <div className="mt-1 flex items-end justify-between gap-4">
+                  <h2 className="text-2xl font-semibold tracking-[-0.03em]">
+                    {clusterMarkets.length} nearby markets
+                  </h2>
+                  <span className="text-[10px] font-semibold text-neutral-400">
+                    {clusterHeadline?.region}
+                  </span>
+                </div>
+                <p className="mt-2 max-w-md text-xs leading-5 text-neutral-400">
+                  These markets share this spot on the globe.
+                </p>
+
+                <div
+                  className="mt-5 space-y-3"
+                  data-testid="cluster-market-list"
+                >
+                  {clusterMarkets.map((market) => (
+                    <MarketListItem
+                      key={market.id}
+                      market={market}
+                      onSelect={(selected) => selectMarket(selected, "cluster")}
+                      tone="dark"
+                    />
+                  ))}
+                </div>
+              </div>
             ) : (
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">

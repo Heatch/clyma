@@ -37,9 +37,10 @@ type MarketContextValue = {
   boardMarkets: ClimateMarket[]
   selectedRegion: string | null
   selectedMarket: ClimateMarket | null
+  clusterMarkets: ClimateMarket[] | null
   isDrawerOpen: boolean
   isPortfolioMode: boolean
-  detailReturnView: "portfolio" | "region" | null
+  detailReturnView: "portfolio" | "region" | "cluster" | null
   isLoading: boolean
   now: number
   search: string
@@ -53,9 +54,11 @@ type MarketContextValue = {
   selectRegion: (region: string) => void
   selectMarket: (
     market: ClimateMarket,
-    source?: "portfolio" | "region",
+    source?: "portfolio" | "region" | "cluster",
   ) => void
+  selectCluster: (markets: ClimateMarket[]) => void
   showRegionMarkets: () => void
+  showClusterMarkets: () => void
   showPortfolio: () => void
   closeDrawer: () => void
 }
@@ -165,10 +168,13 @@ export function MarketProvider({
   const [selectedMarket, setSelectedMarket] = useState<ClimateMarket | null>(
     null,
   )
+  const [clusterMarkets, setClusterMarkets] = useState<ClimateMarket[] | null>(
+    null,
+  )
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isPortfolioMode, setIsPortfolioMode] = useState(false)
   const [detailReturnView, setDetailReturnView] = useState<
-    "portfolio" | "region" | null
+    "portfolio" | "region" | "cluster" | null
   >(null)
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState<MarketCategory | "all">("all")
@@ -369,28 +375,46 @@ export function MarketProvider({
   const selectRegion = useCallback((region: string) => {
     setSelectedRegion(region)
     setSelectedMarket(null)
+    setClusterMarkets(null)
     setDetailReturnView(null)
     setIsDrawerOpen(true)
   }, [])
 
   const selectMarket = useCallback(
-    (market: ClimateMarket, source: "portfolio" | "region" = "region") => {
+    (market: ClimateMarket, source: "portfolio" | "region" | "cluster" = "region") => {
       setSelectedRegion(market.continent)
       setSelectedMarket(market)
       setIsPortfolioMode(false)
-      setDetailReturnView(source === "portfolio" ? "portfolio" : "region")
+      if (source !== "cluster") setClusterMarkets(null)
+      setDetailReturnView(source === "portfolio" ? "portfolio" : source)
       setIsDrawerOpen(true)
     },
     [],
   )
 
+  const selectCluster = useCallback((markets: ClimateMarket[]) => {
+    setClusterMarkets(markets)
+    setSelectedMarket(null)
+    setSelectedRegion(null)
+    setIsPortfolioMode(false)
+    setDetailReturnView("cluster")
+    setIsDrawerOpen(true)
+  }, [])
+
   const showRegionMarkets = useCallback(() => {
     setSelectedMarket(null)
+    setClusterMarkets(null)
     setIsPortfolioMode(false)
     setDetailReturnView(null)
   }, [])
+  const showClusterMarkets = useCallback(() => {
+    setSelectedMarket(null)
+    setIsPortfolioMode(false)
+    setDetailReturnView("cluster")
+  }, [])
   const showPortfolio = useCallback(() => {
     setSelectedMarket(null)
+    setClusterMarkets(null)
     setIsPortfolioMode(true)
     setDetailReturnView(null)
     setIsDrawerOpen(true)
@@ -399,6 +423,7 @@ export function MarketProvider({
     setIsDrawerOpen(false)
     setSelectedMarket(null)
     setSelectedRegion(null)
+    setClusterMarkets(null)
     setIsPortfolioMode(false)
     setDetailReturnView(null)
   }, [])
@@ -410,6 +435,7 @@ export function MarketProvider({
       boardMarkets,
       selectedRegion,
       selectedMarket,
+      clusterMarkets,
       isDrawerOpen,
       isPortfolioMode,
       detailReturnView,
@@ -425,7 +451,9 @@ export function MarketProvider({
       setSort,
       selectRegion,
       selectMarket,
+      selectCluster,
       showRegionMarkets,
+      showClusterMarkets,
       showPortfolio,
       closeDrawer,
     }),
@@ -433,6 +461,7 @@ export function MarketProvider({
       boardMarkets,
       category,
       closeDrawer,
+      clusterMarkets,
       isDrawerOpen,
       isPortfolioMode,
       detailReturnView,
@@ -442,8 +471,10 @@ export function MarketProvider({
       search,
       selectedMarket,
       selectedRegion,
+      selectCluster,
       selectMarket,
       selectRegion,
+      showClusterMarkets,
       showRegionMarkets,
       showPortfolio,
       sort,

@@ -9,27 +9,33 @@ import landTopology from "world-atlas/land-110m.json"
 
 import { useGlobeLink } from "@/components/providers/GlobeLinkProvider"
 import {
+  CLUSTER_MIN_DISTANCE_PX,
+  clusterProjectedPoints,
+  type PointCluster,
+} from "@/lib/geo/clustering"
+import {
+  HAZARD_GLYPH_SIZE_PX,
+  hazardGlyphDelay,
+  hazardGlyphMarkup,
+  hazardGroupMarkup,
+} from "@/components/globe/hazard-glyphs"
+import {
   CONTINENTS,
   REGION_CENTERS,
   closestContinent,
   isContinentName,
 } from "@/lib/geo/regions"
 import {
-  CATEGORY_ACCENTS,
   CATEGORY_LABELS,
-  HAZARD_MARKER_EFFECTS,
-  resolveClusterHazardCategory,
+  resolveClusterCategories,
 } from "@/lib/markets/categories"
-import type { ClimateMarket, MarketCategory } from "@/lib/markets/types"
+import type { ClimateMarket } from "@/lib/markets/types"
 import { clampProbability } from "@/lib/utils/likelihood"
 
 type Projection = d3.GeoProjection
 
-type RenderedCluster = {
-  x: number
-  y: number
-  markets: ClimateMarket[]
-}
+/** Screen hit radius for animated markers (~34px glyph, generous target). */
+const MARKER_HIT_RADIUS_PX = 20
 
 type PointerState = {
   x: number
@@ -46,12 +52,27 @@ type ViewportTransition = {
   toBaseRadius: number
 }
 
+/**
+ * Shortest-path longitude delta in degrees, wrapped to [-180, 180).
+ *
+ * d3 rotation longitudes are periodic, but the focus animation lerps raw
+ * values. Without wrapping, a globe sitting at rotation 181° focusing a
+ * target at -179° (the same meridian) would spin ~360° instead of ~2°.
+ */
+export function shortestLongitudeDelta(
+  fromLongitude: number,
+  toLongitude: number,
+): number {
+  return ((((toLongitude - fromLongitude) % 360) + 540) % 360) - 180
+}
+
 interface ClimateGlobeProps {
   markets: ClimateMarket[]
   selectedRegion: string | null
   selectedMarketId?: string | null
   onRegionSelect: (region: string) => void
   onMarketSelect: (market: ClimateMarket) => void
+  onClusterSelect: (markets: ClimateMarket[]) => void
   className?: string
   fullBleed?: boolean
 }
@@ -105,152 +126,6 @@ function createLandPattern(
   return context.createPattern(tile, "repeat")
 }
 
-function drawHazardGlyph(
-  context: CanvasRenderingContext2D,
-  category: MarketCategory,
-  x: number,
-  y: number,
-  color: string,
-) {
-  context.save()
-  context.translate(x, y)
-  context.scale(1.5, 1.5)
-  context.translate(-x, -y)
-  context.strokeStyle = color
-  context.fillStyle = color
-  context.lineWidth = 1.2
-  context.lineCap = "round"
-  context.lineJoin = "round"
-
-  switch (category) {
-    case "hurricane":
-      context.beginPath()
-      context.arc(x - 1.2, y - 0.6, 3, Math.PI * 0.1, Math.PI * 1.08)
-      context.stroke()
-      context.beginPath()
-      context.arc(x + 1.2, y + 0.6, 3, Math.PI * 1.1, Math.PI * 2.08)
-      context.stroke()
-      context.beginPath()
-      context.arc(x, y, 0.85, 0, Math.PI * 2)
-      context.fill()
-      break
-    case "drought":
-      context.beginPath()
-      context.arc(x + 2.4, y - 2.7, 1.25, 0, Math.PI * 2)
-      context.fill()
-      context.beginPath()
-      context.moveTo(x + 2.4, y - 4.7)
-      context.lineTo(x + 2.4, y - 4.1)
-      context.moveTo(x + 0.4, y - 2.7)
-      context.lineTo(x + 1, y - 2.7)
-      context.moveTo(x - 3.8, y - 0.5)
-      context.lineTo(x + 3.8, y - 0.5)
-      context.moveTo(x, y - 0.5)
-      context.lineTo(x, y + 1.2)
-      context.lineTo(x - 1.4, y + 2.5)
-      context.lineTo(x, y + 4)
-      context.moveTo(x, y + 1.2)
-      context.lineTo(x + 1.8, y + 2.3)
-      context.stroke()
-      break
-    case "temperature":
-      context.beginPath()
-      context.moveTo(x - 1.25, y - 3.8)
-      context.lineTo(x - 1.25, y + 1.2)
-      context.moveTo(x + 1.25, y - 3.8)
-      context.lineTo(x + 1.25, y + 1.2)
-      context.arc(x, y + 2.1, 2.05, Math.PI * 1.82, Math.PI * 1.18)
-      context.stroke()
-      context.beginPath()
-      context.moveTo(x, y - 2.7)
-      context.lineTo(x, y + 2)
-      context.stroke()
-      context.beginPath()
-      context.arc(x, y + 2.2, 1.35, 0, Math.PI * 2)
-      context.fill()
-      break
-    case "rainfall":
-      context.beginPath()
-      context.arc(x - 1.3, y - 0.8, 1.8, Math.PI, Math.PI * 2)
-      context.arc(x + 1.2, y - 1.2, 2.2, Math.PI, Math.PI * 2)
-      context.moveTo(x - 3.1, y - 0.7)
-      context.lineTo(x + 3.4, y - 0.7)
-      context.moveTo(x - 2.2, y + 1.1)
-      context.lineTo(x - 2.8, y + 3.4)
-      context.moveTo(x, y + 1.1)
-      context.lineTo(x - 0.6, y + 3.8)
-      context.moveTo(x + 2.2, y + 1.1)
-      context.lineTo(x + 1.6, y + 3.4)
-      context.stroke()
-      break
-    case "flooding":
-      context.beginPath()
-      context.moveTo(x - 2.8, y - 1.4)
-      context.lineTo(x, y - 3.7)
-      context.lineTo(x + 2.8, y - 1.4)
-      context.moveTo(x - 1.8, y - 1.4)
-      context.lineTo(x - 1.8, y + 0.2)
-      context.moveTo(x - 3.8, y + 1.2)
-      context.lineTo(x - 2.4, y + 0.5)
-      context.lineTo(x - 1, y + 1.2)
-      context.lineTo(x + 0.4, y + 0.5)
-      context.lineTo(x + 1.8, y + 1.2)
-      context.lineTo(x + 3.2, y + 0.5)
-      context.stroke()
-      break
-    case "crop-yield":
-      context.beginPath()
-      context.moveTo(x, y - 3.8)
-      context.lineTo(x, y + 3.8)
-      context.moveTo(x, y - 1.8)
-      context.lineTo(x - 2.5, y - 3)
-      context.moveTo(x, y - 0.2)
-      context.lineTo(x + 2.5, y - 1.5)
-      context.moveTo(x, y + 1.4)
-      context.lineTo(x - 2.5, y + 0.2)
-      context.moveTo(x, y + 2.8)
-      context.lineTo(x + 2.3, y + 1.7)
-      context.stroke()
-      break
-    case "wildfire":
-      context.beginPath()
-      context.moveTo(x + 0.4, y - 4)
-      context.lineTo(x + 2.8, y - 1)
-      context.lineTo(x + 2.1, y + 2.5)
-      context.lineTo(x, y + 4)
-      context.lineTo(x - 2.5, y + 2.2)
-      context.lineTo(x - 2.9, y - 0.5)
-      context.lineTo(x - 1.1, y - 3)
-      context.lineTo(x - 0.9, y + 0.8)
-      context.lineTo(x + 0.7, y - 1)
-      context.closePath()
-      context.stroke()
-      context.beginPath()
-      context.moveTo(x - 0.6, y + 2)
-      context.lineTo(x, y + 0.2)
-      context.lineTo(x + 0.8, y + 1.7)
-      context.stroke()
-      break
-    case "other":
-      context.beginPath()
-      context.moveTo(x, y - 3.8)
-      context.lineTo(x + 3.7, y + 3.1)
-      context.lineTo(x - 3.7, y + 3.1)
-      context.closePath()
-      context.stroke()
-      context.beginPath()
-      context.moveTo(x, y - 1.4)
-      context.lineTo(x, y + 0.8)
-      context.stroke()
-      context.beginPath()
-      context.arc(x, y + 2, 0.55, 0, Math.PI * 2)
-      context.fill()
-      break
-  }
-
-  context.restore()
-}
-
 function isVisible(projection: Projection, coordinates: [number, number]) {
   const [rotateLongitude, rotateLatitude] = projection.rotate()
   return (
@@ -279,6 +154,7 @@ export default function ClimateGlobe({
   selectedMarketId,
   onRegionSelect,
   onMarketSelect,
+  onClusterSelect,
   className = "",
   fullBleed = false,
 }: ClimateGlobeProps) {
@@ -289,7 +165,8 @@ export default function ClimateGlobe({
   const rotationRef = useRef<[number, number, number]>([...DEFAULT_ROTATION])
   const baseRadiusRef = useRef(200)
   const zoomRef = useRef(1)
-  const clustersRef = useRef<RenderedCluster[]>([])
+  const clustersRef = useRef<PointCluster<ClimateMarket>[]>([])
+  const markersLayerRef = useRef<HTMLDivElement>(null)
   const hoveredCanvasMarketIdRef = useRef<string | null>(null)
   const renderVersionRef = useRef(0)
   const marketsRef = useRef(markets)
@@ -304,7 +181,7 @@ export default function ClimateGlobe({
   const pointersRef = useRef(new Map<number, PointerState>())
   const pinchDistanceRef = useRef<number | null>(null)
   const draggedRef = useRef(false)
-  const callbacksRef = useRef({ onRegionSelect, onMarketSelect })
+  const callbacksRef = useRef({ onRegionSelect, onMarketSelect, onClusterSelect })
   const [isReady, setIsReady] = useState(false)
   const [hoverLabel, setHoverLabel] = useState<string | null>(null)
 
@@ -312,10 +189,11 @@ export default function ClimateGlobe({
     marketsRef.current = markets
     selectedRegionRef.current = selectedRegion
     selectedMarketIdRef.current = selectedMarketId
-    callbacksRef.current = { onRegionSelect, onMarketSelect }
+    callbacksRef.current = { onRegionSelect, onMarketSelect, onClusterSelect }
     renderVersionRef.current += 1
   }, [
     markets,
+    onClusterSelect,
     onMarketSelect,
     onRegionSelect,
     selectedMarketId,
@@ -343,9 +221,18 @@ export default function ClimateGlobe({
   const focusCoordinates = useCallback(
     (longitude: number, latitude: number) => {
       const destination: [number, number, number] = [-longitude, -latitude, 0]
+      // Wrap the longitude leg to the shortest path: rotation accumulates
+      // unboundedly via drag/idle spin, so the raw delta to the destination
+      // can exceed a full turn even when the target is already centered.
+      const wrappedDestination: [number, number, number] = [
+        rotationRef.current[0] +
+          shortestLongitudeDelta(rotationRef.current[0], destination[0]),
+        destination[1],
+        0,
+      ]
       const now = performance.now()
       if (prefersReducedMotion()) {
-        rotationRef.current = destination
+        rotationRef.current = wrappedDestination
         focusAnimationRef.current = null
         idleUntilRef.current = now + IDLE_DELAY_MS
         return
@@ -353,7 +240,7 @@ export default function ClimateGlobe({
       focusAnimationRef.current = {
         startedAt: now,
         from: [...rotationRef.current],
-        to: destination,
+        to: wrappedDestination,
       }
       idleUntilRef.current = now + IDLE_DELAY_MS + 900
     },
@@ -398,8 +285,14 @@ export default function ClimateGlobe({
     const path = d3.geoPath(projection, context)
     const landPattern = createLandPattern(context)
     projectionRef.current = projection
+    // `width`/`height` are the canvas box; `viewWidth`/`viewHeight` are the
+    // viewport box. During a size transition the canvas is held at the larger
+    // of the two so the interpolating globe is never clipped by the canvas
+    // edge, then finalised once the transition settles.
     let width = 0
     let height = 0
+    let viewWidth = 0
+    let viewHeight = 0
     let pixelRatio = 0
     let animationFrame = 0
     let lastFrame = performance.now()
@@ -415,6 +308,35 @@ export default function ClimateGlobe({
     let lastRenderedLinkedHover: string | null | undefined
     let renderedBaseRadius = baseRadiusRef.current
     let viewportTransition: ViewportTransition | null = null
+
+    const allocateCanvas = (
+      nextWidth: number,
+      nextHeight: number,
+      ratio: number,
+    ) => {
+      if (
+        nextWidth === width &&
+        nextHeight === height &&
+        Math.abs(ratio - pixelRatio) < 0.01
+      ) {
+        return
+      }
+      width = nextWidth
+      height = nextHeight
+      pixelRatio = ratio
+      canvas.width = Math.round(width * pixelRatio)
+      canvas.height = Math.round(height * pixelRatio)
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+      // The marker overlay must occupy exactly the canvas box so glyphs and
+      // the globe always share one coordinate space.
+      const layer = markersLayerRef.current
+      if (layer) {
+        layer.style.width = `${width}px`
+        layer.style.height = `${height}px`
+      }
+    }
 
     const sampleViewportTransition = (now: number): boolean => {
       const transition = viewportTransition
@@ -435,70 +357,78 @@ export default function ClimateGlobe({
             (transition.toCenter[1] - transition.fromCenter[1]) * eased,
         ])
         .scale(renderedBaseRadius * zoomRef.current)
-      if (progress >= 1) viewportTransition = null
+
+      if (progress >= 1) {
+        viewportTransition = null
+        renderedBaseRadius = baseRadiusRef.current
+        projection.translate([viewWidth / 2, viewHeight / 2])
+        allocateCanvas(viewWidth, viewHeight, pixelRatio)
+      }
       return true
     }
 
     const resize = () => {
-      const now = performance.now()
-      const hadActiveTransition = viewportTransition !== null
-      sampleViewportTransition(now)
-
       const rectangle = wrapper.getBoundingClientRect()
-      const nextWidth = Math.max(280, rectangle.width)
-      const nextHeight = Math.max(320, rectangle.height || 680)
-      const nextBaseRadius = Math.max(
-        125,
-        Math.min(nextWidth * 0.43, nextHeight * 0.42),
-      )
-      const targetCenter: [number, number] = [nextWidth / 2, nextHeight / 2]
-      const hasPreviousViewport = width > 0 && height > 0
-      const widthDelta = Math.abs(nextWidth - width)
-      const heightDelta = Math.abs(nextHeight - height)
+      const nextViewWidth = Math.max(280, rectangle.width)
+      const nextViewHeight = Math.max(320, rectangle.height || 680)
       const nextPixelRatio = Math.min(
         window.devicePixelRatio || 1,
-        nextWidth * nextHeight > 1_000_000 ? 1.25 : 1.5,
+        nextViewWidth * nextViewHeight > 1_000_000 ? 1.25 : 1.5,
       )
-      const logicalSizeChanged = widthDelta >= 0.5 || heightDelta >= 0.5
+      const sizeChanged =
+        Math.abs(nextViewWidth - viewWidth) >= 0.5 ||
+        Math.abs(nextViewHeight - viewHeight) >= 0.5
       const pixelRatioChanged = Math.abs(nextPixelRatio - pixelRatio) >= 0.01
-      if (hasPreviousViewport && !logicalSizeChanged && !pixelRatioChanged) {
-        return
-      }
+      if (viewWidth > 0 && !sizeChanged && !pixelRatioChanged) return
 
+      const hadPreviousViewport = viewWidth > 0 && viewHeight > 0
+      const previousViewWidth = viewWidth
+      const previousViewHeight = viewHeight
       const previousCenter = projection.translate() as [number, number]
       const previousBaseRadius = renderedBaseRadius
-      const shouldAnimate =
-        hasPreviousViewport &&
-        logicalSizeChanged &&
-        !prefersReducedMotion.matches &&
-        (hadActiveTransition ||
-          widthDelta >= VIEWPORT_TRANSITION_MIN_DELTA_PX ||
-          heightDelta >= VIEWPORT_TRANSITION_MIN_DELTA_PX)
+      const targetCenter: [number, number] = [
+        nextViewWidth / 2,
+        nextViewHeight / 2,
+      ]
+      const nextBaseRadius = Math.max(
+        125,
+        Math.min(nextViewWidth * 0.43, nextViewHeight * 0.42),
+      )
 
-      width = nextWidth
-      height = nextHeight
-      pixelRatio = nextPixelRatio
-      canvas.width = Math.round(width * pixelRatio)
-      canvas.height = Math.round(height * pixelRatio)
-      canvas.style.width = `${width}px`
-      canvas.style.height = `${height}px`
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+      viewWidth = nextViewWidth
+      viewHeight = nextViewHeight
       baseRadiusRef.current = nextBaseRadius
 
+      const shouldAnimate =
+        hadPreviousViewport &&
+        sizeChanged &&
+        !prefersReducedMotion.matches &&
+        (viewportTransition !== null ||
+          Math.abs(nextViewWidth - previousViewWidth) >=
+            VIEWPORT_TRANSITION_MIN_DELTA_PX ||
+          Math.abs(nextViewHeight - previousViewHeight) >=
+            VIEWPORT_TRANSITION_MIN_DELTA_PX)
+
       if (shouldAnimate) {
-        // The wrapper snaps to its final width so the canvas backing store is
-        // allocated once. Only the projection interpolates, keeping the
-        // drawer transition smooth without a ResizeObserver allocation loop.
+        // Hold the canvas at the wider of the two viewports and let the
+        // viewport's own overflow clip the excess, so the globe slides and
+        // shrinks smoothly instead of being cut off by the canvas edge.
+        allocateCanvas(
+          Math.max(width, nextViewWidth),
+          Math.max(height, nextViewHeight),
+          nextPixelRatio,
+        )
         viewportTransition = {
-          startedAt: now,
+          startedAt: performance.now(),
           fromCenter: previousCenter,
           toCenter: targetCenter,
           fromBaseRadius: previousBaseRadius,
           toBaseRadius: nextBaseRadius,
         }
-      } else if (logicalSizeChanged || !hasPreviousViewport) {
+      } else {
         viewportTransition = null
         renderedBaseRadius = nextBaseRadius
+        allocateCanvas(nextViewWidth, nextViewHeight, nextPixelRatio)
         projection.translate(targetCenter)
       }
 
@@ -509,26 +439,43 @@ export default function ClimateGlobe({
       draw()
     }
 
-    const draw = () => {
-      context.clearRect(0, 0, width, height)
-      const radius = projection.scale()
-      const center = projection.translate()
-      const scaleFactor = radius / Math.max(1, renderedBaseRadius)
-      context.save()
-      context.beginPath()
-      context.arc(center[0], center[1], radius, 0, Math.PI * 2)
-      context.fillStyle = "#070b0a"
-      context.fill()
-      context.strokeStyle = "rgba(255, 255, 255, 0.24)"
-      context.lineWidth = Math.max(0.75, 1.1 * scaleFactor)
-      context.stroke()
-      context.clip()
+    // Offscreen cache for everything except the animated markers: the
+    // background disc, graticule, region highlight and land only change
+    // when the viewport does, so at rest each frame is a blit plus marker
+    // strokes instead of a full re-render. Falls back to direct painting
+    // when the buffer cannot be created.
+    let staticLayer: HTMLCanvasElement | null = null
+    let staticLayerContext: CanvasRenderingContext2D | null = null
+    let staticLayerPath: typeof path | null = null
+    let staticLayerPattern: CanvasPattern | null = null
+    let staticLayerKey = ""
+    let staticLayerWidth = 0
+    let staticLayerHeight = 0
 
-      context.beginPath()
-      path(GRATICULE)
-      context.strokeStyle = "rgba(167, 243, 208, 0.07)"
-      context.lineWidth = Math.max(0.5, 0.65 * scaleFactor)
-      context.stroke()
+    const paintStaticLayers = (
+      targetContext: CanvasRenderingContext2D,
+      targetPath: typeof path,
+      targetPattern: CanvasPattern | null,
+      radius: number,
+      center: [number, number],
+      scaleFactor: number,
+    ) => {
+      targetContext.clearRect(0, 0, width, height)
+      targetContext.save()
+      targetContext.beginPath()
+      targetContext.arc(center[0], center[1], radius, 0, Math.PI * 2)
+      targetContext.fillStyle = "#070b0a"
+      targetContext.fill()
+      targetContext.strokeStyle = "rgba(255, 255, 255, 0.24)"
+      targetContext.lineWidth = Math.max(0.75, 1.1 * scaleFactor)
+      targetContext.stroke()
+      targetContext.clip()
+
+      targetContext.beginPath()
+      targetPath(GRATICULE)
+      targetContext.strokeStyle = "rgba(167, 243, 208, 0.07)"
+      targetContext.lineWidth = Math.max(0.5, 0.65 * scaleFactor)
+      targetContext.stroke()
 
       if (
         selectedRegionRef.current &&
@@ -540,23 +487,175 @@ export default function ClimateGlobe({
           .geoCircle()
           .center([centerPoint[0], centerPoint[1]])
           .radius(17)()
-        context.beginPath()
-        path(highlight)
-        context.fillStyle = "rgba(255, 255, 255, 0.08)"
-        context.fill()
-        context.strokeStyle = "rgba(255, 255, 255, 0.5)"
-        context.lineWidth = 1
-        context.stroke()
+        targetContext.beginPath()
+        targetPath(highlight)
+        targetContext.fillStyle = "rgba(255, 255, 255, 0.08)"
+        targetContext.fill()
+        targetContext.strokeStyle = "rgba(255, 255, 255, 0.5)"
+        targetContext.lineWidth = 1
+        targetContext.stroke()
       }
 
-      context.beginPath()
-      path(LAND)
-      context.fillStyle = landPattern ?? "rgba(226, 232, 240, 0.42)"
-      context.fill()
-      context.strokeStyle = "rgba(255, 255, 255, 0.34)"
-      context.lineWidth = Math.max(0.45, 0.72 * scaleFactor)
-      context.stroke()
+      targetContext.beginPath()
+      targetPath(LAND)
+      targetContext.fillStyle = targetPattern ?? "rgba(226, 232, 240, 0.42)"
+      targetContext.fill()
+      targetContext.strokeStyle = "rgba(255, 255, 255, 0.34)"
+      targetContext.lineWidth = Math.max(0.45, 0.72 * scaleFactor)
+      targetContext.stroke()
+      targetContext.restore()
+    }
 
+    // Markers render as a DOM overlay above the canvas: crisp, CSS-animated
+    // SVG glyphs that cost nothing per frame. The canvas stays the source of
+    // truth for positions and hit-testing; this reconciles one node per
+    // visible cluster, keyed by its member ids so nodes are reused as the
+    // globe turns.
+    const markerNodes = new Map<
+      string,
+      { el: HTMLDivElement; glyphId: string }
+    >()
+
+    const syncMarkers = (clusters: PointCluster<ClimateMarket>[]) => {
+      const layer = markersLayerRef.current
+      if (!layer) return
+      const seen = new Set<string>()
+      for (const cluster of clusters) {
+        const selectedMarket = cluster.markets.find(
+          (market) => market.id === selectedMarketIdRef.current,
+        )
+        // A selected market always shows its own hazard; otherwise a cluster
+        // that mixes hazard types shows a grouped glyph instead of picking
+        // one type and implying the whole count is that type.
+        const shown = selectedMarket
+          ? [selectedMarket.category]
+          : resolveClusterCategories(cluster.markets)
+        const selected = Boolean(selectedMarket)
+        if (shown.length === 0) continue
+        const mixed = shown.length > 1
+        const glyphId = mixed ? `group:${shown.join("|")}` : `cat:${shown[0]}`
+        const key = cluster.markets
+          .map((market) => market.id)
+          .sort()
+          .join("|")
+        seen.add(key)
+        let node = markerNodes.get(key)
+        if (!node || node.glyphId !== glyphId) {
+          node?.el.remove()
+          const el = document.createElement("div")
+          el.className = "globe-marker"
+          el.dataset.clusterKey = key
+          el.style.setProperty("--glyph-size", `${HAZARD_GLYPH_SIZE_PX}px`)
+          el.innerHTML = mixed
+            ? hazardGroupMarkup(shown)
+            : hazardGlyphMarkup(shown[0]!)
+          const count = document.createElement("span")
+          count.className = "globe-marker__count"
+          el.appendChild(count)
+          node = { el, glyphId }
+          markerNodes.set(key, node)
+          layer.appendChild(el)
+        }
+        const hovered = cluster.markets.some(
+          (market) =>
+            market.id === hoveredMarketIdRef.current ||
+            market.id === hoveredCanvasMarketIdRef.current,
+        )
+        const scale = selected ? 1.22 : hovered ? 1.1 : 1
+        node.el.style.transform = `translate3d(${cluster.x}px, ${cluster.y}px, 0) scale(${scale})`
+        node.el.style.setProperty(
+          "--hg-delay",
+          hazardGlyphDelay(cluster.markets[0]!.id),
+        )
+        node.el.classList.toggle("is-selected", selected)
+        node.el.classList.toggle("is-hovered", hovered)
+        const count = node.el.lastElementChild as HTMLSpanElement | null
+        if (count) {
+          count.textContent =
+            cluster.markets.length > 1 ? String(cluster.markets.length) : ""
+        }
+        node.el.dataset.marketCount = String(cluster.markets.length)
+      }
+      for (const [key, node] of markerNodes) {
+        if (!seen.has(key)) {
+          node.el.remove()
+          markerNodes.delete(key)
+        }
+      }
+    }
+
+    const draw = () => {
+      const radius = projection.scale()
+      const center = projection.translate()
+      const scaleFactor = radius / Math.max(1, renderedBaseRadius)
+      const rotation = rotationRef.current
+      const staticKey = [
+        width,
+        height,
+        pixelRatio,
+        renderedBaseRadius,
+        center[0],
+        center[1],
+        rotation[0],
+        rotation[1],
+        rotation[2],
+        zoomRef.current,
+        renderVersionRef.current,
+        selectedRegionRef.current,
+        selectedMarketIdRef.current,
+      ].join("|")
+
+      const backingWidth = Math.max(1, Math.round(width * pixelRatio))
+      const backingHeight = Math.max(1, Math.round(height * pixelRatio))
+      if (
+        !staticLayer ||
+        staticLayerWidth !== backingWidth ||
+        staticLayerHeight !== backingHeight
+      ) {
+        try {
+          const layer = document.createElement("canvas")
+          layer.width = backingWidth
+          layer.height = backingHeight
+          const layerContext = layer.getContext("2d")
+          staticLayer = layer
+          staticLayerContext = layerContext
+          staticLayerPath = layerContext
+            ? d3.geoPath(projection, layerContext)
+            : null
+          staticLayerPattern = layerContext
+            ? createLandPattern(layerContext)
+            : null
+          staticLayerWidth = backingWidth
+          staticLayerHeight = backingHeight
+          staticLayerKey = ""
+        } catch {
+          staticLayer = null
+          staticLayerContext = null
+          staticLayerPath = null
+        }
+      }
+
+      if (staticLayer && staticLayerContext && staticLayerPath) {
+        if (staticLayerKey !== staticKey) {
+          staticLayerContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+          paintStaticLayers(
+            staticLayerContext,
+            staticLayerPath,
+            staticLayerPattern,
+            radius,
+            center,
+            scaleFactor,
+          )
+          staticLayerKey = staticKey
+        }
+        context.clearRect(0, 0, width, height)
+        context.drawImage(staticLayer, 0, 0, width, height)
+      } else {
+        paintStaticLayers(context, path, landPattern, radius, center, scaleFactor)
+      }
+
+      // Project and cluster visible open markets. The result drives both the
+      // DOM marker overlay and canvas hit-testing.
       const projectedMarkets = marketsRef.current
         .filter((market) => market.status === "open")
         .flatMap((market) => {
@@ -569,106 +668,12 @@ export default function ClimateGlobe({
           return point ? [{ market, x: point[0], y: point[1] }] : []
         })
 
-      const clusters: RenderedCluster[] = []
-      for (const projectedMarket of projectedMarkets) {
-        const nearby = clusters.find(
-          (cluster) =>
-            Math.hypot(
-              cluster.x - projectedMarket.x,
-              cluster.y - projectedMarket.y,
-            ) < 24,
-        )
-        if (nearby) {
-          const count = nearby.markets.length
-          nearby.x = (nearby.x * count + projectedMarket.x) / (count + 1)
-          nearby.y = (nearby.y * count + projectedMarket.y) / (count + 1)
-          nearby.markets.push(projectedMarket.market)
-        } else {
-          clusters.push({
-            x: projectedMarket.x,
-            y: projectedMarket.y,
-            markets: [projectedMarket.market],
-          })
-        }
-      }
+      const clusters = clusterProjectedPoints(
+        projectedMarkets,
+        CLUSTER_MIN_DISTANCE_PX,
+      )
       clustersRef.current = clusters
-
-      for (const cluster of clusters) {
-        const selected = cluster.markets.some(
-          (market) => market.id === selectedMarketIdRef.current,
-        )
-        const glyphCategory = resolveClusterHazardCategory(
-          cluster.markets,
-          selectedMarketIdRef.current,
-        )
-        if (!glyphCategory) continue
-        const markerRadius = cluster.markets.length > 1 ? 10 : 9
-        const hovered = cluster.markets.some(
-          (market) =>
-            market.id === hoveredMarketIdRef.current ||
-            market.id === hoveredCanvasMarketIdRef.current,
-        )
-        const markerState = selected
-          ? "selected"
-          : hovered
-            ? "hovered"
-            : "default"
-        const markerEffect = HAZARD_MARKER_EFFECTS[markerState]
-        const accent = CATEGORY_ACCENTS[glyphCategory]
-
-        // Shape remains the primary category cue. The tight, static accent
-        // halo reinforces it without recreating the removed likelihood radius.
-        context.save()
-        context.beginPath()
-        context.arc(
-          cluster.x,
-          cluster.y,
-          markerRadius + markerEffect.haloExpansion,
-          0,
-          Math.PI * 2,
-        )
-        context.fillStyle = `${accent}${markerEffect.haloAlpha}`
-        context.fill()
-
-        context.beginPath()
-        context.arc(cluster.x, cluster.y, markerRadius, 0, Math.PI * 2)
-        context.fillStyle = selected ? accent : "rgba(3, 8, 7, 0.94)"
-        context.shadowColor = `${accent}bf`
-        context.shadowBlur = markerEffect.shadowBlur
-        context.fill()
-        context.shadowBlur = 0
-        context.shadowColor = "transparent"
-        context.strokeStyle = accent
-        context.lineWidth = selected ? 1.8 : 1.25
-        context.stroke()
-
-        drawHazardGlyph(
-          context,
-          glyphCategory,
-          cluster.x,
-          cluster.y,
-          selected ? "#050807" : accent,
-        )
-
-        if (cluster.markets.length > 1) {
-          const badgeX = cluster.x + markerRadius
-          const badgeY = cluster.y - markerRadius
-          context.beginPath()
-          context.arc(badgeX, badgeY, 5.5, 0, Math.PI * 2)
-          context.fillStyle = accent
-          context.fill()
-          context.strokeStyle = "#050807"
-          context.lineWidth = 1
-          context.stroke()
-          context.fillStyle = "#050807"
-          context.font = "700 7px Inter, system-ui, sans-serif"
-          context.textAlign = "center"
-          context.textBaseline = "middle"
-          context.fillText(String(cluster.markets.length), badgeX, badgeY + 0.5)
-        }
-        context.restore()
-      }
-      context.restore()
+      syncMarkers(clusters)
     }
 
     const tick = (now: number) => {
@@ -705,7 +710,7 @@ export default function ClimateGlobe({
       const isViewportAnimating = sampleViewportTransition(now)
       if (!isViewportAnimating) {
         renderedBaseRadius = baseRadiusRef.current
-        projection.translate([width / 2, height / 2])
+        projection.translate([viewWidth / 2, viewHeight / 2])
       }
       projection
         .rotate(rotationRef.current)
@@ -714,6 +719,8 @@ export default function ClimateGlobe({
       const rotation = rotationRef.current
       const linkedHover = hoveredMarketIdRef.current
       const canvasHover = hoveredCanvasMarketIdRef.current
+      // Glyph motion is CSS-driven, so the canvas only redraws when the
+      // viewport or hover/selection state actually changes.
       const shouldDraw =
         renderVersionRef.current !== lastRenderedVersion ||
         zoomRef.current !== lastRenderedZoom ||
@@ -744,6 +751,8 @@ export default function ClimateGlobe({
     return () => {
       resizeObserver.disconnect()
       window.cancelAnimationFrame(animationFrame)
+      markerNodes.forEach((node) => node.el.remove())
+      markerNodes.clear()
       projectionRef.current = null
     }
     // hoveredMarketIdRef is a stable ref; listed to satisfy exhaustive-deps.
@@ -757,7 +766,7 @@ export default function ClimateGlobe({
     const x = clientX - rectangle.left
     const y = clientY - rectangle.top
     const cluster = clustersRef.current.find(
-      (item) => Math.hypot(item.x - x, item.y - y) <= 24,
+      (item) => Math.hypot(item.x - x, item.y - y) <= MARKER_HIT_RADIUS_PX,
     )
     if (cluster) return { type: "cluster" as const, cluster }
     const coordinates = projection.invert?.([x, y])
@@ -821,7 +830,7 @@ export default function ClimateGlobe({
         hoveredCanvasMarketIdRef.current = singleMarket?.id ?? null
         setHoverLabel(
           target.cluster.markets.length > 1
-            ? `${target.cluster.markets.length} nearby hazard markets · select to explore`
+            ? `${target.cluster.markets.length} overlapping markets · click to list`
             : singleMarket
               ? `${CATEGORY_LABELS[singleMarket.category]} · ${singleMarket.region} · YES ${Math.round(
                   clampProbability(singleMarket.yesPrice) * 100,
@@ -893,7 +902,7 @@ export default function ClimateGlobe({
       if (!market) return
       if (target.cluster.markets.length === 1)
         callbacksRef.current.onMarketSelect(market)
-      else callbacksRef.current.onRegionSelect(market.continent)
+      else callbacksRef.current.onClusterSelect(target.cluster.markets)
       return
     }
     if (target?.type === "region")
@@ -1007,6 +1016,11 @@ export default function ClimateGlobe({
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           onWheel={handleWheel}
+        />
+        <div
+          ref={markersLayerRef}
+          className="pointer-events-none absolute left-0 top-0 z-[5] overflow-hidden"
+          aria-hidden="true"
         />
         {hoverLabel && (
           <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 max-w-[82%] -translate-x-1/2 rounded-full border border-white/15 bg-black/85 px-3 py-1.5 text-center font-mono text-[9px] uppercase tracking-[0.08em] text-white/80 backdrop-blur-xl">

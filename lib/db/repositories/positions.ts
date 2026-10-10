@@ -1,4 +1,5 @@
 import {
+  existingMarketIds,
   insertPosition as storeInsertPosition,
   listPositionsByWallet as storeListByWallet,
   updatePositionStatusById,
@@ -74,7 +75,12 @@ export async function getPositionsByWalletForApi(
   walletAddress: string,
 ): Promise<UserPosition[]> {
   const docs = await getPositionsByWallet(walletAddress)
-  return docs.map(positionDocToUserPosition)
+  // Drop rows pointing at markets that no longer exist (e.g. recorded
+  // before a reseed replaced the catalog).
+  const alive = new Set(existingMarketIds(docs.map((doc) => doc.marketDocId)))
+  return docs
+    .filter((doc) => alive.has(doc.marketDocId))
+    .map(positionDocToUserPosition)
 }
 
 export async function updatePositionStatus(

@@ -10,6 +10,7 @@ import {
 } from "react"
 
 import { useSolanaWallet } from "@/components/providers/SolanaProvider"
+import { useMarkets } from "@/components/providers/MarketProvider"
 import type { TradeSide } from "@/lib/markets/types"
 
 export interface IndexedPosition {
@@ -66,6 +67,7 @@ function parseStoredPositions(value: string | null): IndexedPosition[] {
 export function PositionProvider({ children }: { children: React.ReactNode }) {
   const { publicKey } = useSolanaWallet()
   const wallet = publicKey?.toBase58() ?? null
+  const { markets, isLoading: marketsLoading } = useMarkets()
   const [positions, setPositions] = useState<IndexedPosition[]>([])
   const [isFetching, setIsFetching] = useState(false)
 
@@ -79,6 +81,30 @@ export function PositionProvider({ children }: { children: React.ReactNode }) {
     )
     setPositions(stored)
   }, [wallet])
+
+  // Drop cached positions whose market is gone from the catalog (e.g.
+  // recorded before a reseed replaced all markets) and persist the prune,
+  // so stale entries never resurrect on reload. Skipped until the catalog
+  // is loaded — an empty list proves nothing.
+  useEffect(() => {
+    if (marketsLoading || markets.length === 0) return
+    const alive = new Set(markets.map((market) => market.id))
+    setPositions((current) => {
+      if (current.every((position) => alive.has(position.marketId))) {
+        return current
+      }
+      const pruned = current.filter((position) =>
+        alive.has(position.marketId),
+      )
+      if (wallet) {
+        window.localStorage.setItem(
+          `${STORAGE_PREFIX}${wallet}`,
+          JSON.stringify(pruned),
+        )
+      }
+      return pruned
+    })
+  }, [markets, marketsLoading, wallet])
 
   const persist = useCallback(
     (nextPositions: IndexedPosition[]) => {

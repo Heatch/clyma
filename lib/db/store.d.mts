@@ -47,6 +47,7 @@ export function incrementActivity(
 ): { participants: number } | null
 export function seedParticipants(marketDocId: string, wallets: string[]): number
 export function getRowIdByMarketId(marketDocId: string): number | null
+export function existingMarketIds(marketDocIds: string[]): string[]
 export function countOpenMarkets(): number
 export function maxOnchainMarketId(): number | null
 export function dueToClose(nowIso: string): Array<Record<string, unknown>>

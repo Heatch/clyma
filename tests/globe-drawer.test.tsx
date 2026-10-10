@@ -150,6 +150,7 @@ describe("geographic market workflow", () => {
         selectedRegion={null}
         onRegionSelect={onRegionSelect}
         onMarketSelect={vi.fn()}
+        onClusterSelect={vi.fn()}
       />,
     )
 
@@ -218,6 +219,39 @@ describe("geographic market workflow", () => {
     expect(within(drawer).getByTestId("selected-market")).toHaveTextContent(
       europeMarket!.question,
     )
+  })
+
+  it("lists only the clicked cluster markets instead of the whole continent", async () => {
+    const user = userEvent.setup()
+    const cluster = testMarkets.slice(0, 2)
+
+    function Harness() {
+      const { selectCluster } = useMarkets()
+      return (
+        <>
+          <button type="button" onClick={() => selectCluster(cluster)}>
+            Open cluster
+          </button>
+          <RegionalMarketDrawer />
+        </>
+      )
+    }
+
+    render(
+      <MarketProvider initialMarkets={testMarkets}>
+        <Harness />
+      </MarketProvider>,
+    )
+
+    await user.click(screen.getByRole("button", { name: "Open cluster" }))
+    const drawer = screen.getByTestId("market-drawer")
+    expect(
+      within(drawer).getByRole("heading", { name: "2 nearby markets" }),
+    ).toBeInTheDocument()
+    // The provider holds 3 markets; only the 2 cluster members may show.
+    expect(
+      within(drawer).getAllByRole("button", { name: /open market:/i }),
+    ).toHaveLength(2)
   })
 
   it("reserves the drawer width in the globe viewport after selecting a market", async () => {

@@ -157,6 +157,186 @@ a {
   animation: soft-pulse 2.4s ease-in-out infinite;
 }
 
+/* --- Globe hazard glyph markers ------------------------------------- */
+/* Positioned by the globe's frame loop via transform; the glyph art and its
+   motion live entirely in the SVG + keyframes below. */
+.globe-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--glyph-size, 34px);
+  height: var(--glyph-size, 34px);
+  margin-top: calc(var(--glyph-size, 34px) / -2);
+  margin-left: calc(var(--glyph-size, 34px) / -2);
+  pointer-events: none;
+  opacity: 0.95;
+  transition: opacity 160ms ease;
+}
+
+.globe-marker.is-hovered,
+.globe-marker.is-selected {
+  opacity: 1;
+}
+
+.globe-marker > svg.hg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.globe-marker__count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.hg [class*="hg-"] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.hg .hg-spin {
+  animation: hg-spin 3.6s linear infinite;
+  animation-delay: calc(var(--hg-delay, 0s));
+}
+
+.hg .hg-sway {
+  transform-origin: 50% 92%;
+  animation: hg-sway 2.8s ease-in-out infinite;
+  animation-delay: calc(var(--hg-delay, 0s));
+}
+
+.hg .hg-flame {
+  transform-origin: 50% 100%;
+  animation: hg-flame 1.7s ease-in-out infinite;
+  animation-delay: calc(var(--hg-delay, 0s));
+}
+
+.hg .hg-water {
+  animation: hg-water 2.7s ease-in-out infinite;
+  animation-delay: calc(var(--hg-delay, 0s));
+}
+
+.hg .hg-mercury {
+  transform-origin: 50% 100%;
+  animation: hg-mercury 2.5s ease-in-out infinite;
+  animation-delay: calc(var(--hg-delay, 0s));
+}
+
+.hg .hg-drop {
+  animation: hg-drop 1.35s ease-in infinite;
+}
+
+.hg .hg-drop-1 {
+  animation-delay: calc(var(--hg-delay, 0s));
+}
+
+.hg .hg-drop-2 {
+  animation-delay: calc(var(--hg-delay, 0s) + 0.3s);
+}
+
+.hg .hg-drop-3 {
+  animation-delay: calc(var(--hg-delay, 0s) + 0.6s);
+}
+
+.hg .hg-sun {
+  transform-origin: 34% 31%;
+  animation: hg-sun 3.1s ease-in-out infinite;
+  animation-delay: calc(var(--hg-delay, 0s));
+}
+
+.hg .hg-question {
+  animation: hg-question 2.7s ease-in-out infinite;
+  animation-delay: calc(var(--hg-delay, 0s));
+}
+
+@keyframes hg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes hg-sway {
+  0%,
+  100% {
+    transform: rotate(-3.5deg);
+  }
+  50% {
+    transform: rotate(3.5deg);
+  }
+}
+
+@keyframes hg-flame {
+  0%,
+  100% {
+    transform: scaleY(1) translateY(0);
+  }
+  50% {
+    transform: scaleY(1.08) translateY(-0.3px);
+  }
+}
+
+@keyframes hg-water {
+  0%,
+  100% {
+    transform: translateY(1.2px);
+  }
+  50% {
+    transform: translateY(-1.2px);
+  }
+}
+
+@keyframes hg-mercury {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes hg-drop {
+  0% {
+    transform: translateY(-1.5px);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(3.5px);
+    opacity: 0;
+  }
+}
+
+@keyframes hg-sun {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+@keyframes hg-question {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

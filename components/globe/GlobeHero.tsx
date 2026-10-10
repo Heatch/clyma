@@ -1,21 +1,8 @@
 "use client"
 
 import ClimateGlobe from "@/components/globe/ClimateGlobe"
-import HazardIcon from "@/components/icons/HazardIcon"
 import MarketFilters from "@/components/markets/MarketFilters"
 import { useMarkets } from "@/components/providers/MarketProvider"
-import { CATEGORY_ACCENTS, CATEGORY_LABELS } from "@/lib/markets/categories"
-import type { MarketCategory } from "@/lib/markets/types"
-
-const LEGEND_CATEGORIES: MarketCategory[] = [
-  "hurricane",
-  "drought",
-  "temperature",
-  "rainfall",
-  "flooding",
-  "crop-yield",
-  "wildfire",
-]
 
 export default function GlobeHero() {
   const {
@@ -29,6 +16,7 @@ export default function GlobeHero() {
     setCategory,
     selectRegion,
     selectMarket,
+    selectCluster,
   } = useMarkets()
 
   const openMarkets = visibleMarkets.filter(
@@ -63,6 +51,7 @@ export default function GlobeHero() {
           selectedMarketId={selectedMarket?.id}
           onRegionSelect={selectRegion}
           onMarketSelect={selectMarket}
+          onClusterSelect={selectCluster}
         />
 
         <div className="pointer-events-none absolute left-7 top-[94px] z-20 hidden max-w-[245px] xl:block">
@@ -118,32 +107,6 @@ export default function GlobeHero() {
             placeholder="Search place or hazard"
             className="h-10 w-full rounded-full border border-white/15 bg-black/60 px-4 text-base text-white outline-none backdrop-blur-xl placeholder:text-white/35 focus:border-white/45 focus:ring-2 focus:ring-white/15"
           />
-        </div>
-
-        <div className="pointer-events-none absolute bottom-[86px] left-5 z-20 hidden xl:block">
-          <p className="mb-2 font-mono text-[8px] uppercase tracking-[0.18em] text-white/30">
-            Hazard index
-          </p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            {LEGEND_CATEGORIES.map((item) => (
-              <span
-                key={item}
-                className="text-white/42 flex items-center gap-2 text-[9px]"
-              >
-                <span
-                  className="grid size-5 place-items-center rounded-md border"
-                  style={{
-                    backgroundColor: `${CATEGORY_ACCENTS[item]}12`,
-                    borderColor: `${CATEGORY_ACCENTS[item]}40`,
-                    boxShadow: `0 0 10px ${CATEGORY_ACCENTS[item]}26`,
-                  }}
-                >
-                  <HazardIcon category={item} className="size-4" />
-                </span>
-                {CATEGORY_LABELS[item]}
-              </span>
-            ))}
-          </div>
         </div>
 
         <p

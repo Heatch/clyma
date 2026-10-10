@@ -5,7 +5,6 @@ import HazardIcon from "@/components/icons/HazardIcon"
 import {
   CATEGORY_ACCENTS,
   CATEGORY_SYMBOLS,
-  HAZARD_MARKER_EFFECTS,
   resolveClusterHazardCategory,
 } from "@/lib/markets/categories"
 import { MARKET_CATEGORIES } from "@/lib/markets/types"
@@ -45,7 +44,7 @@ describe("hazard icon system", () => {
     )
   })
 
-  it("keeps category colors unique and globe glow effects restrained", () => {
+  it("keeps category colors unique", () => {
     const accents = MARKET_CATEGORIES.map(
       (category) => CATEGORY_ACCENTS[category],
     )
@@ -55,15 +54,6 @@ describe("hazard icon system", () => {
     )
     expect(accents.every((accent) => /^#[0-9a-f]{6}$/i.test(accent))).toBe(true)
     expect(new Set(accents).size).toBe(MARKET_CATEGORIES.length)
-    expect(HAZARD_MARKER_EFFECTS.default.shadowBlur).toBe(0)
-    expect(HAZARD_MARKER_EFFECTS.hovered.shadowBlur).toBeLessThanOrEqual(8)
-    expect(HAZARD_MARKER_EFFECTS.selected.shadowBlur).toBeLessThanOrEqual(8)
-    expect(HAZARD_MARKER_EFFECTS.hovered.haloExpansion).toBeGreaterThan(
-      HAZARD_MARKER_EFFECTS.default.haloExpansion,
-    )
-    expect(HAZARD_MARKER_EFFECTS.selected.haloExpansion).toBeGreaterThan(
-      HAZARD_MARKER_EFFECTS.hovered.haloExpansion,
-    )
   })
 
   it("uses the dominant cluster symbol unless a market is selected", () => {

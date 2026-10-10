@@ -1,4 +1,5 @@
 import {
+  existingMarketIds,
   findTransactionBySignature as storeFindBySignature,
   insertTransaction as storeInsertTransaction,
   listActivityByWallet as storeListActivity,
@@ -55,5 +56,14 @@ export async function getActivityByWallet(
   walletAddress: string,
 ): Promise<UserActivity[]> {
   const docs = storeListActivity(walletAddress) as unknown as TransactionDoc[]
-  return docs.map(transactionDocToActivity)
+  // Drop rows pointing at markets that no longer exist. Rows without a
+  // market reference are kept (absence proves nothing).
+  const alive = new Set(
+    existingMarketIds(
+      docs.map((doc) => doc.marketDocId).filter((id): id is string => !!id),
+    ),
+  )
+  return docs
+    .filter((doc) => !doc.marketDocId || alive.has(doc.marketDocId))
+    .map(transactionDocToActivity)
 }
