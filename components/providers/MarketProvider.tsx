@@ -30,12 +30,14 @@ import { SOLANA_COMMITMENT, SOLANA_PROGRAM_ID } from "@/lib/solana/config"
 import { deriveMarketPda, deriveProtocolConfigPda } from "@/lib/solana/pdas"
 
 export type MarketSort = "trending" | "volume" | "closing" | "yes"
+export type SortDirection = "asc" | "desc"
 
 export interface BrowseFilters {
   query: string
   categories: MarketCategory[]
   regions: string[]
   sort: MarketSort
+  sortDirection: SortDirection
 }
 
 type MarketContextValue = {
@@ -110,11 +112,19 @@ const STATUS_ORDER: Record<MarketStatus, number> = {
   cancelled: 3,
 }
 
+export const DEFAULT_SORT_DIRECTIONS: Record<MarketSort, SortDirection> = {
+  closing: "asc",
+  volume: "desc",
+  yes: "desc",
+  trending: "desc",
+}
+
 const DEFAULT_BROWSE_FILTERS: BrowseFilters = {
   query: "",
   categories: [],
   regions: [],
   sort: "closing",
+  sortDirection: DEFAULT_SORT_DIRECTIONS.closing,
 }
 
 function freshBrowseFilters(): BrowseFilters {
@@ -141,21 +151,34 @@ function matchesSearch(market: ClimateMarket, search: string) {
     .some((value) => value.toLocaleLowerCase().includes(normalized))
 }
 
-function comparatorFor(sort: MarketSort) {
+function comparatorFor(sort: MarketSort, direction: SortDirection) {
+  const reverse = <T,>(compare: (first: T, second: T) => number) =>
+    direction === DEFAULT_SORT_DIRECTIONS[sort]
+      ? compare
+      : (first: T, second: T) => -compare(first, second)
+
   switch (sort) {
     case "volume":
-      return (first: ClimateMarket, second: ClimateMarket) =>
-        second.totalVolume - first.totalVolume
+      return reverse(
+        (first: ClimateMarket, second: ClimateMarket) =>
+          second.totalVolume - first.totalVolume,
+      )
     case "closing":
-      return (first: ClimateMarket, second: ClimateMarket) =>
-        Date.parse(first.closeTime) - Date.parse(second.closeTime)
+      return reverse(
+        (first: ClimateMarket, second: ClimateMarket) =>
+          Date.parse(first.closeTime) - Date.parse(second.closeTime),
+      )
     case "yes":
-      return (first: ClimateMarket, second: ClimateMarket) =>
-        second.yesPrice - first.yesPrice
+      return reverse(
+        (first: ClimateMarket, second: ClimateMarket) =>
+          second.yesPrice - first.yesPrice,
+      )
     case "trending":
     default:
-      return (first: ClimateMarket, second: ClimateMarket) =>
-        second.trendingScore - first.trendingScore
+      return reverse(
+        (first: ClimateMarket, second: ClimateMarket) =>
+          second.trendingScore - first.trendingScore,
+      )
   }
 }
 
@@ -363,7 +386,10 @@ export function MarketProvider({
 
   const browseResults = useMemo(() => {
     const scope = browseScopeIds ? new Set(browseScopeIds) : null
-    const comparator = comparatorFor(browseFilters.sort)
+    const comparator = comparatorFor(
+      browseFilters.sort,
+      browseFilters.sortDirection,
+    )
     return [...markets]
       .filter(
         (market) =>
@@ -423,6 +449,7 @@ export function MarketProvider({
         categories: [],
         regions: region ? [region] : [],
         sort: previous.sort,
+        sortDirection: previous.sortDirection,
       }))
       setBrowseScopeIds(scopeIds ? [...scopeIds] : null)
       setSelectedMarket(null)

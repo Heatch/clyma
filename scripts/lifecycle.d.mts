@@ -11,16 +11,28 @@ export function buildCloseMarket(
   protocol: PublicKey,
   market: PublicKey,
   closer: PublicKey,
-): { programId: PublicKey; keys: Array<{ pubkey: PublicKey; isSigner: boolean; isWritable: boolean }>; data: Buffer }
+): {
+  programId: PublicKey
+  keys: Array<{ pubkey: PublicKey; isSigner: boolean; isWritable: boolean }>
+  data: Buffer
+}
 
 export function buildResolveMarket(
   protocol: PublicKey,
   market: PublicKey,
   resolver: PublicKey,
   decision: number,
-): { programId: PublicKey; keys: Array<{ pubkey: PublicKey; isSigner: boolean; isWritable: boolean }>; data: Buffer }
+): {
+  programId: PublicKey
+  keys: Array<{ pubkey: PublicKey; isSigner: boolean; isWritable: boolean }>
+  data: Buffer
+}
 
 export function resolveDraw(marketId: string, modelOdds: number): "yes" | "no"
+
+export function readEstimate(raw: unknown): number | null
+
+export function validateRaw(raw: unknown): { targetYes: number } | null
 
 export function modelOddsOf(doc: {
   marketId?: string

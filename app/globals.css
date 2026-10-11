@@ -161,8 +161,31 @@ a {
 /* --- Globe hazard glyph markers ------------------------------------- */
 /* Positioned by the globe's frame loop via transform; the glyph art and its
    motion live entirely in the SVG + keyframes below. */
+.globe-marker-layer.has-selection .globe-marker:not(.is-selected) {
+  opacity: 0.22;
+}
+
+.globe-spotlight {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 6, 5, 0.72);
+  -webkit-mask-image: radial-gradient(
+    circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%),
+    transparent 0 56px,
+    black 120px
+  );
+  mask-image: radial-gradient(
+    circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%),
+    transparent 0 56px,
+    black 120px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
 .globe-marker {
   position: absolute;
+  z-index: 1;
   top: 0;
   left: 0;
   width: var(--glyph-size, 34px);

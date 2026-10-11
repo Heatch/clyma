@@ -7,7 +7,6 @@ import PredictionForm, {
   type TradePreview,
 } from "@/components/trading/PredictionForm"
 import RedeemPosition from "@/components/trading/RedeemPosition"
-import { useAIForecast } from "@/hooks/useAIForecast"
 import { CATEGORY_LABELS } from "@/lib/markets/categories"
 import type { ClimateMarket, TradeConfirmedDetail } from "@/lib/markets/types"
 import { TRADE_CONFIRMED_EVENT } from "@/lib/markets/types"
@@ -31,10 +30,6 @@ export default function MarketDetails({ market }: MarketDetailsProps) {
     return () => window.clearInterval(timer)
   }, [])
 
-  const { probability: modelProb } = useAIForecast(
-    market.question,
-    market.resolutionRules,
-  )
   const [preview, setPreview] = useState<TradePreview | null>(null)
   const [lastTrade, setLastTrade] = useState<{
     at: number
@@ -89,7 +84,6 @@ export default function MarketDetails({ market }: MarketDetailsProps) {
         <MarketChart
           history={history}
           tone="dark"
-          forecastProb={modelProb}
           previewProb={preview?.yesProbability ?? null}
           recentTradeDeltaPts={lastTrade?.deltaPts ?? null}
         />

@@ -44,11 +44,11 @@ node scripts/preflight.mjs
 | Web application | Next.js App Router, React, TypeScript, Tailwind CSS                |
 | Globe           | D3 orthographic canvas projection with local Natural Earth data    |
 | Charts          | Recharts                                                           |
-| Wallet          | Phantom browser extension                                           |
+| Wallet          | Phantom browser extension                                          |
 | Solana client   | `@solana/web3.js`, Anchor instruction encoding, deterministic PDAs |
 | Program         | Anchor 0.30.1 Rust program (`programs/climate_market`)             |
-| Database        | SQLite (`node:sqlite`) via `lib/db/store.mjs`                 |
-| Market data     | Model-generated markets, seeded to SQLite + Devnet     |
+| Database        | SQLite (`node:sqlite`) via `lib/db/store.mjs`                      |
+| Market data     | Model-generated markets, seeded to SQLite + Devnet                 |
 | Validation      | Zod schemas                                                        |
 | Tests           | Vitest + Testing Library + Anchor local-validator                  |
 
@@ -89,14 +89,14 @@ lamports. Cancelled markets allow reclaiming original deposits.
 
 Program Derived Addresses for:
 
-| PDA               | Purpose                              |
-| ----------------- | ------------------------------------ |
-| `protocol`        | Authority, resolver, market count    |
-| `market`          | Market ID, question hash, pool state |
-| `vault`           | Pooled SOL vault                     |
-| `yes_position`    | Per-wallet YES position              |
-| `no_position`     | Per-wallet NO position               |
-| `claim`           | Per-wallet claim record per market   |
+| PDA            | Purpose                              |
+| -------------- | ------------------------------------ |
+| `protocol`     | Authority, resolver, market count    |
+| `market`       | Market ID, question hash, pool state |
+| `vault`        | Pooled SOL vault                     |
+| `yes_position` | Per-wallet YES position              |
+| `no_position`  | Per-wallet NO position               |
+| `claim`        | Per-wallet claim record per market   |
 
 ## Program instructions
 
@@ -124,14 +124,14 @@ BACKBOARD_API_KEY=
 LLM_MODEL=gpt-5.6-luna
 ```
 
-| Variable                       | Purpose                                          |
-| ------------------------------ | ------------------------------------------------ |
-| `NEXT_PUBLIC_SOLANA_NETWORK`   | Must be `devnet`                                 |
-| `NEXT_PUBLIC_SOLANA_RPC_URL`   | Optional; defaults to public Devnet endpoint      |
-| `NEXT_PUBLIC_PROGRAM_ID`       | Deployed Solana program address                  |
-| `SQLITE_PATH`                  | App database file (default `./data/clyma.db`)    |
-| `BACKBOARD_API_KEY`            | Backboard key for GPT Luna (generation + forecasts)   |
-| `LLM_MODEL`                    | Model id (default: `gpt-5.6-luna`)                     |
+| Variable                     | Purpose                                             |
+| ---------------------------- | --------------------------------------------------- |
+| `NEXT_PUBLIC_SOLANA_NETWORK` | Must be `devnet`                                    |
+| `NEXT_PUBLIC_SOLANA_RPC_URL` | Optional; defaults to public Devnet endpoint        |
+| `NEXT_PUBLIC_PROGRAM_ID`     | Deployed Solana program address                     |
+| `SQLITE_PATH`                | App database file (default `./data/clyma.db`)       |
+| `BACKBOARD_API_KEY`          | Backboard key for GPT Luna (generation + forecasts) |
+| `LLM_MODEL`                  | Model id (default: `gpt-5.6-luna`)                  |
 
 Serving markets requires `BACKBOARD_API_KEY` (generation + forecasts). The
 database is a local SQLite file — no DB server needed. Bare `node scripts/*`
@@ -220,8 +220,8 @@ is no oracle or dispute process.
 
 `POST /api/predict` asks the Model (GPT Luna via Backboard) for a calibrated
 YES probability from the market question, its resolution rules, and any
-caller-supplied context. The result drives the Model reference line on the
-market chart and the opening probability of newly created markets.
+caller-supplied context. The result drives the opening probability of newly
+created markets.
 
 - Uses `BACKBOARD_API_KEY` and `LLM_MODEL` (default `gpt-5.6-luna`), the same
   credentials as market generation

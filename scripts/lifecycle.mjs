@@ -148,7 +148,7 @@ Return ONLY a JSON object of the form {"markets": [ ... ]} with no markdown fenc
 - latitude: number (accurate)
 - longitude: number (accurate)
 - closeInDays: integer 30-240
-- estimatedProbability: number 0-1
+- estimatedProbability: number 0-1 (required; a decimal probability such as 0.22 for 22%, not a percentage)
 - resolutionSource: string (real authority e.g. NOAA, NASA, WMO)
 - resolutionSourceUrl: string (that source's real official URL)
 - resolutionRules: string (precise settlement criteria)
@@ -172,6 +172,29 @@ function slugify(input) {
     input.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) ||
     "market"
   )
+}
+
+/**
+ * Read a market's opening probability from either the raw model shape
+ * (`estimatedProbability`) or the already-validated definition shape
+ * (`targetYes`, which is what gets saved to the replayable fixture file).
+ * Returns null when absent or unusable so the caller can drop the item —
+ * silently defaulting here would open every market at 50/50.
+ */
+function readEstimate(raw) {
+  const value =
+    raw?.estimatedProbability ??
+    raw?.estimated_probability ??
+    raw?.targetYes ??
+    raw?.target_yes
+  const number = Number(value)
+  if (!Number.isFinite(number) || number <= 0) return null
+  // Tolerate percent-style values ("62") alongside decimals ("0.62").
+  const normalized = number > 1 ? number / 100 : number
+  if (!Number.isFinite(normalized) || normalized <= 0 || normalized >= 1) {
+    return null
+  }
+  return clamp(normalized, 0.05, 0.95)
 }
 function normalizeUrl(value) {
   if (typeof value !== "string") return null
@@ -249,7 +272,10 @@ function validateRaw(raw) {
   }
   const resolutionSourceUrl = normalizeUrl(raw.resolutionSourceUrl)
   if (!resolutionSourceUrl) return null
-  const targetYes = clamp(Number(raw.estimatedProbability) || 0.5, 0.05, 0.95)
+  // Opening odds are mandatory: without them a market would be seeded at
+  // 50/50, which contradicts "markets open at model odds".
+  const targetYes = readEstimate(raw)
+  if (targetYes === null) return null
   const closeDays = clamp(Math.round(Number(raw.closeInDays) || 60), 7, 300)
   const evidence = []
   const list = Array.isArray(raw.evidence) ? raw.evidence : []
@@ -1118,7 +1144,9 @@ export {
   buildResolveMarket,
   instructionDiscriminator,
   modelOddsOf,
+  readEstimate,
   resolveDraw,
+  validateRaw,
   RESOLUTION_DECISIONS,
 }
 export function __useProgramIdForTests(publicKey) {

@@ -1,7 +1,9 @@
 "use client"
 
 import MarketListItem from "@/components/markets/MarketListItem"
+import MultiSelect from "@/components/markets/MultiSelect"
 import {
+  DEFAULT_SORT_DIRECTIONS,
   type MarketSort,
   useMarkets,
 } from "@/components/providers/MarketProvider"
@@ -27,6 +29,8 @@ export default function MarketBrowser() {
     resetBrowseFilters,
     selectMarket,
   } = useMarkets()
+  const isReversedOrder =
+    browseFilters.sortDirection !== DEFAULT_SORT_DIRECTIONS[browseFilters.sort]
   const hasNarrowing =
     browseFilters.query.trim() !== "" ||
     browseFilters.categories.length > 0 ||
@@ -35,14 +39,7 @@ export default function MarketBrowser() {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold tracking-[-0.03em]">
-        Search markets
-      </h2>
-      <p className="mt-1 text-xs leading-5 text-neutral-400">
-        Search region, market type, title, or description.
-      </p>
-
-      <label className="mt-5 block" htmlFor="market-browser-search">
+      <label className="mt-1 block" htmlFor="market-browser-search">
         <span className="sr-only">Search markets</span>
         <input
           id="market-browser-search"
@@ -56,56 +53,38 @@ export default function MarketBrowser() {
         />
       </label>
 
-      <div className="mt-5 grid gap-6 sm:grid-cols-2">
-        <fieldset>
-          <legend className="text-xs font-semibold text-white/70">
-            Market type
-          </legend>
-          <div className="mt-3 space-y-2.5">
-            {MARKET_CATEGORIES.map((category) => (
-              <label
-                key={category}
-                className="flex cursor-pointer items-center gap-2.5 text-sm text-neutral-200"
-              >
-                <input
-                  type="checkbox"
-                  checked={browseFilters.categories.includes(category)}
-                  onChange={() => toggleBrowseCategory(category)}
-                  className="size-4 accent-white"
-                />
-                {CATEGORY_LABELS[category]}
-              </label>
-            ))}
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold text-white/70">Market type</p>
+          <div className="mt-2">
+            <MultiSelect
+              label="Market type filter"
+              allLabel="All types"
+              options={MARKET_CATEGORIES.map((category) => ({
+                value: category,
+                label: CATEGORY_LABELS[category],
+              }))}
+              selected={browseFilters.categories}
+              onToggle={toggleBrowseCategory}
+            />
           </div>
-          <p className="mt-3 text-[11px] text-neutral-500">
-            Any selected = all types
-          </p>
-        </fieldset>
+        </div>
 
-        <fieldset>
-          <legend className="text-xs font-semibold text-white/70">
-            Region
-          </legend>
-          <div className="mt-3 space-y-2.5">
-            {MARKET_CONTINENTS.map((region) => (
-              <label
-                key={region}
-                className="flex cursor-pointer items-center gap-2.5 text-sm text-neutral-200"
-              >
-                <input
-                  type="checkbox"
-                  checked={browseFilters.regions.includes(region)}
-                  onChange={() => toggleBrowseRegion(region)}
-                  className="size-4 accent-white"
-                />
-                {region}
-              </label>
-            ))}
+        <div>
+          <p className="text-xs font-semibold text-white/70">Region</p>
+          <div className="mt-2">
+            <MultiSelect
+              label="Region filter"
+              allLabel="All regions"
+              options={MARKET_CONTINENTS.map((region) => ({
+                value: region,
+                label: region,
+              }))}
+              selected={browseFilters.regions}
+              onToggle={toggleBrowseRegion}
+            />
           </div>
-          <p className="mt-3 text-[11px] text-neutral-500">
-            Any selected = all regions
-          </p>
-        </fieldset>
+        </div>
       </div>
 
       <div className="mt-5 flex items-center gap-3">
@@ -118,9 +97,13 @@ export default function MarketBrowser() {
         <select
           id="market-browser-sort"
           value={browseFilters.sort}
-          onChange={(event) =>
-            updateBrowseFilters({ sort: event.target.value as MarketSort })
-          }
+          onChange={(event) => {
+            const sort = event.target.value as MarketSort
+            updateBrowseFilters({
+              sort,
+              sortDirection: DEFAULT_SORT_DIRECTIONS[sort],
+            })
+          }}
           className="h-10 rounded-lg border border-white/15 bg-white/[0.06] px-3 text-sm text-white outline-none transition hover:border-white/30 focus:border-white/60"
         >
           {SORT_OPTIONS.map((option) => (
@@ -133,6 +116,33 @@ export default function MarketBrowser() {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={() =>
+            updateBrowseFilters({
+              sortDirection:
+                browseFilters.sortDirection === "asc" ? "desc" : "asc",
+            })
+          }
+          aria-label={isReversedOrder ? "Restore order" : "Reverse order"}
+          aria-pressed={isReversedOrder}
+          title={isReversedOrder ? "Restore order" : "Reverse order"}
+          className="grid size-10 place-items-center text-white/70 transition hover:text-white"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className={`size-4 transition ${isReversedOrder ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 5v14" />
+            <path d="m5 12 7-7 7 7" />
+          </svg>
+        </button>
       </div>
 
       {browseScopeIds && (

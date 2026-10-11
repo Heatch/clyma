@@ -1,42 +1,32 @@
 "use client"
 
+import { useEffect } from "react"
+
 import { useMarkets } from "@/components/providers/MarketProvider"
 import { usePositions } from "@/components/providers/PositionProvider"
 import { useSolanaWallet } from "@/components/providers/SolanaProvider"
 import { getExplorerTransactionUrl } from "@/lib/solana/config"
 import { formatSol } from "@/lib/utils/format"
 
-const statusDisplay: Record<string, { label: string; className: string }> = {
-  open: {
-    label: "Open",
-    className: "bg-blue-400/15 text-blue-300 border-blue-400/25",
-  },
-  claimable: {
-    label: "Claimable",
-    className: "bg-emerald-400/15 text-emerald-300 border-emerald-400/25",
-  },
-  claimed: {
-    label: "Claimed",
-    className: "bg-neutral-500/15 text-neutral-400 border-neutral-500/25",
-  },
-  refundable: {
-    label: "Refundable",
-    className: "bg-amber-400/15 text-amber-300 border-amber-400/25",
-  },
-  refunded: {
-    label: "Refunded",
-    className: "bg-neutral-500/15 text-neutral-400 border-neutral-500/25",
-  },
-  lost: {
-    label: "Lost",
-    className: "bg-red-400/15 text-red-300 border-red-400/25",
-  },
+const statusLabels: Record<string, string> = {
+  open: "Open",
+  claimable: "Claimable",
+  claimed: "Claimed",
+  refundable: "Refundable",
+  refunded: "Refunded",
+  lost: "Lost",
 }
 
 export default function PortfolioPanel() {
   const { connected } = useSolanaWallet()
-  const { positions, isFetching, fetchRemotePositions } = usePositions()
+  const { positions, fetchRemotePositions } = usePositions()
   const { markets, selectMarket } = useMarkets()
+
+  // The panel mounts whenever the portfolio view opens, so fetching here
+  // keeps positions current without a manual refresh control.
+  useEffect(() => {
+    void fetchRemotePositions()
+  }, [fetchRemotePositions])
 
   const totalCommitted = positions.reduce((sum, p) => sum + p.amountSol, 0)
   const totalPotential = positions.reduce(
@@ -55,27 +45,7 @@ export default function PortfolioPanel() {
   const settledPositions = positions.filter((p) => p.status !== "open")
 
   return (
-    <section aria-labelledby="portfolio-heading">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="eyebrow text-neutral-400">Your account</p>
-          <h2
-            id="portfolio-heading"
-            className="mt-1 text-xl font-semibold tracking-[-0.025em]"
-          >
-            Devnet positions
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={fetchRemotePositions}
-          disabled={isFetching || !connected}
-          className="rounded-full border border-white/20 bg-white/[0.06] px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-neutral-300 transition hover:border-white/40 hover:bg-white/15 disabled:opacity-50"
-        >
-          {isFetching ? "Refreshing..." : "Refresh"}
-        </button>
-      </div>
-
+    <section aria-label="Positions">
       {!connected ? (
         <div className="mt-5 rounded-2xl border border-dashed border-white/20 bg-white/[0.03] px-5 py-8 text-center">
           <div
@@ -146,7 +116,7 @@ export default function PortfolioPanel() {
 
           {openPositions.length > 0 && (
             <>
-              <h3 className="mb-3 mt-5 text-xs font-bold uppercase tracking-wider text-neutral-400">
+              <h3 className="mb-3 mt-6 text-sm font-semibold text-neutral-300">
                 Open positions ({openPositions.length})
               </h3>
               <div className="divide-y divide-white/[0.06] rounded-xl border border-white/10 bg-white/[0.03]">
@@ -164,7 +134,7 @@ export default function PortfolioPanel() {
 
           {settledPositions.length > 0 && (
             <>
-              <h3 className="mb-3 mt-5 text-xs font-bold uppercase tracking-wider text-neutral-500">
+              <h3 className="mb-3 mt-6 text-sm font-semibold text-neutral-400">
                 Settled positions ({settledPositions.length})
               </h3>
               <div className="divide-y divide-white/[0.06] rounded-xl border border-white/10 bg-white/[0.03]">
@@ -200,46 +170,41 @@ function PositionRow({
   selectMarket: ReturnType<typeof useMarkets>["selectMarket"]
 }) {
   const market = markets.find((m) => m.id === position.marketId)
-  const statusInfo = statusDisplay[position.status] ?? {
-    label: position.status,
-    className: "bg-neutral-500/10 text-neutral-400",
-  }
+  const statusLabel = statusLabels[position.status] ?? position.status
 
   return (
-    <div className="px-3.5 py-3">
+    <div className="px-5 py-5">
       <button
         type="button"
         disabled={!market}
         onClick={() => market && selectMarket(market, "portfolio")}
-        className="line-clamp-2 text-left text-xs font-semibold leading-4 text-neutral-100 hover:underline disabled:cursor-default"
+        className="line-clamp-2 text-left text-base font-semibold leading-6 text-neutral-100 hover:underline disabled:cursor-default sm:text-lg sm:leading-7"
       >
         {position.marketQuestion}
       </button>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
+      <div className="mt-3 flex flex-wrap items-center gap-2.5 text-sm">
         <span
           className={
             position.side === "yes"
-              ? "rounded border border-emerald-400/40 bg-emerald-400/15 px-1.5 py-0.5 font-bold text-emerald-300"
-              : "rounded border border-red-400/40 bg-red-400/15 px-1.5 py-0.5 font-bold text-red-300"
+              ? "rounded border border-emerald-400/40 bg-emerald-400/15 px-2 py-1 text-xs font-bold text-emerald-300"
+              : "rounded border border-red-400/40 bg-red-400/15 px-2 py-1 text-xs font-bold text-red-300"
           }
         >
           {position.side.toUpperCase()}
         </span>
-        <span className="tabular text-neutral-300">
+        <span className="tabular text-neutral-200">
           {formatSol(position.amountSol, 3)} staked
         </span>
         {position.estimatedPayoutSol > 0 && (
-          <span className="tabular text-neutral-500">
+          <span className="tabular text-neutral-400">
             / {formatSol(position.estimatedPayoutSol, 3)} payout
           </span>
         )}
-        <span
-          className={`ml-auto rounded-full border px-2 py-0.5 text-[9px] font-semibold ${statusInfo.className}`}
-        >
-          {statusInfo.label}
+        <span className="ml-auto text-xs font-semibold text-neutral-300">
+          {statusLabel}
         </span>
       </div>
-      <div className="mt-1.5 flex items-center gap-2 text-[9px] text-neutral-500">
+      <div className="mt-3 flex items-center gap-2 text-xs text-neutral-500">
         <span>{new Date(position.createdAt).toLocaleDateString()}</span>
         {position.signature && (
           <a

@@ -287,6 +287,7 @@ export default function ClimateGlobe({
   useEffect(() => {
     const canvas = canvasRef.current
     const wrapper = wrapperRef.current
+    const markersLayer = markersLayerRef.current
     if (!canvas || !wrapper) return
 
     const context = canvas.getContext("2d", {
@@ -532,11 +533,32 @@ export default function ClimateGlobe({
       string,
       { el: HTMLDivElement; glyphId: string }
     >()
+    let spotlight: HTMLDivElement | null = null
+
+    const updateSpotlight = (position: { x: number; y: number } | null) => {
+      const layer = markersLayerRef.current
+      if (!layer) return
+      if (!position) {
+        spotlight?.remove()
+        spotlight = null
+        layer.classList.remove("has-selection")
+        return
+      }
+      if (!spotlight) {
+        spotlight = document.createElement("div")
+        spotlight.className = "globe-spotlight"
+        layer.prepend(spotlight)
+      }
+      layer.classList.add("has-selection")
+      spotlight.style.setProperty("--spotlight-x", `${position.x}px`)
+      spotlight.style.setProperty("--spotlight-y", `${position.y}px`)
+    }
 
     const syncMarkers = (clusters: PointCluster<ClimateMarket>[]) => {
       const layer = markersLayerRef.current
       if (!layer) return
       const seen = new Set<string>()
+      let selectedPosition: { x: number; y: number } | null = null
       for (const cluster of clusters) {
         const selectedMarket = cluster.markets.find(
           (market) => market.id === selectedMarketIdRef.current,
@@ -580,6 +602,7 @@ export default function ClimateGlobe({
         )
         const scale = selected ? 1.22 : hovered ? 1.1 : 1
         node.el.style.transform = `translate3d(${cluster.x}px, ${cluster.y}px, 0) scale(${scale})`
+        if (selected) selectedPosition = { x: cluster.x, y: cluster.y }
         node.el.style.setProperty(
           "--hg-delay",
           hazardGlyphDelay(cluster.markets[0]!.id),
@@ -599,6 +622,7 @@ export default function ClimateGlobe({
           markerNodes.delete(key)
         }
       }
+      updateSpotlight(selectedPosition)
     }
 
     const draw = () => {
@@ -781,6 +805,9 @@ export default function ClimateGlobe({
       window.cancelAnimationFrame(animationFrame)
       markerNodes.forEach((node) => node.el.remove())
       markerNodes.clear()
+      spotlight?.remove()
+      spotlight = null
+      markersLayer?.classList.remove("has-selection")
       projectionRef.current = null
     }
     // hoveredMarketIdRef is a stable ref; listed to satisfy exhaustive-deps.
@@ -1038,7 +1065,7 @@ export default function ClimateGlobe({
         />
         <div
           ref={markersLayerRef}
-          className="pointer-events-none absolute left-0 top-0 z-[5] overflow-hidden"
+          className="globe-marker-layer pointer-events-none absolute left-0 top-0 z-[5] overflow-hidden"
           aria-hidden="true"
         />
         {hoverLabel && (

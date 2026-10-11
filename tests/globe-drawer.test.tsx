@@ -28,7 +28,7 @@ const testMarkets: ClimateMarket[] = [
     region: "Florida",
     latitude: 27.6648,
     longitude: -81.5158,
-    closeTime: "2099-12-31T23:59:59.000Z",
+    closeTime: "2099-12-29T23:59:59.000Z",
     resolutionTime: "2100-01-14T18:00:00.000Z",
     status: "open",
     outcome: "unresolved",
@@ -64,7 +64,7 @@ const testMarkets: ClimateMarket[] = [
     region: "Paris–Madrid–Rome",
     latitude: 44.5,
     longitude: 5.5,
-    closeTime: "2099-12-31T23:59:59.000Z",
+    closeTime: "2099-12-30T23:59:59.000Z",
     resolutionTime: "2100-01-14T18:00:00.000Z",
     status: "open",
     outcome: "unresolved",
@@ -166,6 +166,31 @@ describe("geographic market workflow", () => {
     expect(screen.queryByText(/drag to rotate/i)).not.toBeInTheDocument()
   })
 
+  it("spotlights the selected market and dims the other markers", () => {
+    render(
+      <ClimateGlobe
+        markets={testMarkets}
+        selectedRegion={null}
+        selectedMarketId={testMarkets[0]!.id}
+        isDrawerOpen
+        onRegionSelect={vi.fn()}
+        onMarketSelect={vi.fn()}
+        onClusterSelect={vi.fn()}
+      />,
+    )
+
+    const layer = document.querySelector(".globe-marker-layer")
+    expect(layer).toHaveClass("has-selection")
+    const spotlight = layer?.querySelector(".globe-spotlight")
+    expect(spotlight).toBeInTheDocument()
+    expect(
+      (spotlight as HTMLElement).style.getPropertyValue("--spotlight-x"),
+    ).toContain("px")
+    expect(
+      (spotlight as HTMLElement).style.getPropertyValue("--spotlight-y"),
+    ).toContain("px")
+  })
+
   it("opens the globe region in the central browse view", async () => {
     const user = userEvent.setup()
 
@@ -192,6 +217,9 @@ describe("geographic market workflow", () => {
     expect(
       within(drawer).getByRole("heading", { name: "Search markets" }),
     ).toBeInTheDocument()
+    await user.click(
+      within(drawer).getByRole("button", { name: /region filter/i }),
+    )
     expect(
       within(drawer).getByRole("checkbox", { name: "Europe" }),
     ).toBeChecked()
@@ -355,13 +383,22 @@ describe("geographic market workflow", () => {
     const drawer = screen.getByTestId("market-drawer")
 
     await user.click(
+      within(drawer).getByRole("button", { name: /market type filter/i }),
+    )
+    await user.click(
       within(drawer).getByRole("checkbox", { name: "Hurricanes" }),
     )
     expect(
-      within(drawer).getAllByRole("button", { name: /open market:/i }),
-    ).toHaveLength(2)
-
-    await user.click(within(drawer).getByRole("checkbox", { name: "Oceania" }))
+      within(drawer).getByRole("button", {
+        name: "Market type filter: Hurricanes",
+      }),
+    ).toBeInTheDocument()
+    await user.click(
+      within(drawer).getByRole("button", { name: /region filter/i }),
+    )
+    await user.click(
+      await within(drawer).findByRole("checkbox", { name: "Oceania" }),
+    )
     const results = within(drawer).getAllByRole("button", {
       name: /open market:/i,
     })
@@ -403,6 +440,32 @@ describe("geographic market workflow", () => {
         .getAllByRole("button", { name: /open market:/i })[0]
         ?.getAttribute("aria-label"),
     ).toMatch(/paris/i)
+
+    await user.click(
+      within(drawer).getByRole("button", { name: /reverse order/i }),
+    )
+    expect(
+      within(drawer).getByRole("button", { name: /restore order/i }).className,
+    ).not.toMatch(/rounded-lg|border|bg-white/)
+    expect(
+      within(drawer)
+        .getAllByRole("button", { name: /open market:/i })[0]
+        ?.getAttribute("aria-label"),
+    ).toMatch(/queensland/i)
+    expect(
+      within(drawer).getByRole("button", { name: /restore order/i }),
+    ).toBeInTheDocument()
+
+    await user.selectOptions(within(drawer).getByLabelText(/sort/i), "closing")
+    expect(within(drawer).getByLabelText(/sort/i)).toHaveValue("closing")
+    expect(
+      within(drawer).getByRole("button", { name: /reverse order/i }),
+    ).toBeInTheDocument()
+    expect(
+      within(drawer)
+        .getAllByRole("button", { name: /open market:/i })[0]
+        ?.getAttribute("aria-label"),
+    ).toMatch(/florida/i)
 
     await user.selectOptions(within(drawer).getByLabelText(/sort/i), "yes")
     expect(

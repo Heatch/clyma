@@ -75,7 +75,7 @@ components/
   providers/                  SolanaProvider, MarketProvider, PositionProvider, GlobeLinkProvider
   layout/                     AccountDock (wallet + open-position count)
   wallet/ ui/                   connect button, balance, skeletons
-hooks/                        useAIForecast, useMarketProgram (Anchor client)
+hooks/                        useMarketProgram (Anchor client)
 lib/
   markets/                    types, calculations, generation, data (fixtures), openingPrice
   solana/                     config, pdas, accounts, instructions, encoding, errors, idl
@@ -113,13 +113,15 @@ only in code, env vars, and this doc.
   above. The globe always renders open markets and is independent of drawer
   browsing.
 - `MarketBrowser` is the drawer’s only list view: text search, multi-select
-  market-type and region filters, sorting, and an exact cluster scope when a
-  globe cluster was clicked. Region clicks preset the region filter; cluster
-  clicks preset an exact market-ID scope.
+  market-type and region dropdowns, sorting with a naked direction toggle, and
+  an exact cluster scope when a globe cluster was clicked. Region clicks preset
+  the region filter; cluster clicks preset an exact market-ID scope.
+- Opening a market spotlights its globe marker: a full-layer vignette leaves a
+  circular opening around the selection while dimming the rest of the globe.
 - `MarketProvider.tsx:145-230` enriches the catalogue from chain PDAs on mount,
   on a 30s interval, and on `terraform:market-state-changed` events.
-- `MarketDetails.tsx:46-58` renders `market.history`, overriding only the
-  newest point with the Model forecast (`useAIForecast`).
+- `MarketDetails.tsx` renders `market.history` through `MarketChart`; the
+  chart header carries the current probability and change from open.
 - `PredictionForm.tsx` computes its quote with `calculatePooledTradeQuote()`
   (`lib/markets/calculations.ts:272`): before/after probabilities, avg
   execution price, payout, and `priceImpactLevel` (`none/low/moderate/high`)
@@ -129,11 +131,10 @@ only in code, env vars, and this doc.
   (`TradeConfirmedDetail` in `lib/markets/types.ts`).
 - Globe hover prefetches `/api/predict` fire-and-forget, deduped by region
   (`ClimateGlobe.tsx:791-810`).
-- `MarketDetails` shows probability once in the chart header, plus a dashed
-  Model reference line (`forecastProb`) and the preview segment
-  (`previewProb`); the forecast never rewrites history points. A transient
-  "Odds moved ±X pts" message shows beside the chart delta for 15s after a
-  confirmed trade.
+- `MarketDetails` shows probability once in the chart header, plus the
+  preview segment (`previewProb`); the forecast never rewrites history
+  points. A transient "Odds moved ±X pts" message shows beside the chart
+  delta for 15s after a confirmed trade.
 - `MarketProvider` keeps confirmed-trade points in an `optimisticRef` map and
   re-applies them on top of every chain refresh (pools stay chain-owned);
   `POST /api/index-transaction` is the durable path (snapshot + capped
@@ -172,9 +173,9 @@ timeout. Parses strict `0.42`-format first, then any lone decimal, else
 fallback provider). Returns
 `{ probability, raw_output, forecaster: "model", format_valid, news_context_used }`.
 No live web retrieval — callers pass their own `news_context`. Same credentials
-as market generation. Callers: `useAIForecast` (chart reference line),
-`openingPrice.ts` (new-market opening, via `POST /api/markets/create` —
-throws on failure so creation fails visibly), globe hover prefetch.
+as market generation. Callers: `openingPrice.ts` (new-market opening, via
+`POST /api/markets/create` — throws on failure so creation fails visibly),
+globe hover prefetch.
 Provider naming never reaches the UI or API consumers.
 
 ## Solana program (`programs/climate_market/`)
@@ -237,11 +238,13 @@ outcome, total_yes/no/pool/paid_amount`); `vault` (native SOL,
 
 `scripts/lifecycle.mjs callModel()` (600s timeout, `json_output: true`,
 `--batch-size` default 25) → `extractJson()` → `validateRaw()` (category/
-continent allow-lists, lat/lon ranges, real-URL check, prob clamp 0.05–0.95,
-de-dupe by slug, invalid dropped) → saved definitions JSON in
-`os.tmpdir()/clyma/` for offline replay (`--fixture-file`). Per-round fault
-tolerance: a failed batch is logged and skipped, not fatal (aborts only on
-zero valid). No request caps, no fallback provider by project decision.
+continent allow-lists, lat/lon ranges, real-URL check, mandatory opening
+probability, prob clamp 0.05–0.95, de-dupe by slug, invalid dropped) → saved
+definitions JSON in `os.tmpdir()/clyma/` for offline replay (`--fixture-file`).
+Saved definitions retain `targetYes`, so replays preserve opening odds.
+Per-round fault tolerance: a failed batch is logged and skipped, not fatal
+(aborts only on zero valid). No request caps, no fallback provider by project
+decision.
 
 ## Scripts
 
@@ -293,8 +296,9 @@ forwards `--experimental-sqlite` to all npm scripts).
 ## Testing
 
 - `npm test` → `vitest run`, jsdom, `tests/setup.ts` shims. Includes
-  `tests/*.test.tsx` (account-dock, api-routes, globe-drawer,
-  prediction-form, store, tape, lifecycle, market-history) +
+  `tests/*.test.tsx` (account-dock, api-routes, globe-drawer, market-chart,
+  multi-select, portfolio-panel, prediction-form, store, tape, lifecycle,
+  market-history) +
   co-located `lib/solana/*.test.ts` (accounts, encoding, errors,
   instructions). Store tests run against real in-memory SQLite (`:memory:`).
 - `tests/climate-market.ts` is Anchor integration — runs via
@@ -303,7 +307,9 @@ forwards `--experimental-sqlite` to all npm scripts).
   **test fixtures only** (`tests/api-routes.test.ts`) — the My Positions UI
   does not consume them, so the portfolio can appear empty with a fresh DB.
 - Region, cluster, search, filter, sort, magnifier, and portfolio drawer
-  flows are covered in `tests/globe-drawer.test.tsx`; bottom-left wallet and
+  flows are covered in `tests/globe-drawer.test.tsx`; multi-select dropdown
+  behavior is covered in `tests/multi-select.test.tsx`; opening-odds parsing
+  is covered in `tests/lifecycle.test.ts`. Bottom-left wallet and
   position-count behavior is covered in `tests/account-dock.test.tsx`.
 
 ## Conventions

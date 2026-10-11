@@ -26,8 +26,6 @@ interface MarketChartProps {
   history: MarketHistoryPoint[]
   compact?: boolean
   tone?: ChartTone
-  /** Independent model forecast (0–1): dashed reference line, never rewrites history. */
-  forecastProb?: number | null
   /** Live what-if preview (0–1): dashed segment from the current point. */
   previewProb?: number | null
   /** Most recent confirmed-trade move, shown briefly beside the chart delta. */
@@ -201,7 +199,6 @@ export default function MarketChart({
   history,
   compact = false,
   tone = "light",
-  forecastProb = null,
   previewProb = null,
   recentTradeDeltaPts = null,
 }: MarketChartProps) {
@@ -236,14 +233,6 @@ export default function MarketChart({
   const delta =
     firstDatum && currentDatum ? currentDatum.yes - firstDatum.yes : 0
   const hasMeaningfulDelta = Math.abs(delta) >= 0.05
-
-  const forecastValue =
-    typeof forecastProb === "number" &&
-    Number.isFinite(forecastProb) &&
-    forecastProb >= 0 &&
-    forecastProb <= 1
-      ? normalizeProbability(forecastProb)
-      : null
 
   // Dashed what-if segment: current point → projected point. Kept out of the
   // ranged data so range buttons keep working on real history.
@@ -509,14 +498,6 @@ export default function MarketChart({
               fill="transparent"
               isAnimationActive={false}
             />
-            {forecastValue !== null && (
-              <ReferenceLine
-                y={forecastValue}
-                stroke={tone === "dark" ? "#c4b5fd" : "#7c3aed"}
-                strokeDasharray="5 4"
-                strokeWidth={1.25}
-              />
-            )}
             {previewData && (
               <Line
                 type="monotone"
@@ -560,15 +541,6 @@ export default function MarketChart({
         >
           <span>━ YES</span>
           <span>┄ NO</span>
-          {forecastValue !== null && (
-            <span
-              className={
-                tone === "dark" ? "text-violet-200" : "text-violet-700"
-              }
-            >
-              ┄ Model
-            </span>
-          )}
           {previewData && (
             <span className={tone === "dark" ? "text-sky-200" : "text-sky-700"}>
               ┄ Preview

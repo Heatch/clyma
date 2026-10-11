@@ -7,6 +7,23 @@ import MarketDetails from "@/components/markets/MarketDetails"
 import PortfolioPanel from "@/components/portfolio/PortfolioPanel"
 import { useMarkets } from "@/components/providers/MarketProvider"
 
+function DrawerControlIcon({ path }: { path: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={path} />
+    </svg>
+  )
+}
+
 export default function RegionalMarketDrawer() {
   const {
     selectedMarket,
@@ -107,27 +124,29 @@ export default function RegionalMarketDrawer() {
           >
             <span className="h-1 w-10 rounded-full bg-white/25" />
           </div>
-          <div className="flex shrink-0 items-center justify-between px-4 py-3 sm:px-5">
+          <div className="flex shrink-0 items-center justify-between gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
             {selectedMarket ? (
               <button
                 type="button"
                 onClick={backAction}
-                className="grid size-9 place-items-center text-xl text-neutral-300 transition hover:text-white"
+                className="grid size-9 place-items-center text-neutral-300 transition hover:text-white"
                 aria-label={backLabel}
               >
-                ‹
+                <DrawerControlIcon path="M14.5 5.5 8 12l6.5 6.5" />
               </button>
             ) : (
-              <span aria-hidden="true" className="size-9" />
+              <h2 className="truncate text-xl font-semibold tracking-[-0.025em]">
+                {isPortfolioMode ? "My Positions" : "Search markets"}
+              </h2>
             )}
             <button
               ref={closeButtonRef}
               type="button"
               onClick={closeDrawer}
-              className="grid size-9 place-items-center text-xl text-neutral-300 transition hover:text-white"
+              className="grid size-9 place-items-center text-neutral-300 transition hover:text-white"
               aria-label="Close market panel"
             >
-              ×
+              <DrawerControlIcon path="M6 6l12 12M18 6 6 18" />
             </button>
           </div>
 

@@ -8,13 +8,13 @@ import {
   buildResolveMarket,
   instructionDiscriminator,
   modelOddsOf,
+  readEstimate,
   resolveDraw,
+  validateRaw,
   RESOLUTION_DECISIONS,
 } from "@/scripts/lifecycle.mjs"
 
-const PROGRAM_ID = new PublicKey(
-  "EkcwkAzNUCGRcKCA5WJc7GCtUXooubkm3ktesBWQXPBt",
-)
+const PROGRAM_ID = new PublicKey("EkcwkAzNUCGRcKCA5WJc7GCtUXooubkm3ktesBWQXPBt")
 __useProgramIdForTests(PROGRAM_ID)
 
 const PROTOCOL = new PublicKey("9wFjuU9SWcZ3NtwYi4nsArMzNCtY6fyAZHNxQtU74Fsy")
@@ -64,9 +64,9 @@ describe("instruction builders", () => {
         .update(`global:${name}`)
         .digest()
         .subarray(0, 8)
-      expect(
-        Buffer.from(instructionDiscriminator(name)).equals(expected),
-      ).toBe(true)
+      expect(Buffer.from(instructionDiscriminator(name)).equals(expected)).toBe(
+        true,
+      )
     }
   })
 })
@@ -82,7 +82,9 @@ describe("resolveDraw", () => {
 
   it("only emits yes or no", () => {
     for (let i = 0; i < 50; i++) {
-      expect(["yes", "no"]).toContain(resolveDraw(`q${i}`, 0.13 + (i % 70) / 100))
+      expect(["yes", "no"]).toContain(
+        resolveDraw(`q${i}`, 0.13 + (i % 70) / 100),
+      )
     }
   })
 })
@@ -99,7 +101,52 @@ describe("modelOddsOf", () => {
   it("falls back to yesPrice, then 0.5, clamped", () => {
     expect(modelOddsOf(base)).toBeCloseTo(0.7, 5)
     expect(modelOddsOf({ marketId: "m" })).toBe(0.5)
-    expect(modelOddsOf({ ...base, history: [{ yesProbability: 0.9999 }] })).toBe(0.95)
-    expect(modelOddsOf({ ...base, history: [{ yesProbability: 0.0001 }] })).toBe(0.05)
+    expect(
+      modelOddsOf({ ...base, history: [{ yesProbability: 0.9999 }] }),
+    ).toBe(0.95)
+    expect(
+      modelOddsOf({ ...base, history: [{ yesProbability: 0.0001 }] }),
+    ).toBe(0.05)
+  })
+})
+
+describe("readEstimate", () => {
+  it("accepts decimals and already-validated targetYes values", () => {
+    expect(readEstimate({ estimatedProbability: 0.22 })).toBeCloseTo(0.22, 5)
+    expect(readEstimate({ targetYes: 0.62 })).toBeCloseTo(0.62, 5)
+    expect(readEstimate({ estimatedProbability: 62 })).toBeCloseTo(0.62, 5)
+  })
+
+  it("rejects missing, zero, and out-of-range estimates", () => {
+    expect(readEstimate({})).toBeNull()
+    expect(readEstimate({ estimatedProbability: 0 })).toBeNull()
+    expect(readEstimate({ estimatedProbability: 120 })).toBeNull()
+  })
+})
+
+describe("validateRaw", () => {
+  const baseRaw = {
+    category: "hurricane",
+    continent: "North America",
+    question: "Will a test storm form?",
+    description: "A test market.",
+    region: "Test region",
+    resolutionSource: "NOAA",
+    resolutionSourceUrl: "https://www.nhc.noaa.gov/",
+    resolutionRules: "Resolve YES on formation.",
+    latitude: 25,
+    longitude: -80,
+    closeInDays: 90,
+  }
+
+  it("keeps a replayed targetYes instead of falling back to 50/50", () => {
+    expect(validateRaw({ ...baseRaw, targetYes: 0.62 })?.targetYes).toBeCloseTo(
+      0.62,
+      5,
+    )
+  })
+
+  it("drops a market without opening odds", () => {
+    expect(validateRaw(baseRaw)).toBeNull()
   })
 })
