@@ -20,12 +20,12 @@ export const REGION_CENTERS: Record<ContinentName, readonly [number, number]> =
   }
 
 const REGION_RADIUS: Record<ContinentName, number> = {
-  "North America": 39,
-  "South America": 30,
-  Europe: 20,
-  Africa: 31,
-  Asia: 48,
-  Oceania: 28,
+  "North America": 26,
+  "South America": 22,
+  Europe: 14,
+  Africa: 22,
+  Asia: 30,
+  Oceania: 22,
 }
 
 const toRadians = (value: number) => (value * Math.PI) / 180

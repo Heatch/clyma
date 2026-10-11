@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useEffect } from "react"
 
 import { useMarkets } from "@/components/providers/MarketProvider"
@@ -48,12 +49,14 @@ export default function PortfolioPanel() {
     <section aria-label="Positions">
       {!connected ? (
         <div className="mt-5 rounded-2xl border border-dashed border-white/20 bg-white/[0.03] px-5 py-8 text-center">
-          <div
-            className="mx-auto grid size-10 place-items-center rounded-full border border-white/20 text-lg"
+          <Image
+            src="/clyma-logo-shadow.svg"
+            alt=""
             aria-hidden="true"
-          >
-            &#9671;
-          </div>
+            width={40}
+            height={38}
+            className="mx-auto h-10 w-auto"
+          />
           <p className="mt-3 text-sm font-semibold">Connect a Devnet wallet</p>
           <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-neutral-400">
             Your confirmed purchases, claims, and refunds will appear here.

@@ -1,6 +1,7 @@
 "use client"
 
 import ClimateGlobe from "@/components/globe/ClimateGlobe"
+import BrandMark from "@/components/layout/BrandMark"
 import { useMarkets } from "@/components/providers/MarketProvider"
 
 export default function GlobeHero() {
@@ -9,10 +10,12 @@ export default function GlobeHero() {
     selectedRegion,
     selectedMarket,
     isDrawerOpen,
+    isDrawerClosing,
     selectRegion,
     selectMarket,
     selectCluster,
     showBrowse,
+    closeDrawer,
   } = useMarkets()
 
   const openMarkets = markets.filter((market) => market.status === "open")
@@ -24,8 +27,10 @@ export default function GlobeHero() {
     >
       <div
         data-testid="globe-viewport"
-        className={`absolute inset-y-0 left-0 overflow-hidden ${
-          isDrawerOpen ? "right-0 md:right-[var(--drawer-width)]" : "right-0"
+        className={`absolute inset-y-0 left-0 right-0 overflow-hidden transition-[right] duration-[520ms] ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none ${
+          isDrawerOpen && !isDrawerClosing
+            ? "md:right-[var(--drawer-width)]"
+            : ""
         }`}
       >
         <div
@@ -47,6 +52,7 @@ export default function GlobeHero() {
           onRegionSelect={selectRegion}
           onMarketSelect={selectMarket}
           onClusterSelect={selectCluster}
+          onEmptySelect={closeDrawer}
         />
 
         {!isDrawerOpen && (
@@ -88,6 +94,8 @@ export default function GlobeHero() {
           </p>
         </div>
       </div>
+
+      {!isDrawerOpen && <BrandMark />}
 
       <div className="sr-only" aria-live="polite">
         {openMarkets.length} open markets shown

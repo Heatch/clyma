@@ -43,14 +43,6 @@ type PointerState = {
   startY: number
 }
 
-type ViewportTransition = {
-  startedAt: number
-  fromCenter: [number, number]
-  toCenter: [number, number]
-  fromBaseRadius: number
-  toBaseRadius: number
-}
-
 /**
  * Shortest-path longitude delta in degrees, wrapped to [-180, 180).
  *
@@ -89,6 +81,7 @@ interface ClimateGlobeProps {
   onRegionSelect: (region: string) => void
   onMarketSelect: (market: ClimateMarket) => void
   onClusterSelect: (markets: ClimateMarket[]) => void
+  onEmptySelect?: () => void
   className?: string
   fullBleed?: boolean
 }
@@ -102,8 +95,6 @@ const IDLE_ROTATION_ZOOM_FRACTION = 0.5
 export const IDLE_ROTATION_MAX_ZOOM =
   MIN_ZOOM + (MAX_ZOOM - MIN_ZOOM) * IDLE_ROTATION_ZOOM_FRACTION
 const TARGET_FRAME_INTERVAL_MS = 1000 / 30
-const VIEWPORT_TRANSITION_MS = 520
-const VIEWPORT_TRANSITION_MIN_DELTA_PX = 48
 
 function makeLandFeature(): Feature<Geometry> {
   const topology = landTopology as unknown as Topology<
@@ -175,6 +166,7 @@ export default function ClimateGlobe({
   onRegionSelect,
   onMarketSelect,
   onClusterSelect,
+  onEmptySelect,
   className = "",
   fullBleed = false,
 }: ClimateGlobeProps) {
@@ -206,6 +198,7 @@ export default function ClimateGlobe({
     onRegionSelect,
     onMarketSelect,
     onClusterSelect,
+    onEmptySelect,
   })
   const [isReady, setIsReady] = useState(false)
   const [hoverLabel, setHoverLabel] = useState<{
@@ -219,12 +212,18 @@ export default function ClimateGlobe({
     selectedRegionRef.current = selectedRegion
     selectedMarketIdRef.current = selectedMarketId
     isDrawerOpenRef.current = isDrawerOpen
-    callbacksRef.current = { onRegionSelect, onMarketSelect, onClusterSelect }
+    callbacksRef.current = {
+      onRegionSelect,
+      onMarketSelect,
+      onClusterSelect,
+      onEmptySelect,
+    }
     renderVersionRef.current += 1
   }, [
     markets,
     isDrawerOpen,
     onClusterSelect,
+    onEmptySelect,
     onMarketSelect,
     onRegionSelect,
     selectedMarketId,
@@ -303,10 +302,11 @@ export default function ClimateGlobe({
     const path = d3.geoPath(projection, context)
     const landPattern = createLandPattern(context)
     projectionRef.current = projection
-    // `width`/`height` are the canvas box; `viewWidth`/`viewHeight` are the
-    // viewport box. During a size transition the canvas is held at the larger
-    // of the two so the interpolating globe is never clipped by the canvas
-    // edge, then finalised once the transition settles.
+    // The canvas is a full-bleed surface sized to the surrounding section,
+    // which never changes when the drawer opens or closes. Only the viewport
+    // (`viewWidth`/`viewHeight`) changes; the projection follows it, so the
+    // globe glides without reallocating the canvas — reallocation mid-toggle
+    // is what flashed a stretched frame.
     let width = 0
     let height = 0
     let viewWidth = 0
@@ -325,7 +325,11 @@ export default function ClimateGlobe({
     let lastRenderedCanvasHover: string | null | undefined
     let lastRenderedLinkedHover: string | null | undefined
     let renderedBaseRadius = baseRadiusRef.current
-    let viewportTransition: ViewportTransition | null = null
+    // The drawer's viewport clips the globe; the canvas spans the whole
+    // section behind it so its size stays stable across drawer toggles.
+    const surface =
+      (wrapper.closest('[data-testid="globe-viewport"]') as HTMLElement | null)
+        ?.parentElement ?? wrapper
 
     const allocateCanvas = (
       nextWidth: number,
@@ -356,101 +360,43 @@ export default function ClimateGlobe({
       }
     }
 
-    const sampleViewportTransition = (now: number): boolean => {
-      const transition = viewportTransition
-      if (!transition) return false
-
-      const progress = prefersReducedMotion.matches
-        ? 1
-        : Math.min(1, (now - transition.startedAt) / VIEWPORT_TRANSITION_MS)
-      const eased = easeInOut(progress)
-      renderedBaseRadius =
-        transition.fromBaseRadius +
-        (transition.toBaseRadius - transition.fromBaseRadius) * eased
-      projection
-        .translate([
-          transition.fromCenter[0] +
-            (transition.toCenter[0] - transition.fromCenter[0]) * eased,
-          transition.fromCenter[1] +
-            (transition.toCenter[1] - transition.fromCenter[1]) * eased,
-        ])
-        .scale(renderedBaseRadius * zoomRef.current)
-
-      if (progress >= 1) {
-        viewportTransition = null
-        renderedBaseRadius = baseRadiusRef.current
-        projection.translate([viewWidth / 2, viewHeight / 2])
-        allocateCanvas(viewWidth, viewHeight, pixelRatio)
-      }
-      return true
-    }
-
     const resize = () => {
-      const rectangle = wrapper.getBoundingClientRect()
-      const nextViewWidth = Math.max(280, rectangle.width)
-      const nextViewHeight = Math.max(320, rectangle.height || 680)
+      const surfaceRectangle = surface.getBoundingClientRect()
+      const nextWidth = Math.max(280, surfaceRectangle.width)
+      const nextHeight = Math.max(320, surfaceRectangle.height || 680)
+      const viewRectangle = wrapper.getBoundingClientRect()
+      const nextViewWidth = Math.max(280, viewRectangle.width)
+      const nextViewHeight = Math.max(320, viewRectangle.height || 680)
       const nextPixelRatio = Math.min(
         window.devicePixelRatio || 1,
-        nextViewWidth * nextViewHeight > 1_000_000 ? 1.25 : 1.5,
+        nextWidth * nextHeight > 1_000_000 ? 1.25 : 1.5,
       )
-      const sizeChanged =
+      const viewChanged =
         Math.abs(nextViewWidth - viewWidth) >= 0.5 ||
         Math.abs(nextViewHeight - viewHeight) >= 0.5
+      const canvasChanged =
+        Math.abs(nextWidth - width) >= 0.5 ||
+        Math.abs(nextHeight - height) >= 0.5
       const pixelRatioChanged = Math.abs(nextPixelRatio - pixelRatio) >= 0.01
-      if (viewWidth > 0 && !sizeChanged && !pixelRatioChanged) return
-
-      const hadPreviousViewport = viewWidth > 0 && viewHeight > 0
-      const previousViewWidth = viewWidth
-      const previousViewHeight = viewHeight
-      const previousCenter = projection.translate() as [number, number]
-      const previousBaseRadius = renderedBaseRadius
-      const targetCenter: [number, number] = [
-        nextViewWidth / 2,
-        nextViewHeight / 2,
-      ]
-      const nextBaseRadius = Math.max(
-        125,
-        Math.min(nextViewWidth * 0.43, nextViewHeight * 0.42),
-      )
+      if (
+        viewWidth > 0 &&
+        !viewChanged &&
+        !canvasChanged &&
+        !pixelRatioChanged
+      ) {
+        return
+      }
 
       viewWidth = nextViewWidth
       viewHeight = nextViewHeight
-      baseRadiusRef.current = nextBaseRadius
-
-      const shouldAnimate =
-        hadPreviousViewport &&
-        sizeChanged &&
-        !prefersReducedMotion.matches &&
-        (viewportTransition !== null ||
-          Math.abs(nextViewWidth - previousViewWidth) >=
-            VIEWPORT_TRANSITION_MIN_DELTA_PX ||
-          Math.abs(nextViewHeight - previousViewHeight) >=
-            VIEWPORT_TRANSITION_MIN_DELTA_PX)
-
-      if (shouldAnimate) {
-        // Hold the canvas at the wider of the two viewports and let the
-        // viewport's own overflow clip the excess, so the globe slides and
-        // shrinks smoothly instead of being cut off by the canvas edge.
-        allocateCanvas(
-          Math.max(width, nextViewWidth),
-          Math.max(height, nextViewHeight),
-          nextPixelRatio,
-        )
-        viewportTransition = {
-          startedAt: performance.now(),
-          fromCenter: previousCenter,
-          toCenter: targetCenter,
-          fromBaseRadius: previousBaseRadius,
-          toBaseRadius: nextBaseRadius,
-        }
-      } else {
-        viewportTransition = null
-        renderedBaseRadius = nextBaseRadius
-        allocateCanvas(nextViewWidth, nextViewHeight, nextPixelRatio)
-        projection.translate(targetCenter)
-      }
-
+      renderedBaseRadius = Math.max(
+        125,
+        Math.min(nextViewWidth * 0.43, nextViewHeight * 0.42),
+      )
+      baseRadiusRef.current = renderedBaseRadius
+      allocateCanvas(nextWidth, nextHeight, nextPixelRatio)
       projection
+        .translate([viewWidth / 2, viewHeight / 2])
         .rotate(rotationRef.current)
         .scale(renderedBaseRadius * zoomRef.current)
       renderVersionRef.current += 1
@@ -759,11 +705,8 @@ export default function ClimateGlobe({
           360
       }
 
-      const isViewportAnimating = sampleViewportTransition(now)
-      if (!isViewportAnimating) {
-        renderedBaseRadius = baseRadiusRef.current
-        projection.translate([viewWidth / 2, viewHeight / 2])
-      }
+      renderedBaseRadius = baseRadiusRef.current
+      projection.translate([viewWidth / 2, viewHeight / 2])
       projection
         .rotate(rotationRef.current)
         .scale(renderedBaseRadius * zoomRef.current)
@@ -780,8 +723,7 @@ export default function ClimateGlobe({
         rotation[1] !== lastRenderedRotation[1] ||
         rotation[2] !== lastRenderedRotation[2] ||
         canvasHover !== lastRenderedCanvasHover ||
-        linkedHover !== lastRenderedLinkedHover ||
-        isViewportAnimating
+        linkedHover !== lastRenderedLinkedHover
 
       if (shouldDraw) {
         draw()
@@ -960,6 +902,10 @@ export default function ClimateGlobe({
     if (wasDragging) return
 
     const target = findTarget(event.clientX, event.clientY)
+    if (!target) {
+      callbacksRef.current.onEmptySelect?.()
+      return
+    }
     if (target?.type === "cluster") {
       const market = target.cluster.markets[0]
       if (!market) return

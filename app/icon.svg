@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 380">
+<title>Tree logo (black with white shadow)</title>
+<g transform="translate(14 14)">
+<polygon points="192,40 208,40 234,80 166,80" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+<polygon points="158,100 242,100 268,140 132,140" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+<polygon points="124,160 276,160 302,200 98,200" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+<polygon points="90,220 310,220 336,260 64,260" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+<rect x="183" y="278" width="34" height="62" rx="6" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+</g>
+<g>
+<polygon points="192,40 208,40 234,80 166,80" fill="#000000" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+<polygon points="158,100 242,100 268,140 132,140" fill="#000000" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+<polygon points="124,160 276,160 302,200 98,200" fill="#000000" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+<polygon points="90,220 310,220 336,260 64,260" fill="#000000" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+<rect x="183" y="278" width="34" height="62" rx="6" fill="#000000" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+</g>
+</svg>

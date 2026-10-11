@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 
 import MarketBrowser from "@/components/markets/MarketBrowser"
 import MarketDetails from "@/components/markets/MarketDetails"
@@ -28,6 +28,7 @@ export default function RegionalMarketDrawer() {
   const {
     selectedMarket,
     isDrawerOpen,
+    isDrawerClosing,
     isPortfolioMode,
     detailReturnView,
     showBrowse,
@@ -37,6 +38,18 @@ export default function RegionalMarketDrawer() {
   const drawerRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  const focusGlobeCanvas = () => {
+    document
+      .querySelector<HTMLElement>('canvas[aria-label^="Interactive"]')
+      ?.focus({ preventScroll: true })
+  }
+  // Closing is animated: move focus out immediately, the provider unmounts
+  // the panel once the slide-out finishes.
+  const beginClose = useCallback(() => {
+    focusGlobeCanvas()
+    closeDrawer()
+  }, [closeDrawer])
 
   useEffect(() => {
     if (!isDrawerOpen) return
@@ -50,9 +63,12 @@ export default function RegionalMarketDrawer() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault()
-        closeDrawer()
+        beginClose()
         return
       }
+      // While sliding out the panel is leaving: let focus leave with it
+      // instead of trapping tab inside.
+      if (isDrawerClosing) return
       if (event.key !== "Tab" || !drawerRef.current) return
       const focusable = [
         ...drawerRef.current.querySelectorAll<HTMLElement>(
@@ -82,13 +98,17 @@ export default function RegionalMarketDrawer() {
           ?.focus({ preventScroll: true })
       }
     }
-  }, [closeDrawer, isDrawerOpen])
+  }, [beginClose, isDrawerClosing, isDrawerOpen])
 
   const shouldShowPortfolio =
     isPortfolioMode ||
     (!selectedMarket && isDrawerOpen && detailReturnView === "portfolio")
 
   if (!isDrawerOpen) return null
+
+  // entering is handled by the mount keyframe animation (see .drawer-enter);
+  // only the exit needs explicit state.
+  const drawerState = isDrawerClosing ? "closing" : "open"
 
   const backAction =
     detailReturnView === "portfolio" ? showPortfolio : () => showBrowse()
@@ -99,14 +119,16 @@ export default function RegionalMarketDrawer() {
     <>
       <button
         type="button"
-        className="fixed inset-0 z-40 cursor-default bg-black/60 backdrop-blur-[3px] md:hidden"
+        data-state={drawerState}
+        className="fixed inset-0 z-40 cursor-default bg-black/60 backdrop-blur-[3px] transition-opacity duration-[520ms] ease-[cubic-bezier(0.65,0,0.35,1)] data-[state=closing]:opacity-0 motion-reduce:transition-none md:hidden"
         aria-label="Close market panel"
-        onClick={closeDrawer}
+        onClick={beginClose}
       />
       <aside
         ref={drawerRef}
         role="dialog"
         aria-modal="true"
+        data-state={drawerState}
         aria-label={
           isPortfolioMode
             ? "My Positions"
@@ -115,7 +137,7 @@ export default function RegionalMarketDrawer() {
               : "Browse markets"
         }
         data-testid="market-drawer"
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-hidden rounded-t-[1.75rem] border border-white/15 bg-[#0b0d0f]/95 text-white shadow-[0_24px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl md:inset-y-0 md:bottom-0 md:left-auto md:right-0 md:top-0 md:max-h-none md:w-[var(--drawer-width)] md:rounded-none md:border-y-0 md:border-r-0 md:shadow-none"
+        className="drawer-enter fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-hidden rounded-t-[1.75rem] border border-white/15 bg-[#0b0d0f]/95 text-white shadow-[0_24px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[transform,opacity] duration-[520ms] ease-[cubic-bezier(0.65,0,0.35,1)] data-[state=closing]:translate-y-full data-[state=closing]:opacity-0 motion-reduce:transition-none md:inset-y-0 md:bottom-0 md:left-auto md:right-0 md:top-0 md:max-h-none md:w-[var(--drawer-width)] md:rounded-none md:border-y-0 md:border-r-0 md:shadow-none md:data-[state=closing]:translate-x-full md:data-[state=closing]:translate-y-0"
       >
         <div className="flex h-full min-h-0 flex-col">
           <div
@@ -142,7 +164,7 @@ export default function RegionalMarketDrawer() {
             <button
               ref={closeButtonRef}
               type="button"
-              onClick={closeDrawer}
+              onClick={beginClose}
               className="grid size-9 place-items-center text-neutral-300 transition hover:text-white"
               aria-label="Close market panel"
             >

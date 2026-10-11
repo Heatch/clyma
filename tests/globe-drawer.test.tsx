@@ -1,5 +1,11 @@
 import React from "react"
-import { render, screen, within } from "@testing-library/react"
+import {
+  fireEvent,
+  render,
+  screen,
+  waitForElementToBeRemoved,
+  within,
+} from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { vi } from "vitest"
 
@@ -164,6 +170,81 @@ describe("geographic market workflow", () => {
       screen.queryByRole("button", { name: /reset globe view/i }),
     ).not.toBeInTheDocument()
     expect(screen.queryByText(/drag to rotate/i)).not.toBeInTheDocument()
+  })
+
+  it("closes the drawer when empty ocean is clicked", () => {
+    const onEmptySelect = vi.fn()
+    render(
+      <ClimateGlobe
+        markets={testMarkets}
+        selectedRegion={null}
+        isDrawerOpen={false}
+        onRegionSelect={vi.fn()}
+        onMarketSelect={vi.fn()}
+        onClusterSelect={vi.fn()}
+        onEmptySelect={onEmptySelect}
+      />,
+    )
+
+    fireEvent(
+      screen.getByRole("img"),
+      new MouseEvent("pointerup", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 121.2,
+        clientY: 301,
+      }),
+    )
+    expect(onEmptySelect).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not close the drawer after a globe drag", () => {
+    const onEmptySelect = vi.fn()
+    render(
+      <ClimateGlobe
+        markets={testMarkets}
+        selectedRegion={null}
+        isDrawerOpen={false}
+        onRegionSelect={vi.fn()}
+        onMarketSelect={vi.fn()}
+        onClusterSelect={vi.fn()}
+        onEmptySelect={onEmptySelect}
+      />,
+    )
+
+    const canvas = screen.getByRole("img")
+    Object.defineProperty(canvas, "setPointerCapture", {
+      value: vi.fn(),
+      configurable: true,
+    })
+    fireEvent(
+      canvas,
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 100,
+        clientY: 100,
+      }),
+    )
+    fireEvent(
+      canvas,
+      new MouseEvent("pointermove", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 200,
+        clientY: 100,
+      }),
+    )
+    fireEvent(
+      canvas,
+      new MouseEvent("pointerup", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 121.2,
+        clientY: 301,
+      }),
+    )
+    expect(onEmptySelect).not.toHaveBeenCalled()
   })
 
   it("spotlights the selected market and dims the other markers", () => {
@@ -558,5 +639,89 @@ describe("geographic market workflow", () => {
     expect(
       screen.queryByRole("dialog", { name: /null markets/i }),
     ).not.toBeInTheDocument()
+  })
+
+  it("slides the drawer out on close while the globe viewport widens first", async () => {
+    const user = userEvent.setup()
+
+    function Harness() {
+      const { showBrowse } = useMarkets()
+      return (
+        <>
+          <button type="button" onClick={() => showBrowse()}>
+            Browse markets
+          </button>
+          <GlobeHero />
+          <RegionalMarketDrawer />
+        </>
+      )
+    }
+
+    render(
+      <MarketProvider initialMarkets={testMarkets}>
+        <GlobeLinkProvider>
+          <Harness />
+        </GlobeLinkProvider>
+      </MarketProvider>,
+    )
+
+    await user.click(screen.getByRole("button", { name: "Browse markets" }))
+    const drawer = screen.getByTestId("market-drawer")
+    expect(drawer).toHaveAttribute("data-state", "open")
+    expect(screen.getByTestId("globe-viewport")).toHaveClass(
+      "md:right-[var(--drawer-width)]",
+    )
+
+    await user.click(
+      within(drawer).getByRole("button", { name: "Close market panel" }),
+    )
+    // The panel stays mounted in its closing state while the viewport has
+    // already widened, so the globe glide and the slide-out stay in sync.
+    expect(screen.getByTestId("market-drawer")).toHaveAttribute(
+      "data-state",
+      "closing",
+    )
+    expect(screen.getByTestId("globe-viewport")).not.toHaveClass(
+      "md:right-[var(--drawer-width)]",
+    )
+    await waitForElementToBeRemoved(() => screen.queryByTestId("market-drawer"))
+  })
+
+  it("cancels the close when the drawer is reopened mid-exit", async () => {
+    const user = userEvent.setup()
+
+    function Harness() {
+      const { showBrowse } = useMarkets()
+      return (
+        <>
+          <button type="button" onClick={() => showBrowse()}>
+            Browse markets
+          </button>
+          <RegionalMarketDrawer />
+        </>
+      )
+    }
+
+    render(
+      <MarketProvider initialMarkets={testMarkets}>
+        <Harness />
+      </MarketProvider>,
+    )
+
+    await user.click(screen.getByRole("button", { name: "Browse markets" }))
+    const drawer = screen.getByTestId("market-drawer")
+    await user.click(
+      within(drawer).getByRole("button", { name: "Close market panel" }),
+    )
+    expect(screen.getByTestId("market-drawer")).toHaveAttribute(
+      "data-state",
+      "closing",
+    )
+
+    await user.click(screen.getByRole("button", { name: "Browse markets" }))
+    expect(screen.getByTestId("market-drawer")).toHaveAttribute(
+      "data-state",
+      "open",
+    )
   })
 })

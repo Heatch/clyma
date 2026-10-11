@@ -158,6 +158,35 @@ a {
   animation: soft-pulse 2.4s ease-in-out infinite;
 }
 
+/* --- Market drawer transitions -------------------------------------- */
+/* Enter animation runs on mount; keep the duration/easing in sync with
+   DRAWER_TRANSITION_MS in MarketProvider and the globe viewport glide. */
+@keyframes drawer-enter {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+@media (min-width: 768px) {
+  @keyframes drawer-enter {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+  }
+}
+
+.drawer-enter {
+  animation: drawer-enter 520ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-enter {
+    animation: none;
+  }
+}
+
 /* --- Globe hazard glyph markers ------------------------------------- */
 /* Positioned by the globe's frame loop via transform; the glyph art and its
    motion live entirely in the SVG + keyframes below. */

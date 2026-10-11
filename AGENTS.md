@@ -65,15 +65,18 @@ Requires Node `>=22.13.0` (`package.json:60-62`). Anchor program pinned to 1.1.2
 ## Repo map
 
 ```text
-app/                          Next.js App Router: page + layout + API routes
+app/                          Next.js App Router: page + layout + API routes + favicon
 app/api/markets|users|me|auth|predict|index-transaction
+app/icon.svg                  black Clyma favicon
+public/clyma-logo-*.svg       green/black/white brand marks
 components/
   Dashboard.tsx               client composer (providers + account dock + globe + drawer)
   globe/                      ClimateGlobe (D3 canvas), GlobeHero (overview + viewport sizing)
   markets/                    browser, list items, details, chart, drawer
   trading/                    PredictionForm (buy), RedeemPosition (claim/refund)
   providers/                  SolanaProvider, MarketProvider, PositionProvider, GlobeLinkProvider
-  layout/                     AccountDock (wallet + open-position count)
+  layout/                     AccountDock (wallet + open-position count),
+                              BrandMark (Clyma wordmark + tree, bottom-right)
   wallet/ ui/                   connect button, balance, skeletons
 hooks/                        useMarketProgram (Anchor client)
 lib/
@@ -108,16 +111,28 @@ only in code, env vars, and this doc.
 - `app/page.tsx` is `force-dynamic`, queries SQLite, renders
   `<Dashboard initialMarkets>`. `Dashboard` renders the full-window globe,
   bottom-left `AccountDock`, and right-side drawer; there is no sidebar.
-- `GlobeHero` shows a two-line overview, a top-right search trigger, and
-  reserves `--drawer-width` for the open drawer at the `md` breakpoint and
-  above. The globe always renders open markets and is independent of drawer
-  browsing.
+- `GlobeHero` shows a two-line overview, a top-right search trigger, and the
+  `BrandMark` ("Clyma" then the tree) pinned to the empty bottom-right corner
+  while the drawer is closed. The globe always renders open markets and is
+  independent of drawer browsing.
+- The globe canvas is a full-bleed surface sized to the section, so it is
+  never reallocated when the drawer toggles; the drawer's viewport narrows via
+  a CSS transition and the projection follows the viewport each frame. The
+  globe therefore never runs an animation that can race the viewport (that
+  race is what flashed a stretched frame).
 - `MarketBrowser` is the drawer’s only list view: text search, multi-select
   market-type and region dropdowns, sorting with a naked direction toggle, and
   an exact cluster scope when a globe cluster was clicked. Region clicks preset
   the region filter; cluster clicks preset an exact market-ID scope.
 - Opening a market spotlights its globe marker: a full-layer vignette leaves a
   circular opening around the selection while dimming the rest of the globe.
+- Clicking map space outside every marker and continent region closes the
+  drawer and clears the selection; region hitboxes are intentionally smaller
+  than the visible landmasses so open ocean resolves to no region.
+- The drawer slides in on mount (`.drawer-enter` keyframes) and slides out on
+  close while staying mounted (`isDrawerClosing`), both over
+  `DRAWER_TRANSITION_MS` with the globe's easing — so the panel and the
+  globe's viewport glide stay synchronized instead of snapping apart.
 - `MarketProvider.tsx:145-230` enriches the catalogue from chain PDAs on mount,
   on a 30s interval, and on `terraform:market-state-changed` events.
 - `MarketDetails.tsx` renders `market.history` through `MarketChart`; the
@@ -135,10 +150,10 @@ only in code, env vars, and this doc.
   preview segment (`previewProb`); the forecast never rewrites history
   points. A transient "Odds moved ±X pts" message shows beside the chart
   delta for 15s after a confirmed trade.
-- `MarketProvider` keeps confirmed-trade points in an `optimisticRef` map and
-  re-applies them on top of every chain refresh (pools stay chain-owned);
-  `POST /api/index-transaction` is the durable path (snapshot + capped
-  embedded history + counters, idempotent per signature).
+- `MarketProvider` keeps confirmed-trade points and their SOL volume in an
+  `optimisticRef` map and re-applies them on top of every chain refresh (pools
+  stay chain-owned); `POST /api/index-transaction` is the durable path
+  (snapshot + capped embedded history + counters, idempotent per signature).
 
 ## API routes (`app/api/`)
 
@@ -296,9 +311,9 @@ forwards `--experimental-sqlite` to all npm scripts).
 ## Testing
 
 - `npm test` → `vitest run`, jsdom, `tests/setup.ts` shims. Includes
-  `tests/*.test.tsx` (account-dock, api-routes, globe-drawer, market-chart,
-  multi-select, portfolio-panel, prediction-form, store, tape, lifecycle,
-  market-history) +
+  `tests/*.test.tsx` (account-dock, api-routes, brand-assets, globe-drawer,
+  market-chart, market-provider, multi-select, portfolio-panel,
+  prediction-form, regions, store, tape, lifecycle, market-history) +
   co-located `lib/solana/*.test.ts` (accounts, encoding, errors,
   instructions). Store tests run against real in-memory SQLite (`:memory:`).
 - `tests/climate-market.ts` is Anchor integration — runs via
@@ -306,11 +321,14 @@ forwards `--experimental-sqlite` to all npm scripts).
 - `fixtureUserPositions` / `fixtureUserActivity` in `lib/markets/data.ts` are
   **test fixtures only** (`tests/api-routes.test.ts`) — the My Positions UI
   does not consume them, so the portfolio can appear empty with a fresh DB.
-- Region, cluster, search, filter, sort, magnifier, and portfolio drawer
-  flows are covered in `tests/globe-drawer.test.tsx`; multi-select dropdown
-  behavior is covered in `tests/multi-select.test.tsx`; opening-odds parsing
-  is covered in `tests/lifecycle.test.ts`. Bottom-left wallet and
-  position-count behavior is covered in `tests/account-dock.test.tsx`.
+- Region, cluster, search, filter, sort, magnifier, empty-map clicks, and
+  portfolio drawer flows are covered in `tests/globe-drawer.test.tsx`;
+  continent hit-testing is covered in `tests/regions.test.ts`; instant trade
+  volume is covered in `tests/market-provider.test.tsx`; multi-select
+  dropdown behavior is covered in `tests/multi-select.test.tsx`;
+  opening-odds parsing is covered in `tests/lifecycle.test.ts`. Bottom-left
+  wallet, position-count, and brand behavior is covered in
+  `tests/account-dock.test.tsx`.
 
 ## Conventions
 

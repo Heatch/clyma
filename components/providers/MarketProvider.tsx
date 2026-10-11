@@ -48,6 +48,7 @@ type MarketContextValue = {
   browseScopeIds: string[] | null
   browseResults: ClimateMarket[]
   isDrawerOpen: boolean
+  isDrawerClosing: boolean
   isPortfolioMode: boolean
   detailReturnView: "portfolio" | "browse" | null
   isLoading: boolean
@@ -67,18 +68,24 @@ type MarketContextValue = {
 
 const MarketContext = createContext<MarketContextValue | null>(null)
 const MARKET_REFRESH_EVENT = "terraform:market-state-changed"
+/**
+ * Drawer open/close animation length. The globe's viewport transition and
+ * the drawer's slide share this duration so both move together.
+ */
+export const DRAWER_TRANSITION_MS = 520
 
 interface OptimisticPoint {
   timestamp: string
   yesProbability: number
   noProbability: number
+  volume: number
 }
 
 /**
  * Re-applies confirmed-trade points on top of any market snapshot. Chain
  * refreshes rebuild state from the catalog (wiping in-flight points), so
- * this keeps the chart bent in-session. Pools and volumes are chain-owned
- * and intentionally untouched here — only history and headline odds.
+ * this keeps the chart bent in-session. Pools remain chain-owned; volume is
+ * indexed off-chain, so the trade's amount is included here as well.
  */
 function withOptimisticPoints(
   market: ClimateMarket,
@@ -97,11 +104,13 @@ function withOptimisticPoints(
     })),
   ]
   const last = points[points.length - 1]!
+  const optimisticVolume = points.reduce((sum, point) => sum + point.volume, 0)
   return {
     ...market,
     history,
     yesPrice: last.yesProbability,
     noPrice: last.noProbability,
+    totalVolume: market.totalVolume + optimisticVolume,
   }
 }
 
@@ -210,6 +219,11 @@ export function MarketProvider({
     useState<BrowseFilters>(freshBrowseFilters)
   const [browseScopeIds, setBrowseScopeIds] = useState<string[] | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [isDrawerClosing, setIsDrawerClosing] = useState(false)
+  // Mirrors the open/closing flags for use inside callbacks without stale
+  // closures. Every drawer state change below keeps this in sync.
+  const drawerStateRef = useRef({ open: false, closing: false })
+  const closeTimeoutRef = useRef<number | null>(null)
   const [isPortfolioMode, setIsPortfolioMode] = useState(false)
   const [detailReturnView, setDetailReturnView] = useState<
     "portfolio" | "browse" | null
@@ -229,10 +243,12 @@ export function MarketProvider({
     if (!programId) {
       if (requestId !== refreshRequestRef.current) return
       setMarkets(
-        marketCatalog.map((market) => ({
-          ...market,
-          chainState: "unconfigured" as const,
-        })),
+        marketCatalog.map((market) =>
+          withOptimisticPoints(
+            { ...market, chainState: "unconfigured" as const },
+            optimisticRef.current.get(market.id) ?? [],
+          ),
+        ),
       )
       return
     }
@@ -354,6 +370,7 @@ export function MarketProvider({
         timestamp: new Date().toISOString(),
         yesProbability: detail.yesProbabilityAfter,
         noProbability: detail.noProbabilityAfter,
+        volume: detail.amountSol,
       }
       const kept = [
         ...(optimisticRef.current.get(detail.marketId) ?? []),
@@ -442,6 +459,32 @@ export function MarketProvider({
     setBrowseScopeIds(null)
   }, [])
 
+  // Marks the drawer open, cancelling a slide-out exit in progress (e.g. a
+  // market clicked while the drawer was closing slides back in instead of
+  // unmounting).
+  const openDrawerState = useCallback(() => {
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current)
+      closeTimeoutRef.current = null
+    }
+    drawerStateRef.current = { open: true, closing: false }
+    setIsDrawerClosing(false)
+    setIsDrawerOpen(true)
+  }, [])
+
+  const finishCloseDrawer = useCallback(() => {
+    closeTimeoutRef.current = null
+    drawerStateRef.current = { open: false, closing: false }
+    setIsDrawerOpen(false)
+    setSelectedMarket(null)
+    setSelectedRegion(null)
+    setBrowseScopeIds(null)
+    setIsPortfolioMode(false)
+    setDetailReturnView(null)
+    setIsDrawerClosing(false)
+    resetBrowseFilters()
+  }, [resetBrowseFilters])
+
   const openBrowse = useCallback(
     ({ region, scopeIds }: { region?: string; scopeIds?: string[] }) => {
       setBrowseFilters((previous) => ({
@@ -456,9 +499,9 @@ export function MarketProvider({
       setSelectedRegion((previous) => region ?? (scopeIds ? null : previous))
       setIsPortfolioMode(false)
       setDetailReturnView("browse")
-      setIsDrawerOpen(true)
+      openDrawerState()
     },
-    [],
+    [openDrawerState],
   )
 
   const selectRegion = useCallback(
@@ -475,9 +518,9 @@ export function MarketProvider({
       setIsPortfolioMode(false)
       if (source !== "browse") setBrowseScopeIds(null)
       setDetailReturnView(source === "portfolio" ? "portfolio" : "browse")
-      setIsDrawerOpen(true)
+      openDrawerState()
     },
-    [],
+    [openDrawerState],
   )
 
   const selectCluster = useCallback(
@@ -494,26 +537,41 @@ export function MarketProvider({
       setIsPortfolioMode(false)
       setDetailReturnView("browse")
       if (options?.reset) resetBrowseFilters()
-      setIsDrawerOpen(true)
+      openDrawerState()
     },
-    [resetBrowseFilters],
+    [openDrawerState, resetBrowseFilters],
   )
   const showPortfolio = useCallback(() => {
     setSelectedMarket(null)
     setBrowseScopeIds(null)
     setIsPortfolioMode(true)
     setDetailReturnView(null)
-    setIsDrawerOpen(true)
-  }, [])
+    openDrawerState()
+  }, [openDrawerState])
   const closeDrawer = useCallback(() => {
-    setIsDrawerOpen(false)
-    setSelectedMarket(null)
-    setSelectedRegion(null)
-    setBrowseScopeIds(null)
-    setIsPortfolioMode(false)
-    setDetailReturnView(null)
-    resetBrowseFilters()
-  }, [resetBrowseFilters])
+    if (!drawerStateRef.current.open || drawerStateRef.current.closing) return
+    drawerStateRef.current = { open: true, closing: true }
+    setIsDrawerClosing(true)
+    if (
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      finishCloseDrawer()
+      return
+    }
+    closeTimeoutRef.current = window.setTimeout(
+      finishCloseDrawer,
+      DRAWER_TRANSITION_MS,
+    )
+  }, [finishCloseDrawer])
+
+  useEffect(() => {
+    const timeout = closeTimeoutRef
+    return () => {
+      if (timeout.current !== null) window.clearTimeout(timeout.current)
+    }
+  }, [])
 
   const value = useMemo<MarketContextValue>(
     () => ({
@@ -524,6 +582,7 @@ export function MarketProvider({
       browseScopeIds,
       browseResults,
       isDrawerOpen,
+      isDrawerClosing,
       isPortfolioMode,
       detailReturnView,
       isLoading,
@@ -546,6 +605,7 @@ export function MarketProvider({
       browseScopeIds,
       clearBrowseScope,
       closeDrawer,
+      isDrawerClosing,
       isDrawerOpen,
       isPortfolioMode,
       detailReturnView,
