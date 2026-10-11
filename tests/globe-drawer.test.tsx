@@ -724,4 +724,64 @@ describe("geographic market workflow", () => {
       "open",
     )
   })
+
+  it("shows the brand above the hero heading and fades the drawer seam with the drawer", async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MarketProvider initialMarkets={testMarkets}>
+        <GlobeLinkProvider>
+          <GlobeHero />
+          <RegionalMarketDrawer />
+        </GlobeLinkProvider>
+      </MarketProvider>,
+    )
+
+    // Tree-then-wordmark brand sits above the heading, top-left.
+    const mark = screen.getByTestId("brand-mark")
+    const heading = screen.getByRole("heading", {
+      name: "Forecast the world as it changes.",
+    })
+    expect(
+      mark.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    // Seam tracks the settled-open state on the same easing as the viewport.
+    const seam = screen.getByTestId("drawer-seam")
+    expect(seam).toHaveAttribute("data-state", "closed")
+    expect(seam.className).toMatch(/duration-\[520ms\]/)
+    expect(seam.className).toMatch(/ease-\[cubic-bezier\(0\.65,0,0\.35,1\)\]/)
+    // The hairline itself is decorative and never a click target — only the
+    // magnifier ring opens the drawer.
+    expect(seam.className).toMatch(/pointer-events-none/)
+    expect(seam).toHaveAttribute("aria-hidden", "true")
+    const ring = screen.getByRole("button", { name: /search markets/i })
+    expect(ring.className).toMatch(/rounded-full/)
+    expect(ring.className).toMatch(/border-2/)
+
+    await user.click(screen.getByRole("button", { name: /search markets/i }))
+    expect(screen.getByTestId("drawer-seam")).toHaveAttribute(
+      "data-state",
+      "open",
+    )
+    expect(screen.getByTestId("globe-viewport")).toHaveClass(
+      "md:right-[var(--drawer-width)]",
+    )
+
+    await user.click(
+      within(screen.getByTestId("market-drawer")).getByRole("button", {
+        name: "Close market panel",
+      }),
+    )
+    // Closing: viewport widens first while the panel slides out, and the
+    // seam fades back in on the same beat.
+    expect(screen.getByTestId("drawer-seam")).toHaveAttribute(
+      "data-state",
+      "closed",
+    )
+    expect(screen.getByTestId("globe-viewport")).not.toHaveClass(
+      "md:right-[var(--drawer-width)]",
+    )
+    await waitForElementToBeRemoved(() => screen.queryByTestId("market-drawer"))
+  })
 })

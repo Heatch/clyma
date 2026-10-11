@@ -255,7 +255,7 @@ export const marketListQuerySchema = z
     ),
     status: z.preprocess(emptyStringToUndefined, marketStatusSchema.optional()),
     featured: optionalBooleanQuerySchema,
-    limit: optionalIntegerQuerySchema(1, 100, 100),
+    limit: optionalIntegerQuerySchema(1, 1000, 100),
     offset: optionalIntegerQuerySchema(0, 10_000, 0),
   })
   .strict()

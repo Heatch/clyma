@@ -39,6 +39,26 @@ export function listMarketsByContinent(
   query?: Partial<StoreMarketListQuery>,
 ): { markets: Array<Record<string, unknown>>; total: number; limit: number; offset: number }
 export function updateMarketStatus(marketDocId: string, status: string, outcome?: string): void
+export function updateMarketPools(
+  marketDocId: string,
+  pools: {
+    yesPrice: number
+    noPrice: number
+    yesLiquidity: number
+    noLiquidity: number
+    totalVolume: number
+  },
+): void
+export function listOpenMarketPools(): Array<{
+  marketDocId: string
+  onchainMarketId: number
+  yesLiquidity: number
+  noLiquidity: number
+}>
+export function appendRecentTrades(
+  marketDocId: string,
+  trades: Array<Record<string, unknown>>,
+): void
 export function appendHistoryPoint(marketDocId: string, point: MarketHistoryPoint): void
 export function incrementActivity(
   marketDocId: string,

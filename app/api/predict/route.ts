@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { getForecast, INFERENCE_TIMEOUT_MS } from "@/lib/forecast"
+import {
+  buildPredictCacheKey,
+  checkPredictRateLimit,
+  getCachedForecast,
+  setCachedForecast,
+} from "@/lib/forecast/guards"
 
 /**
  * POST /api/predict
@@ -9,6 +15,12 @@ import { getForecast, INFERENCE_TIMEOUT_MS } from "@/lib/forecast"
  * validates the body, delegates inference to `lib/forecast`, and shapes the
  * response. The provider is never named in requests or responses.
  *
+ * Each paid inference is guarded twice: successful forecasts are cached by
+ * question text (15 min default), and callers are rate-limited per IP (20
+ * req/min default) — the globe hover prefetch hits this route on every
+ * marker hover, so without both a handful of visitors could burn real money.
+ * Both guards are in-memory (single instance); tune via env.
+ *
  * Body: { question: string, resolution_rules?: string, news_context?: string }
  */
 
@@ -16,6 +28,12 @@ interface PredictBody {
   question?: string
   resolution_rules?: string
   news_context?: string
+}
+
+function clientIp(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  const first = forwarded?.split(",")[0]?.trim()
+  return first || "unknown"
 }
 
 export async function POST(request: NextRequest) {
@@ -32,6 +50,26 @@ export async function POST(request: NextRequest) {
 
   const newsContext = body.news_context?.trim() || null
 
+  if (!checkPredictRateLimit(clientIp(request))) {
+    return NextResponse.json(
+      {
+        error: "rate_limited",
+        detail: "Too many forecast requests — try again in a minute",
+      },
+      { status: 429 },
+    )
+  }
+
+  const cacheKey = buildPredictCacheKey(
+    body.question,
+    body.resolution_rules,
+    newsContext,
+  )
+  const cached = getCachedForecast(cacheKey)
+  if (cached) {
+    return NextResponse.json({ ...cached, cached: true })
+  }
+
   try {
     const result = await getForecast({
       question: body.question,
@@ -39,13 +77,15 @@ export async function POST(request: NextRequest) {
       context: newsContext,
     })
 
-    return NextResponse.json({
+    const responseBody = {
       probability: result.probability,
       raw_output: result.rawOutput,
       forecaster: "model",
       format_valid: result.formatValid,
       news_context_used: newsContext,
-    })
+    }
+    setCachedForecast(cacheKey, responseBody)
+    return NextResponse.json({ ...responseBody, cached: false })
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes("BACKBOARD_API_KEY")) {
       return NextResponse.json(

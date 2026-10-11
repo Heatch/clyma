@@ -17,6 +17,8 @@ export type ApiErrorCode =
   | "REGION_NOT_FOUND"
   | "MARKET_ID_MISMATCH"
   | "DUPLICATE_SIGNATURE"
+  | "SERVICE_DISABLED"
+  | "RATE_LIMITED"
   | "INTERNAL_ERROR"
 
 export interface ApiErrorResponse {

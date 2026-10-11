@@ -76,7 +76,7 @@ components/
   trading/                    PredictionForm (buy), RedeemPosition (claim/refund)
   providers/                  SolanaProvider, MarketProvider, PositionProvider, GlobeLinkProvider
   layout/                     AccountDock (wallet + open-position count),
-                              BrandMark (Clyma wordmark + tree, bottom-right)
+                              BrandMark (tree + "Clyma" wordmark, top-left)
   wallet/ ui/                   connect button, balance, skeletons
 hooks/                        useMarketProgram (Anchor client)
 lib/
@@ -85,7 +85,7 @@ lib/
   db/                         store.mjs (+ .d.mts), types, init, repositories/
   auth/ geo/ utils/ validation/
 programs/climate_market/      Anchor Rust program (instructions, state, errors, events)
-scripts/                      lifecycle.mjs (seed/close/resolve/roll),
+scripts/                      lifecycle.mjs (seed/close/resolve/roll/boost),
                               preflight.mjs, lib/ (env, tape)
 tests/                        vitest suite (see Testing)
 ```
@@ -111,10 +111,16 @@ only in code, env vars, and this doc.
 - `app/page.tsx` is `force-dynamic`, queries SQLite, renders
   `<Dashboard initialMarkets>`. `Dashboard` renders the full-window globe,
   bottom-left `AccountDock`, and right-side drawer; there is no sidebar.
-- `GlobeHero` shows a two-line overview, a top-right search trigger, and the
-  `BrandMark` ("Clyma" then the tree) pinned to the empty bottom-right corner
-  while the drawer is closed. The globe always renders open markets and is
-  independent of drawer browsing.
+- `GlobeHero` shows the `BrandMark` (tree then "Clyma") above the two-line
+  overview, top-left, plus a top-right search trigger. The globe always
+  renders open markets and is independent of drawer browsing.
+- A desktop-only drawer seam (`data-testid="drawer-seam"`) runs a 1px
+  hairline down from the magnifier to the bottom edge — the seam the drawer
+  slides out from. It is decorative only (`aria-hidden`,
+  `pointer-events-none`); the magnifier itself is a thick-ringed button and
+  the sole click target there. The seam fades on the settled-open flag with
+  the same 520ms easing as the viewport glide and drawer slide, so all
+  three stay synchronized.
 - The globe canvas is a full-bleed surface sized to the section, so it is
   never reallocated when the drawer toggles; the drawer's viewport narrows via
   a CSS transition and the projection follows the viewport each frame. The
@@ -283,6 +289,12 @@ decision.
   the DB max, pool budget pro-rates). All support `--dry-run`. Builders and
   draw logic are unit-tested in `tests/lifecycle.test.ts` (module imports
   cleanly under vitest via a CLI-entry guard). See `docs/DEMO.md` runbook.
+- `scripts/lifecycle.mjs boost` — tops up EXISTING open-market pools to a
+  wide lognormal depth spread summing to `--target-total` (default 15), each
+  funded at its current YES ratio so odds never move; also repairs DB pools
+  that drifted from chain. Flags: `--min-depth` (default 0.02),
+  `--max-depth` (default 1.5), `--seed-tag`, `--dry-run`, `--force`.
+  Planner (`planBoostDepths`) is unit-tested in `tests/boost.test.ts`.
 - `scripts/lib/tape.mjs` — deterministic trade tape: seeded PRNG, genesis
   liquidity at model odds, mean-reverting sides with shock runs, exact integer
   lamport pools. Tested in `tests/tape.test.ts` (vitest imports the .mjs via
@@ -293,16 +305,22 @@ decision.
 
 ## Environment (`.env.example`)
 
-| Variable                     | Purpose                                                                |
-| ---------------------------- | ---------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SOLANA_NETWORK` | Must be `devnet`                                                       |
-| `NEXT_PUBLIC_SOLANA_RPC_URL` | Optional override; defaults to public Devnet                           |
-| `NEXT_PUBLIC_PROGRAM_ID`     | Program address; unset → trading blocked ("program is not configured") |
-| `SQLITE_PATH`                | App database file (default `./data/clyma.db`)                          |
-| `BACKBOARD_API_KEY`          | Backboard key for GPT Luna (generation + forecasts)                    |
-| `BACKBOARD_BASE_URL`         | Optional override (default `https://app.backboard.io/api`)             |
-| `BACKBOARD_LLM_PROVIDER`     | Optional override (default `openai`)                                   |
-| `LLM_MODEL`                  | Model id (default `gpt-5.6-luna`)                                      |
+| Variable                        | Purpose                                                                |
+| ------------------------------- | ---------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SOLANA_NETWORK`    | Must be `devnet`                                                       |
+| `NEXT_PUBLIC_SOLANA_RPC_URL`    | Dedicated Devnet RPC (Helius/QuickNode/Triton); public default 429s    |
+| `NEXT_PUBLIC_PROGRAM_ID`        | Program address; unset → trading blocked ("program is not configured") |
+| `NEXT_PUBLIC_APP_URL`           | Public base URL (set before `npm run build`; inlined at build time)    |
+| `APP_URL`                       | Server-only override for the app base URL (optional)                   |
+| `JWT_SECRET`                    | Required in production; server refuses to start without it             |
+| `ENABLE_MARKET_CREATE`          | `true` to enable `POST /api/markets/create` (disabled for launch)      |
+| `PREDICT_CACHE_TTL_MS`          | `/api/predict` cache TTL (default 900000)                              |
+| `PREDICT_RATE_LIMIT_PER_MINUTE` | `/api/predict` per-IP rate limit (default 20)                          |
+| `SQLITE_PATH`                   | App database file (default `./data/clyma.db`)                          |
+| `BACKBOARD_API_KEY`             | Backboard key for GPT Luna (generation + forecasts)                    |
+| `BACKBOARD_BASE_URL`            | Optional override (default `https://app.backboard.io/api`)             |
+| `BACKBOARD_LLM_PROVIDER`        | Optional override (default `openai`)                                   |
+| `LLM_MODEL`                     | Model id (default `gpt-5.6-luna`)                                      |
 
 Serving markets requires `BACKBOARD_API_KEY` (generation + forecasts). No DB
 server: SQLite file via `node:sqlite` (flag-gated on Node 22.5.x — `.npmrc`

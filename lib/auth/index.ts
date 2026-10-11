@@ -1,9 +1,27 @@
 import { SignJWT, jwtVerify } from "jose"
 import { NextResponse } from "next/server"
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "dev-secret-change-in-production",
-)
+/**
+ * Resolves the JWT signing secret. A missing `JWT_SECRET` is only tolerated
+ * outside production (dev/test); in production the module throws at import
+ * time so the server fails fast instead of accepting forgeable tokens.
+ * Exported for unit tests — pass an explicit env object.
+ */
+export function resolveJwtSecretValue(
+  env: Partial<Pick<NodeJS.ProcessEnv, "JWT_SECRET" | "NODE_ENV">> =
+    process.env,
+): string {
+  const configured = env.JWT_SECRET?.trim()
+  if (configured) return configured
+  if (env.NODE_ENV === "production") {
+    throw new Error(
+      "JWT_SECRET must be set in production — refusing to sign or verify tokens with the insecure dev fallback.",
+    )
+  }
+  return "dev-secret-change-in-production"
+}
+
+const JWT_SECRET = new TextEncoder().encode(resolveJwtSecretValue())
 const JWT_ISSUER = "climate-prediction-market"
 const JWT_AUDIENCE = "climate-prediction-market-app"
 const JWT_EXPIRATION = "7d"

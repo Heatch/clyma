@@ -3,19 +3,16 @@
 import Image from "next/image"
 
 /**
- * Clyma wordmark + tree, pinned to the empty bottom-right corner of the
- * globe. Hidden while the drawer covers that corner.
+ * Clyma tree + wordmark, in that order. Positioned by the parent — currently
+ * above the hero heading, top-left.
  */
 export default function BrandMark() {
   return (
     <div
-      className="pointer-events-none absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-30 flex items-center gap-3 sm:right-6"
+      className="flex items-center gap-3"
       aria-label="Clyma"
       data-testid="brand-mark"
     >
-      <span className="text-2xl font-semibold tracking-[-0.02em] text-white">
-        Clyma
-      </span>
       <Image
         src="/clyma-logo-shadow.svg"
         alt=""
@@ -24,6 +21,9 @@ export default function BrandMark() {
         height={46}
         className="h-12 w-auto"
       />
+      <span className="text-2xl font-semibold tracking-[-0.02em] text-white">
+        Clyma
+      </span>
     </div>
   )
 }

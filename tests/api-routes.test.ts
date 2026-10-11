@@ -54,7 +54,8 @@ vi.mock("@/lib/db/repositories/transactions", () => ({
   insertTransaction: dbMocks.insertTransaction,
 }))
 
-const RESOLUTION_SIGNATURE = "aqcDTRNkJKwcprcwLbCSkXWyUKBXGmYA63iJrEwksaXg5zte76RQ6b2HEXNJp4QQ1tpqWVXaYGtYu2F9mjDuTRM"
+const RESOLUTION_SIGNATURE =
+  "aqcDTRNkJKwcprcwLbCSkXWyUKBXGmYA63iJrEwksaXg5zte76RQ6b2HEXNJp4QQ1tpqWVXaYGtYu2F9mjDuTRM"
 
 interface ErrorBody {
   error: { code: string; message: string }
@@ -149,7 +150,7 @@ describe("market API routes", () => {
 
   it("returns structured validation errors", async () => {
     const response = await getMarkets(
-      new Request("http://localhost/api/markets?limit=1000"),
+      new Request("http://localhost/api/markets?limit=1001"),
     )
     const body = (await response.json()) as ErrorBody
 
@@ -157,6 +158,16 @@ describe("market API routes", () => {
     expect(body.error.code).toBe("VALIDATION_ERROR")
     expect(body.meta.network).toBe("devnet")
     expect(dbMocks.queryMarkets).not.toHaveBeenCalled()
+  })
+
+  it("accepts catalogue-sized limits so listings are never truncated", async () => {
+    const response = await getMarkets(
+      new Request("http://localhost/api/markets?limit=1000"),
+    )
+    expect(response.status).toBe(200)
+    expect(dbMocks.queryMarkets).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 1000 }),
+    )
   })
 
   it("gets a market by slug and returns a typed not-found response", async () => {

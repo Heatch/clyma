@@ -40,4 +40,48 @@ export function modelOddsOf(doc: {
   history?: Array<{ yesProbability?: number }>
 }): number
 
+export interface BoostPlanMarket {
+  marketDocId: string
+  onchainMarketId: number
+  curYesSol: number
+  curNoSol: number
+  dbTotalSol: number
+}
+
+export interface BoostPlanEntry extends BoostPlanMarket {
+  curYes: number
+  curNo: number
+  curTotal: number
+  targetYes: number
+  targetNo: number
+  targetTotal: number
+  addYes: number
+  addNo: number
+  addTotal: number
+}
+
+export function planBoostDepths(
+  markets: BoostPlanMarket[],
+  opts: {
+    targetTotalSol: number
+    minDepthSol: number
+    maxDepthSol: number
+    seedTag: string
+  },
+): BoostPlanEntry[]
+
+export function decodeMarketPools(
+  info:
+    | {
+        data: Buffer
+      }
+    | null
+    | undefined,
+): {
+  yes: number
+  no: number
+  total: number
+  status: number
+} | null
+
 export function __useProgramIdForTests(publicKey: PublicKey): void

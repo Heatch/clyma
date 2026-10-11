@@ -1,6 +1,5 @@
-// scripts/lifecycle.mjs — market lifecycle operations.
-//
-// Currently implements `seed`; `close` / `resolve` / `roll` arrive in Batch 5.
+// scripts/lifecycle.mjs — market lifecycle operations:
+// seed | close | resolve | roll | boost.
 //
 //   node scripts/lifecycle.mjs seed [--markets 100] [--budget 6.5]
 //     [--base-id 3001] [--fixture-file PATH] [--reset]
@@ -45,17 +44,22 @@ import { fileURLToPath } from "node:url"
 import { loadEnv, requireProgramId, resolveRpcUrl } from "./lib/env.mjs"
 import { buildTape, LAMPORTS_PER_SOL } from "./lib/tape.mjs"
 import {
+  appendHistoryPoint,
+  appendRecentTrades,
   countOpenMarkets,
   dueToClose,
   dueToResolve,
+  insertPriceSnapshot,
   insertResolution,
   insertTransaction,
+  listOpenMarketPools,
   maxOnchainMarketId,
   replaceCreationSnapshots,
   replaceHistory,
   resetMarketData,
   seedParticipants,
   settlePositionsByMarket,
+  updateMarketPools,
   updateMarketStatus,
   upsertMarket,
 } from "../lib/db/store.mjs"
@@ -78,6 +82,10 @@ function parseArgs(argv) {
     skipDb: false,
     dryRun: false,
     force: false,
+    targetTotal: 15,
+    minDepth: 0.02,
+    maxDepth: 1.5,
+    boostSeed: "boost",
   }
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i]
@@ -91,9 +99,12 @@ function parseArgs(argv) {
     else if (a === "--budget") {
       args.budget = Number(argv[++i])
       args.budgetExplicit = true
-    }
-    else if (a === "--base-id") args.baseId = Number(argv[++i])
+    } else if (a === "--base-id") args.baseId = Number(argv[++i])
     else if (a === "--fixture-file") args.fixtureFile = argv[++i]
+    else if (a === "--target-total") args.targetTotal = Number(argv[++i])
+    else if (a === "--min-depth") args.minDepth = Number(argv[++i])
+    else if (a === "--max-depth") args.maxDepth = Number(argv[++i])
+    else if (a === "--seed-tag") args.boostSeed = argv[++i]
     else {
       console.error(`Unknown flag: ${a}`)
       process.exit(1)
@@ -122,14 +133,29 @@ const GENERATION_TIMEOUT_MS = 600_000
 const GENERATION_BATCH_MAX = 40
 
 const MARKET_CATEGORIES = [
-  "hurricane", "drought", "temperature", "rainfall",
-  "crop-yield", "wildfire", "flooding", "other",
+  "hurricane",
+  "drought",
+  "temperature",
+  "rainfall",
+  "crop-yield",
+  "wildfire",
+  "flooding",
+  "other",
 ]
 const MARKET_CONTINENTS = [
-  "North America", "South America", "Europe", "Africa", "Asia", "Oceania",
+  "North America",
+  "South America",
+  "Europe",
+  "Africa",
+  "Asia",
+  "Oceania",
 ]
 const EVIDENCE_KINDS = [
-  "forecast", "observation", "methodology", "resolution-source", "background",
+  "forecast",
+  "observation",
+  "methodology",
+  "resolution-source",
+  "background",
 ]
 
 const LUNA_MODEL = process.env.LLM_MODEL?.trim() || "gpt-5.6-luna"
@@ -169,8 +195,11 @@ function round(v, places = 2) {
 }
 function slugify(input) {
   return (
-    input.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) ||
-    "market"
+    input
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "market"
   )
 }
 
@@ -261,7 +290,13 @@ function validateRaw(raw) {
   const region = raw.region?.trim()
   const resolutionSource = raw.resolutionSource?.trim()
   const resolutionRules = raw.resolutionRules?.trim()
-  if (!question || !description || !region || !resolutionSource || !resolutionRules) {
+  if (
+    !question ||
+    !description ||
+    !region ||
+    !resolutionSource ||
+    !resolutionRules
+  ) {
     return null
   }
   const latitude = Number(raw.latitude)
@@ -281,7 +316,12 @@ function validateRaw(raw) {
   const list = Array.isArray(raw.evidence) ? raw.evidence : []
   for (const ev of list) {
     const url = normalizeUrl(ev?.url)
-    if (!url || !ev?.title?.trim() || !ev?.summary?.trim() || !ev?.publisher?.trim()) {
+    if (
+      !url ||
+      !ev?.title?.trim() ||
+      !ev?.summary?.trim() ||
+      !ev?.publisher?.trim()
+    ) {
       continue
     }
     evidence.push({
@@ -330,7 +370,11 @@ async function loadDefinitions(args) {
   }
   const valid = []
   const seen = new Set()
-  const batchMax = clamp(Math.round(args.batchSize || 25), 1, GENERATION_BATCH_MAX)
+  const batchMax = clamp(
+    Math.round(args.batchSize || 25),
+    1,
+    GENERATION_BATCH_MAX,
+  )
   for (let round = 0; valid.length < args.markets && round < 6; round++) {
     const need = Math.min(batchMax, args.markets - valid.length)
     console.log(
@@ -369,7 +413,14 @@ async function loadDefinitions(args) {
 // Market assembly (definition + tape -> seedable market)
 // ---------------------------------------------------------------------------
 
-function assembleMarket(def, globalIndex, onchainMarketId, depthSol, resolver, now) {
+function assembleMarket(
+  def,
+  globalIndex,
+  onchainMarketId,
+  depthSol,
+  resolver,
+  now,
+) {
   const id = `market-${slugify(def.question)}-${globalIndex}`.slice(0, 110)
   const slug = `${slugify(def.question)}-${globalIndex}`.slice(0, 110)
   const tape = buildTape({
@@ -382,7 +433,9 @@ function assembleMarket(def, globalIndex, onchainMarketId, depthSol, resolver, n
   const no = tape.pools.noLamports / LAMPORTS_PER_SOL
   const price = tape.pools.yesLamports / tape.pools.totalLamports
   const closeTime = new Date(now + def.closeDays * DAY_MS).toISOString()
-  const resolutionTime = new Date(now + (def.closeDays + 14) * DAY_MS).toISOString()
+  const resolutionTime = new Date(
+    now + (def.closeDays + 14) * DAY_MS,
+  ).toISOString()
   const evidence = def.evidence.map((ev, ei) => ({
     id: `${id}-evidence-${ei}`,
     ...ev,
@@ -454,16 +507,24 @@ function deriveProtocol() {
 function deriveMarket(marketId) {
   const idBuf = Buffer.alloc(8)
   idBuf.writeBigUInt64LE(BigInt(marketId))
-  const market = PublicKey.findProgramAddressSync([MARKET_SEED, idBuf], PROGRAM_ID)[0]
-  const vault = PublicKey.findProgramAddressSync([VAULT_SEED, market.toBuffer()], PROGRAM_ID)[0]
+  const market = PublicKey.findProgramAddressSync(
+    [MARKET_SEED, idBuf],
+    PROGRAM_ID,
+  )[0]
+  const vault = PublicKey.findProgramAddressSync(
+    [VAULT_SEED, market.toBuffer()],
+    PROGRAM_ID,
+  )[0]
   return { market, vault }
 }
 function derivePositions(marketPda, ownerPubkey) {
   const yesPosition = PublicKey.findProgramAddressSync(
-    [YES_POSITION_SEED, marketPda.toBuffer(), ownerPubkey.toBuffer()], PROGRAM_ID,
+    [YES_POSITION_SEED, marketPda.toBuffer(), ownerPubkey.toBuffer()],
+    PROGRAM_ID,
   )[0]
   const noPosition = PublicKey.findProgramAddressSync(
-    [NO_POSITION_SEED, marketPda.toBuffer(), ownerPubkey.toBuffer()], PROGRAM_ID,
+    [NO_POSITION_SEED, marketPda.toBuffer(), ownerPubkey.toBuffer()],
+    PROGRAM_ID,
   )[0]
   return { yesPosition, noPosition }
 }
@@ -478,10 +539,22 @@ function buildInitProtocol(protocol, authority, resolver) {
       { pubkey: authority, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.concat([instructionDiscriminator("initialize_protocol"), resolver.toBuffer()]),
+    data: Buffer.concat([
+      instructionDiscriminator("initialize_protocol"),
+      resolver.toBuffer(),
+    ]),
   }
 }
-function buildCreateMarket(protocol, authority, market, vault, marketId, questionHash, closeTs, resolutionTs) {
+function buildCreateMarket(
+  protocol,
+  authority,
+  market,
+  vault,
+  marketId,
+  questionHash,
+  closeTs,
+  resolutionTs,
+) {
   const idBuf = Buffer.alloc(8)
   idBuf.writeBigUInt64LE(BigInt(marketId))
   const closeBuf = Buffer.alloc(8)
@@ -498,11 +571,24 @@ function buildCreateMarket(protocol, authority, market, vault, marketId, questio
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: Buffer.concat([
-      instructionDiscriminator("create_market"), idBuf, Buffer.from(questionHash), closeBuf, resBuf,
+      instructionDiscriminator("create_market"),
+      idBuf,
+      Buffer.from(questionHash),
+      closeBuf,
+      resBuf,
     ]),
   }
 }
-function buildFundMarket(protocol, market, vault, yesPos, noPos, funder, yesAmt, noAmt) {
+function buildFundMarket(
+  protocol,
+  market,
+  vault,
+  yesPos,
+  noPos,
+  funder,
+  yesAmt,
+  noAmt,
+) {
   const yesBuf = Buffer.alloc(8)
   yesBuf.writeBigUInt64LE(BigInt(yesAmt))
   const noBuf = Buffer.alloc(8)
@@ -518,7 +604,11 @@ function buildFundMarket(protocol, market, vault, yesPos, noPos, funder, yesAmt,
       { pubkey: funder, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.concat([instructionDiscriminator("fund_market"), yesBuf, noBuf]),
+    data: Buffer.concat([
+      instructionDiscriminator("fund_market"),
+      yesBuf,
+      noBuf,
+    ]),
   }
 }
 async function sendTxn(tx, signer) {
@@ -636,7 +726,10 @@ function assembleAll(defs, { baseId, budgetTotal, resolver, now }) {
     const depthSol = clamp(meanDepth * (0.4 + 1.2 * u), 0.015, 0.2)
     return assembleMarket(def, i, baseId + i, depthSol, resolver, now)
   })
-  const fundingTotal = markets.reduce((a, m) => a + m.tape.pools.totalLamports, 0)
+  const fundingTotal = markets.reduce(
+    (a, m) => a + m.tape.pools.totalLamports,
+    0,
+  )
   return { markets, fundingTotal }
 }
 
@@ -645,10 +738,14 @@ function assembleAll(defs, { baseId, budgetTotal, resolver, now }) {
  * protocol rent when uninitialized + fee buffer. Read-only.
  */
 async function checkBudget(markets, fundingTotal) {
-  const addresses = markets.map((m) => deriveMarket(m.doc.onchainMarketId).market)
+  const addresses = markets.map(
+    (m) => deriveMarket(m.doc.onchainMarketId).market,
+  )
   const infos = []
   for (let i = 0; i < addresses.length; i += 100) {
-    infos.push(...(await getMultipleAccountsWithRetry(addresses.slice(i, i + 100))))
+    infos.push(
+      ...(await getMultipleAccountsWithRetry(addresses.slice(i, i + 100))),
+    )
   }
   const newCount = infos.filter((info) => !info).length
   const [rentMarket, rentVault] = await Promise.all([
@@ -659,7 +756,8 @@ async function checkBudget(markets, fundingTotal) {
   const protocolPda = deriveProtocol()
   const protocolMissing = !(await connection.getAccountInfo(protocolPda))
   if (protocolMissing) {
-    rentTotal += await connection.getMinimumBalanceForRentExemption(PROTOCOL_SPACE)
+    rentTotal +=
+      await connection.getMinimumBalanceForRentExemption(PROTOCOL_SPACE)
   }
   return { newCount, rentTotal, fundingTotal, protocolMissing }
 }
@@ -695,10 +793,14 @@ async function fundAndIndex(markets, { wallet, indexDb, reset }) {
   // one per market (public Devnet RPC rate-limits hard on sequential reads).
   let existingIds = new Set()
   if (wallet) {
-    const addresses = markets.map((m) => deriveMarket(m.doc.onchainMarketId).market)
+    const addresses = markets.map(
+      (m) => deriveMarket(m.doc.onchainMarketId).market,
+    )
     const infos = []
     for (let i = 0; i < addresses.length; i += 100) {
-      infos.push(...(await getMultipleAccountsWithRetry(addresses.slice(i, i + 100))))
+      infos.push(
+        ...(await getMultipleAccountsWithRetry(addresses.slice(i, i + 100))),
+      )
     }
     existingIds = new Set(
       markets.filter((_, i) => infos[i]).map((m) => m.doc.onchainMarketId),
@@ -707,7 +809,9 @@ async function fundAndIndex(markets, { wallet, indexDb, reset }) {
     if (!(await connection.getAccountInfo(protocolPda))) {
       console.log("Initializing protocol...")
       await sendTxn(
-        new Transaction().add(buildInitProtocol(protocolPda, wallet.publicKey, wallet.publicKey)),
+        new Transaction().add(
+          buildInitProtocol(protocolPda, wallet.publicKey, wallet.publicKey),
+        ),
         wallet,
       )
       await sleep(1500)
@@ -723,15 +827,29 @@ async function fundAndIndex(markets, { wallet, indexDb, reset }) {
       const qHash = createHash("sha256").update(m.doc.question).digest()
       const closeTs = Math.floor(Date.parse(m.doc.closeTime) / 1000)
       const resTs = Math.floor(Date.parse(m.doc.resolutionTime) / 1000)
-      console.log(`  [${m.doc.onchainMarketId}] creating: ${m.doc.question.slice(0, 70)}...`)
+      console.log(
+        `  [${m.doc.onchainMarketId}] creating: ${m.doc.question.slice(0, 70)}...`,
+      )
       await sendTxn(
         new Transaction().add(
-          buildCreateMarket(protocolPda, wallet.publicKey, market, vault, m.doc.onchainMarketId, qHash, closeTs, resTs),
+          buildCreateMarket(
+            protocolPda,
+            wallet.publicKey,
+            market,
+            vault,
+            m.doc.onchainMarketId,
+            qHash,
+            closeTs,
+            resTs,
+          ),
         ),
         wallet,
       )
       await sleep(1500)
-      const { yesPosition, noPosition } = derivePositions(market, wallet.publicKey)
+      const { yesPosition, noPosition } = derivePositions(
+        market,
+        wallet.publicKey,
+      )
       console.log(
         `  [${m.doc.onchainMarketId}] funding ${(m.tape.pools.yesLamports / LAMPORTS_PER_SOL).toFixed(4)} / ` +
           `${(m.tape.pools.noLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`,
@@ -739,8 +857,14 @@ async function fundAndIndex(markets, { wallet, indexDb, reset }) {
       await sendTxn(
         new Transaction().add(
           buildFundMarket(
-            protocolPda, market, vault, yesPosition, noPosition, wallet.publicKey,
-            m.tape.pools.yesLamports, m.tape.pools.noLamports,
+            protocolPda,
+            market,
+            vault,
+            yesPosition,
+            noPosition,
+            wallet.publicKey,
+            m.tape.pools.yesLamports,
+            m.tape.pools.noLamports,
           ),
         ),
         wallet,
@@ -758,20 +882,37 @@ async function fundAndIndex(markets, { wallet, indexDb, reset }) {
     for (const m of markets) {
       const d = m.doc
       upsertMarket({
-        marketId: d.id, onchainMarketId: d.onchainMarketId,
-        title: d.question, question: d.question, description: d.description, slug: d.slug,
-        category: d.category, continent: d.continent, country: d.country ?? null, region: d.region,
-        latitude: d.latitude, longitude: d.longitude,
-        resolutionSource: d.resolutionSource, resolutionSourceUrl: d.resolutionSourceUrl,
+        marketId: d.id,
+        onchainMarketId: d.onchainMarketId,
+        title: d.question,
+        question: d.question,
+        description: d.description,
+        slug: d.slug,
+        category: d.category,
+        continent: d.continent,
+        country: d.country ?? null,
+        region: d.region,
+        latitude: d.latitude,
+        longitude: d.longitude,
+        resolutionSource: d.resolutionSource,
+        resolutionSourceUrl: d.resolutionSourceUrl,
         resolutionRules: d.resolutionRules,
-        status: d.status, outcome: d.outcome,
-        yesPrice: d.yesPrice, noPrice: d.noPrice,
-        yesLiquidity: d.yesLiquidity, noLiquidity: d.noLiquidity,
-        totalVolume: d.totalVolume, participants: d.participants,
-        featured: d.featured, trendingScore: d.trendingScore,
+        status: d.status,
+        outcome: d.outcome,
+        yesPrice: d.yesPrice,
+        noPrice: d.noPrice,
+        yesLiquidity: d.yesLiquidity,
+        noLiquidity: d.noLiquidity,
+        totalVolume: d.totalVolume,
+        participants: d.participants,
+        featured: d.featured,
+        trendingScore: d.trendingScore,
         resolver: d.resolver,
-        evidence: d.evidence, recentTrades: d.recentTrades,
-        createdAt: d.createdAt, closeTime: d.closeTime, resolutionTime: d.resolutionTime,
+        evidence: d.evidence,
+        recentTrades: d.recentTrades,
+        createdAt: d.createdAt,
+        closeTime: d.closeTime,
+        resolutionTime: d.resolutionTime,
       })
       replaceHistory(d.id, d.history)
       seedParticipants(d.id, [...new Set(m.tape.trades.map((t) => t.wallet))])
@@ -791,7 +932,9 @@ async function closeDueMarkets(wallet, dry = false) {
   const due = dueToClose(now)
   if (dry) {
     for (const doc of due) {
-      console.log(`  would close ${doc.onchain_market_id}: ${doc.question?.slice(0, 60)}...`)
+      console.log(
+        `  would close ${doc.onchain_market_id}: ${doc.question?.slice(0, 60)}...`,
+      )
     }
     return { closed: [], failed: [] }
   }
@@ -812,7 +955,9 @@ async function closeDueMarkets(wallet, dry = false) {
       }
       updateMarketStatus(doc.market_id, "closed")
       closed.push(doc.market_id)
-      console.log(`  closed ${doc.onchain_market_id}: ${doc.question?.slice(0, 60)}...`)
+      console.log(
+        `  closed ${doc.onchain_market_id}: ${doc.question?.slice(0, 60)}...`,
+      )
     } catch (err) {
       failed.push(doc.market_id)
       console.error(`  CLOSE FAILED ${doc.onchain_market_id}: ${err.message}`)
@@ -833,7 +978,9 @@ async function resolveDueMarkets(wallet, dry = false) {
   if (dry) {
     for (const doc of due) {
       const outcome = resolveDraw(doc.marketId, modelOddsOf(doc))
-      console.log(`  would resolve ${doc.onchainMarketId} -> ${outcome.toUpperCase()}`)
+      console.log(
+        `  would resolve ${doc.onchainMarketId} -> ${outcome.toUpperCase()}`,
+      )
     }
     return { resolved: [], failed: [] }
   }
@@ -898,14 +1045,20 @@ async function seed(args) {
 
   // --- Phase 1: definitions ---
   const defs = await loadDefinitions(args)
-  const count = args.fixtureFile ? defs.length : Math.min(defs.length, args.markets)
+  const count = args.fixtureFile
+    ? defs.length
+    : Math.min(defs.length, args.markets)
   const chosen = defs.slice(0, count)
 
   // Save validated definitions for offline replay.
   const defsDir = join(tmpdir(), "clyma")
   await mkdir(defsDir, { recursive: true })
   const defsPath = join(defsDir, `seed-definitions-${Date.now()}.json`)
-  await writeFile(defsPath, JSON.stringify({ markets: chosen }, null, 2), "utf-8")
+  await writeFile(
+    defsPath,
+    JSON.stringify({ markets: chosen }, null, 2),
+    "utf-8",
+  )
   console.log(`Definitions saved to ${defsPath} (replay with --fixture-file)`)
 
   // --- Phase 2: tapes + assembly ---
@@ -913,7 +1066,9 @@ async function seed(args) {
   const { markets, fundingTotal } = assembleAll(chosen, {
     baseId: args.baseId,
     budgetTotal: args.budget,
-    resolver: wallet ? wallet.publicKey.toBase58() : "11111111111111111111111111111111",
+    resolver: wallet
+      ? wallet.publicKey.toBase58()
+      : "11111111111111111111111111111111",
     now,
   })
   console.log(
@@ -1009,7 +1164,9 @@ async function rollCommand(args) {
 
   const openCount = countOpenMarkets()
   const needed = target - openCount
-  console.log(`Open markets: ${openCount}, target: ${target}, needed: ${Math.max(0, needed)}`)
+  console.log(
+    `Open markets: ${openCount}, target: ${target}, needed: ${Math.max(0, needed)}`,
+  )
   if (needed <= 0) {
     console.log("Nothing to top up.")
     return
@@ -1019,7 +1176,9 @@ async function rollCommand(args) {
   const defs = await loadDefinitions({ ...args, markets: needed })
   const chosen = defs.slice(0, needed)
   if (chosen.length < needed) {
-    console.warn(`Only ${chosen.length} definitions for ${needed} needed — proceeding`)
+    console.warn(
+      `Only ${chosen.length} definitions for ${needed} needed — proceeding`,
+    )
   }
   if (chosen.length === 0) {
     console.error("No definitions to top up with")
@@ -1061,6 +1220,378 @@ async function rollCommand(args) {
 }
 
 // ---------------------------------------------------------------------------
+// boost: top up existing pools to a wide depth spread (chain + DB)
+// ---------------------------------------------------------------------------
+
+const BOOST_SIGMA = 1.2
+const BOOST_DRIFT_TOL_SOL = 0.0006
+
+// programs/climate_market/src/state.rs Market layout: discriminator 8,
+// protocol/authority/resolver 32x3, market_id u64, question_hash 32,
+// close/resolution i64 x2, status u8 @160, outcome u8 @161,
+// total_yes u64 @162, total_no u64 @170, total_pool u64 @178.
+const POOL_YES_OFFSET = 162
+const POOL_NO_OFFSET = 170
+const POOL_TOTAL_OFFSET = 178
+const POOL_MIN_BYTES = 186
+/** MarketStatus::Open discriminant. */
+const MARKET_STATUS_OPEN = 0
+
+function decodeMarketPools(info) {
+  if (!info) return null
+  const d = info.data
+  if (!d || d.length < POOL_MIN_BYTES) return null
+  return {
+    yes: Number(d.readBigUInt64LE(POOL_YES_OFFSET)) / LAMPORTS_PER_SOL,
+    no: Number(d.readBigUInt64LE(POOL_NO_OFFSET)) / LAMPORTS_PER_SOL,
+    total: Number(d.readBigUInt64LE(POOL_TOTAL_OFFSET)) / LAMPORTS_PER_SOL,
+    status: d[160],
+  }
+}
+
+/** Sum of 3 unit uniforms, recentered: approx Normal(0, 1). */
+function normalFromUniforms(seedTag, key) {
+  const sum =
+    unitUniform(`${seedTag}|${key}|a`) +
+    unitUniform(`${seedTag}|${key}|b`) +
+    unitUniform(`${seedTag}|${key}|c`)
+  return (sum - 1.5) * 2
+}
+
+/**
+ * Plan per-market pool targets summing to `targetTotalSol` (pure).
+ *
+ * Depths are lognormal (median ~= the mean market depth), clamped to
+ * [minDepthSol, maxDepthSol], then scaled so the targets sum exactly to the
+ * total. Each target is split at the market's CURRENT yes ratio, so funding
+ * the delta never moves the odds. Markets already at/above target get no
+ * funding (addTotal 0). Deterministic per seedTag + onchain ids.
+ */
+function planBoostDepths(
+  markets,
+  { targetTotalSol, minDepthSol, maxDepthSol, seedTag },
+) {
+  // Funding is one-sided (pools only grow), so raw targets summing to the
+  // total would overshoot by the surplus of markets already above target.
+  // Solve for the smaller input total whose FUNDED result lands on target
+  // (binary search; the funded final is monotonic in the input total).
+  const targetLamports = Math.round(targetTotalSol * LAMPORTS_PER_SOL)
+  const chainLamports = markets.reduce(
+    (a, m) =>
+      a +
+      Math.round(m.curYesSol * LAMPORTS_PER_SOL) +
+      Math.round(m.curNoSol * LAMPORTS_PER_SOL),
+    0,
+  )
+  const planWith = (inputTotalSol) =>
+    planBoostRaw(markets, {
+      targetTotalSol: inputTotalSol,
+      minDepthSol,
+      maxDepthSol,
+      seedTag,
+    })
+  const fundedFinal = (inputTotalSol) =>
+    chainLamports + planWith(inputTotalSol).reduce((a, p) => a + p.addTotal, 0)
+  if (chainLamports >= targetLamports) return planWith(targetTotalSol)
+  let lo = 0
+  let hi = targetTotalSol
+  for (let i = 0; i < 25; i++) {
+    const mid = (lo + hi) / 2
+    if (fundedFinal(mid) < targetLamports) lo = mid
+    else hi = mid
+  }
+  return planWith(hi)
+}
+
+function planBoostRaw(
+  markets,
+  { targetTotalSol, minDepthSol, maxDepthSol, seedTag },
+) {
+  const mean = targetTotalSol / markets.length
+  const mu = Math.log(mean) - (BOOST_SIGMA * BOOST_SIGMA) / 2
+  const raw = markets.map((m) => {
+    const depth = Math.exp(
+      mu + BOOST_SIGMA * normalFromUniforms(seedTag, m.onchainMarketId),
+    )
+    return Math.min(maxDepthSol, Math.max(minDepthSol, depth))
+  })
+  const rawSum = raw.reduce((a, b) => a + b, 0)
+  const scale = targetTotalSol / rawSum
+  return markets.map((m, i) => {
+    const curYes = Math.round(m.curYesSol * LAMPORTS_PER_SOL)
+    const curNo = Math.round(m.curNoSol * LAMPORTS_PER_SOL)
+    const curTotal = curYes + curNo
+    const targetTotal = Math.round(raw[i] * scale * LAMPORTS_PER_SOL)
+    const yesRatio = curTotal > 0 ? curYes / curTotal : 0.5
+    const targetYes = Math.round(targetTotal * yesRatio)
+    const targetNo = targetTotal - targetYes
+    const addYes = Math.max(0, targetYes - curYes)
+    const addNo = Math.max(0, targetNo - curNo)
+    return {
+      ...m,
+      curYes,
+      curNo,
+      curTotal,
+      targetYes,
+      targetNo,
+      targetTotal,
+      addYes,
+      addNo,
+      addTotal: addYes + addNo,
+    }
+  })
+}
+
+async function boostCommand(args) {
+  loadEnv()
+  PROGRAM_ID = requireProgramId()
+  connection = new Connection(resolveRpcUrl(), "confirmed")
+  const wallet = loadWallet(true)
+  const funder = wallet.publicKey.toBase58()
+
+  const { targetTotal, minDepth, maxDepth, boostSeed } = args
+
+  // --- Step 1: chain pools (source of truth) + DB rows ---
+  const dbRows = listOpenMarketPools()
+  if (dbRows.length === 0) {
+    console.error("No open markets in the DB — nothing to boost")
+    process.exit(1)
+  }
+  console.log(`Reading chain pools for ${dbRows.length} open markets...`)
+  const addresses = dbRows.map((r) => deriveMarket(r.onchainMarketId).market)
+  const infos = []
+  for (let i = 0; i < addresses.length; i += 100) {
+    infos.push(
+      ...(await getMultipleAccountsWithRetry(addresses.slice(i, i + 100))),
+    )
+  }
+  const markets = []
+  dbRows.forEach((row, i) => {
+    const decoded = decodeMarketPools(infos[i])
+    if (!decoded) {
+      console.log(`  [${row.onchainMarketId}] missing on-chain, skipping`)
+      return
+    }
+    if (decoded.status !== MARKET_STATUS_OPEN) {
+      console.log(
+        `  [${row.onchainMarketId}] on-chain status=${decoded.status}, skipping`,
+      )
+      return
+    }
+    markets.push({
+      marketDocId: row.marketDocId,
+      onchainMarketId: row.onchainMarketId,
+      curYesSol: decoded.yes,
+      curNoSol: decoded.no,
+      dbTotalSol: (row.yesLiquidity ?? 0) + (row.noLiquidity ?? 0),
+    })
+  })
+  if (markets.length === 0) {
+    console.error("No fundable markets found on-chain")
+    process.exit(1)
+  }
+
+  // --- Step 2: plan ---
+  const plan = planBoostDepths(markets, {
+    targetTotalSol: targetTotal,
+    minDepthSol: minDepth,
+    maxDepthSol: maxDepth,
+    seedTag: boostSeed,
+  })
+  const chainTotal = plan.reduce((a, p) => a + p.curTotal, 0)
+  const fundTotal = plan.reduce((a, p) => a + p.addTotal, 0)
+  let drifted = 0
+  for (const p of plan) {
+    const dbTotalLamports = Math.round(p.dbTotalSol * LAMPORTS_PER_SOL)
+    const drift = Math.abs(p.curTotal - dbTotalLamports) / LAMPORTS_PER_SOL
+    p.driftSol = drift
+    if (drift > BOOST_DRIFT_TOL_SOL) drifted++
+    const flag =
+      p.addTotal > 0
+        ? "BOOST "
+        : drift > BOOST_DRIFT_TOL_SOL
+          ? "FIX   "
+          : "ok    "
+    console.log(
+      `  ${flag} [${p.onchainMarketId}] ` +
+        `cur ${(p.curTotal / LAMPORTS_PER_SOL).toFixed(4)} -> ` +
+        `target ${(p.targetTotal / LAMPORTS_PER_SOL).toFixed(4)} ` +
+        `add +${(p.addTotal / LAMPORTS_PER_SOL).toFixed(4)} ` +
+        `(yes +${(p.addYes / LAMPORTS_PER_SOL).toFixed(4)} / ` +
+        `no +${(p.addNo / LAMPORTS_PER_SOL).toFixed(4)})` +
+        (drift > BOOST_DRIFT_TOL_SOL && p.addTotal === 0
+          ? ` drift ${drift.toFixed(4)}`
+          : ""),
+    )
+  }
+  console.log(
+    `Chain total ${(chainTotal / LAMPORTS_PER_SOL).toFixed(4)} SOL, ` +
+      `projected final ${((chainTotal + fundTotal) / LAMPORTS_PER_SOL).toFixed(4)} SOL ` +
+      `(target ${targetTotal.toFixed(4)}), ` +
+      `to fund +${(fundTotal / LAMPORTS_PER_SOL).toFixed(4)} SOL, ` +
+      `${drifted} drifted`,
+  )
+
+  if (args.dryRun) {
+    console.log("Dry run — no chain or DB writes. Exiting.")
+    return
+  }
+  await requireFunds(wallet, fundTotal + FEE_BUFFER_LAMPORTS, args.force)
+
+  // --- Step 3: fund on-chain (continue past single-tx failures) ---
+  const protocolPda = deriveProtocol()
+  const funded = []
+  const failed = []
+  for (const p of plan) {
+    if (p.addTotal === 0) continue
+    const { market, vault } = deriveMarket(p.onchainMarketId)
+    const { yesPosition, noPosition } = derivePositions(
+      market,
+      wallet.publicKey,
+    )
+    try {
+      const signature = await sendTxn(
+        new Transaction().add(
+          buildFundMarket(
+            protocolPda,
+            market,
+            vault,
+            yesPosition,
+            noPosition,
+            wallet.publicKey,
+            p.addYes,
+            p.addNo,
+          ),
+        ),
+        wallet,
+      )
+      funded.push({ ...p, signature })
+      console.log(
+        `  [${p.onchainMarketId}] funded +${(p.addTotal / LAMPORTS_PER_SOL).toFixed(4)} SOL (${signature.slice(0, 12)}...)`,
+      )
+    } catch (err) {
+      failed.push(p.onchainMarketId)
+      console.error(`  FUND FAILED ${p.onchainMarketId}: ${err.message}`)
+    }
+    await sleep(1500)
+  }
+
+  // --- Step 4: re-read funded pools (exact), write DB ---
+  if (funded.length > 0) {
+    const fundedAddrs = funded.map(
+      (p) => deriveMarket(p.onchainMarketId).market,
+    )
+    const reInfos = []
+    for (let i = 0; i < fundedAddrs.length; i += 100) {
+      reInfos.push(
+        ...(await getMultipleAccountsWithRetry(fundedAddrs.slice(i, i + 100))),
+      )
+    }
+    funded.forEach((p, i) => {
+      const decoded = decodeMarketPools(reInfos[i])
+      if (decoded) {
+        p.finalYes = decoded.yes
+        p.finalNo = decoded.no
+      } else {
+        p.finalYes = (p.curYes + p.addYes) / LAMPORTS_PER_SOL
+        p.finalNo = (p.curNo + p.addNo) / LAMPORTS_PER_SOL
+      }
+    })
+  }
+  const timestamp = new Date().toISOString()
+  const writePlan = (p, finalYes, finalNo) => {
+    const total = finalYes + finalNo
+    const yesPrice = total > 0 ? finalYes / total : 0.5
+    updateMarketPools(p.marketDocId, {
+      yesPrice: round(yesPrice, 4),
+      noPrice: round(1 - yesPrice, 4),
+      yesLiquidity: round(finalYes, 4),
+      noLiquidity: round(finalNo, 4),
+      totalVolume: round(total, 4),
+    })
+    appendHistoryPoint(p.marketDocId, {
+      timestamp,
+      yesProbability: round(yesPrice, 4),
+      noProbability: round(1 - yesPrice, 4),
+      totalVolume: round(total, 4),
+      yesLiquidity: round(finalYes, 4),
+      noLiquidity: round(finalNo, 4),
+    })
+    insertPriceSnapshot({
+      marketDocId: p.marketDocId,
+      timestamp,
+      yesPrice: round(yesPrice, 4),
+      noPrice: round(1 - yesPrice, 4),
+      volume: round(p.addTotal / LAMPORTS_PER_SOL, 4),
+      triggerEvent: "boost",
+      yesLiquidity: round(finalYes, 4),
+      noLiquidity: round(finalNo, 4),
+      totalVolume: round(total, 4),
+    })
+    seedParticipants(p.marketDocId, [funder])
+  }
+  let historyPoints = 0
+  // Mirrors the tape's payout convention (amount / probability, 4dp).
+  const legPayout = (amountLamports, probability) =>
+    Math.round(
+      (amountLamports / LAMPORTS_PER_SOL / Math.max(0.0001, probability)) *
+        10_000,
+    ) / 10_000
+  for (const p of funded) {
+    writePlan(p, p.finalYes, p.finalNo)
+    historyPoints++
+    if (p.addYes > 0 || p.addNo > 0) {
+      const legs = []
+      const yesProb = p.targetYes / Math.max(1, p.targetTotal)
+      const noProb = p.targetNo / Math.max(1, p.targetTotal)
+      if (p.addYes > 0) {
+        legs.push({
+          id: `${p.marketDocId}-boost-yes`,
+          marketId: p.marketDocId,
+          side: "yes",
+          amountSol: p.addYes / LAMPORTS_PER_SOL,
+          amountLamports: String(p.addYes),
+          probability: round(yesProb, 4),
+          estimatedPayoutSol: legPayout(p.addYes, yesProb),
+          wallet: funder,
+          timestamp,
+        })
+      }
+      if (p.addNo > 0) {
+        legs.push({
+          id: `${p.marketDocId}-boost-no`,
+          marketId: p.marketDocId,
+          side: "no",
+          amountSol: p.addNo / LAMPORTS_PER_SOL,
+          amountLamports: String(p.addNo),
+          probability: round(noProb, 4),
+          estimatedPayoutSol: legPayout(p.addNo, noProb),
+          wallet: funder,
+          timestamp,
+        })
+      }
+      appendRecentTrades(p.marketDocId, legs)
+    }
+  }
+  // Drift-only markets: repair DB pools (no funding, still chart the fix).
+  let repaired = 0
+  for (const p of plan) {
+    if (p.addTotal > 0 || p.driftSol <= BOOST_DRIFT_TOL_SOL) continue
+    if (failed.includes(p.onchainMarketId)) continue
+    writePlan(p, p.curYes / LAMPORTS_PER_SOL, p.curNo / LAMPORTS_PER_SOL)
+    historyPoints++
+    repaired++
+  }
+
+  console.log(
+    `\nBoost done! funded=${funded.length} failed=${failed.length} ` +
+      `drift-repaired=${repaired} history-points=${historyPoints}` +
+      (failed.length > 0 ? ` (failed ids: ${failed.join(",")})` : ""),
+  )
+  if (failed.length > 0) process.exit(1)
+}
+
+// ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
@@ -1083,6 +1614,15 @@ const USAGE = `Usage:
     pro-rates to markets actually created; pass --budget to set the top-up
     total explicitly.
 
+  node scripts/lifecycle.mjs boost [--target-total 15] [--min-depth 0.02]
+    [--max-depth 1.5] [--seed-tag boost] [--dry-run] [--force]
+    Top up EXISTING open-market pools to a wide depth spread summing to
+    <target-total> SOL. Depths are lognormal (seeded), clamped to
+    [min-depth, max-depth]; each market is funded at its current YES ratio
+    so odds never move. Also repairs DB pools that drifted from chain
+    (e.g. after live trades). Prints the per-market plan; --dry-run writes
+    nothing.
+
   Resolution is permissioned: this script's wallet is the resolver. There is
   no oracle or dispute process (prototype).`
 
@@ -1101,11 +1641,31 @@ async function main() {
       console.error("--markets must be a positive number")
       process.exit(1)
     }
-    if (args.budgetExplicit && (!Number.isFinite(args.budget) || args.budget <= 0)) {
+    if (
+      args.budgetExplicit &&
+      (!Number.isFinite(args.budget) || args.budget <= 0)
+    ) {
       console.error("--budget must be a positive number")
       process.exit(1)
     }
     await rollCommand(args)
+    return
+  }
+  if (args.command === "boost") {
+    if (!Number.isFinite(args.targetTotal) || args.targetTotal <= 0) {
+      console.error("--target-total must be a positive number")
+      process.exit(1)
+    }
+    if (
+      !Number.isFinite(args.minDepth) ||
+      args.minDepth <= 0 ||
+      !Number.isFinite(args.maxDepth) ||
+      args.maxDepth < args.minDepth
+    ) {
+      console.error("--min-depth/--max-depth must be positive with max >= min")
+      process.exit(1)
+    }
+    await boostCommand(args)
     return
   }
   if (args.command !== "seed") {
@@ -1142,8 +1702,10 @@ if (cliEntry) {
 export {
   buildCloseMarket,
   buildResolveMarket,
+  decodeMarketPools,
   instructionDiscriminator,
   modelOddsOf,
+  planBoostDepths,
   readEstimate,
   resolveDraw,
   validateRaw,

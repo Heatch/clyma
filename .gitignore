@@ -12,6 +12,7 @@ test-ledger/
 *.log
 *.tsbuildinfo
 .DS_Store
+.playwright-mcp/
 
 # Local SQLite database (gitignored; recreated by seeding or migration)
 data/
