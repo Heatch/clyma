@@ -1,0 +1,48 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        HOST_UID: ${HOST_UID}
+        NEXT_PUBLIC_SOLANA_NETWORK: ${NEXT_PUBLIC_SOLANA_NETWORK}
+        NEXT_PUBLIC_SOLANA_RPC_URL: ${NEXT_PUBLIC_SOLANA_RPC_URL}
+        NEXT_PUBLIC_PROGRAM_ID: ${NEXT_PUBLIC_PROGRAM_ID}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    env_file: .env
+    environment:
+      SQLITE_PATH: /app/data/clyma.db
+    restart: unless-stopped
+    init: true
+    mem_limit: 768m
+    expose:
+      - "3000"
+    volumes:
+      - ./data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    mem_limit: 128m
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  caddy-data:
+  caddy-config:
