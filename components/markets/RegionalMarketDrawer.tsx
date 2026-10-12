@@ -137,9 +137,9 @@ export default function RegionalMarketDrawer() {
               : "Browse markets"
         }
         data-testid="market-drawer"
-        className="drawer-enter fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-hidden rounded-t-[1.75rem] border border-white/15 bg-[#0b0d0f]/95 text-white shadow-[0_24px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[transform,opacity] duration-[520ms] ease-[cubic-bezier(0.65,0,0.35,1)] data-[state=closing]:translate-y-full data-[state=closing]:opacity-0 motion-reduce:transition-none md:inset-y-0 md:bottom-0 md:left-auto md:right-0 md:top-0 md:max-h-none md:w-[var(--drawer-width)] md:rounded-none md:border-y-0 md:border-r-0 md:shadow-none md:data-[state=closing]:translate-x-full md:data-[state=closing]:translate-y-0"
+        className="drawer-enter fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col overflow-hidden rounded-t-[1.75rem] border border-white/15 bg-[#0b0d0f]/95 text-white shadow-[0_24px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[transform,opacity] duration-[520ms] ease-[cubic-bezier(0.65,0,0.35,1)] data-[state=closing]:translate-y-full data-[state=closing]:opacity-0 motion-reduce:transition-none md:inset-y-0 md:bottom-0 md:left-auto md:right-0 md:top-0 md:max-h-none md:w-[var(--drawer-width)] md:rounded-none md:border-y-0 md:border-r-0 md:shadow-none md:data-[state=closing]:translate-x-full md:data-[state=closing]:translate-y-0"
       >
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="flex min-h-0 flex-auto flex-col">
           <div
             className="flex justify-center py-2 md:hidden"
             aria-hidden="true"
@@ -172,7 +172,7 @@ export default function RegionalMarketDrawer() {
             </button>
           </div>
 
-          <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
+          <div className="scrollbar-none min-h-0 flex-auto overflow-y-auto overscroll-contain p-4 sm:p-5">
             {shouldShowPortfolio ? (
               <PortfolioPanel />
             ) : selectedMarket ? (

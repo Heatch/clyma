@@ -289,6 +289,14 @@ describe("wallet and transaction API routes", () => {
       }),
     )
     expect(dbMocks.insertPosition).toHaveBeenCalledOnce()
+    const positionCall = dbMocks.insertPosition.mock
+      .calls[0]?.[0] as unknown as
+      | { estimatedPayoutSol: number; estimatedPayoutLamports: string }
+      | undefined
+    expect(positionCall?.estimatedPayoutSol).toBeGreaterThan(0)
+    expect(
+      BigInt(positionCall?.estimatedPayoutLamports ?? "0"),
+    ).toBeGreaterThan(0n)
     expect(dbMocks.insertPriceSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({
         marketDocId: "fixture-fl-hurricane-2026",

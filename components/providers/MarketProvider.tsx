@@ -16,7 +16,7 @@ import {
   calculateImpliedProbabilities,
   lamportsToSolNumber,
 } from "@/lib/markets/calculations"
-import { CATEGORY_LABELS } from "@/lib/markets/categories"
+import { matchesSearch, searchRelevance } from "@/lib/markets/search"
 import type {
   ClimateMarket,
   MarketCategory,
@@ -142,22 +142,6 @@ function freshBrowseFilters(): BrowseFilters {
     categories: [],
     regions: [],
   }
-}
-
-function matchesSearch(market: ClimateMarket, search: string) {
-  const normalized = search.trim().toLocaleLowerCase()
-  if (!normalized) return true
-  return [
-    market.question,
-    market.description,
-    market.region,
-    market.country,
-    market.continent,
-    market.category,
-    CATEGORY_LABELS[market.category],
-  ]
-    .filter((value): value is string => Boolean(value))
-    .some((value) => value.toLocaleLowerCase().includes(normalized))
 }
 
 function comparatorFor(sort: MarketSort, direction: SortDirection) {
@@ -407,6 +391,7 @@ export function MarketProvider({
       browseFilters.sort,
       browseFilters.sortDirection,
     )
+    const hasQuery = browseFilters.query.trim().length > 0
     return [...markets]
       .filter(
         (market) =>
@@ -421,6 +406,12 @@ export function MarketProvider({
         const statusDelta =
           STATUS_ORDER[first.status] - STATUS_ORDER[second.status]
         if (statusDelta !== 0) return statusDelta
+        if (hasQuery) {
+          const relevanceDelta =
+            searchRelevance(second, deferredQuery) -
+            searchRelevance(first, deferredQuery)
+          if (relevanceDelta !== 0) return relevanceDelta
+        }
         return (
           comparator(first, second) ||
           first.question.localeCompare(second.question)

@@ -2,12 +2,68 @@ import {
   existingMarketIds,
   insertPosition as storeInsertPosition,
   listPositionsByWallet as storeListByWallet,
+  marketPoolsByDocIds,
   updatePositionStatusById,
 } from "@/lib/db/store.mjs"
 import type { PositionDoc } from "@/lib/db/types"
 import type { UserPosition } from "@/lib/markets/types"
 
-function positionDocToUserPosition(doc: PositionDoc): UserPosition {
+const LAMPORTS_PER_SOL = 1_000_000_000
+
+function toLamports(amountSol: number): bigint {
+  if (!Number.isFinite(amountSol) || amountSol <= 0) return 0n
+  return BigInt(Math.round(amountSol * LAMPORTS_PER_SOL))
+}
+
+/**
+ * Live payout estimate from current pools (pro-rata at post-trade sizes).
+ * Falls back to the stored value when pools are unknown or degenerate.
+ */
+function livePayoutEstimate(
+  doc: PositionDoc,
+  pools: { yesLiquidity: number; noLiquidity: number } | undefined,
+): { estimatedPayoutSol: number; estimatedPayoutLamports: string } {
+  const stored = {
+    estimatedPayoutSol: doc.estimatedPayoutSol,
+    estimatedPayoutLamports: doc.estimatedPayoutLamports,
+  }
+  if (!pools) return stored
+  let amountLamports: bigint
+  try {
+    amountLamports = BigInt(doc.amountLamports)
+  } catch {
+    return stored
+  }
+  if (amountLamports <= 0n) return stored
+  const sideLiq =
+    doc.side === "yes"
+      ? toLamports(pools.yesLiquidity)
+      : toLamports(pools.noLiquidity)
+  const sideLiqAfter = sideLiq + amountLamports
+  if (sideLiqAfter <= 0n) return stored
+  const totalAfter =
+    toLamports(pools.yesLiquidity) +
+    toLamports(pools.noLiquidity) +
+    amountLamports
+  const payout = (amountLamports * totalAfter) / sideLiqAfter
+  return {
+    estimatedPayoutSol: Number(payout) / LAMPORTS_PER_SOL,
+    estimatedPayoutLamports: payout.toString(),
+  }
+}
+
+function positionDocToUserPosition(
+  doc: PositionDoc,
+  pools?: { yesLiquidity: number; noLiquidity: number },
+): UserPosition {
+  // Unsettled positions track live pools; settled rows keep stored values.
+  const live =
+    doc.status === "open"
+      ? livePayoutEstimate(doc, pools)
+      : {
+          estimatedPayoutSol: doc.estimatedPayoutSol,
+          estimatedPayoutLamports: doc.estimatedPayoutLamports,
+        }
   return {
     id: doc._id,
     wallet: doc.walletAddress,
@@ -17,8 +73,8 @@ function positionDocToUserPosition(doc: PositionDoc): UserPosition {
     side: doc.side,
     amountLamports: doc.amountLamports,
     amountSol: doc.amountSol,
-    estimatedPayoutLamports: doc.estimatedPayoutLamports,
-    estimatedPayoutSol: doc.estimatedPayoutSol,
+    estimatedPayoutLamports: live.estimatedPayoutLamports,
+    estimatedPayoutSol: live.estimatedPayoutSol,
     claimableLamports: "0",
     claimableSol: 0,
     claimedLamports: "0",
@@ -78,9 +134,11 @@ export async function getPositionsByWalletForApi(
   // Drop rows pointing at markets that no longer exist (e.g. recorded
   // before a reseed replaced the catalog).
   const alive = new Set(existingMarketIds(docs.map((doc) => doc.marketDocId)))
-  return docs
-    .filter((doc) => alive.has(doc.marketDocId))
-    .map(positionDocToUserPosition)
+  const live = docs.filter((doc) => alive.has(doc.marketDocId))
+  const pools = marketPoolsByDocIds(live.map((doc) => doc.marketDocId))
+  return live.map((doc) =>
+    positionDocToUserPosition(doc, pools.get(doc.marketDocId)),
+  )
 }
 
 export async function updatePositionStatus(

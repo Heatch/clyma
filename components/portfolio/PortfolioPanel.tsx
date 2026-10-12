@@ -30,10 +30,11 @@ export default function PortfolioPanel() {
   }, [fetchRemotePositions])
 
   const totalCommitted = positions.reduce((sum, p) => sum + p.amountSol, 0)
-  const totalPotential = positions.reduce(
-    (sum, p) => sum + p.estimatedPayoutSol,
-    0,
-  )
+  // Only unsettled positions have a meaningful potential payout; settled
+  // rows (claimed/refunded/lost) would otherwise overstate the tile.
+  const totalPotential = positions
+    .filter((p) => p.status === "open" || p.status === "claimable")
+    .reduce((sum, p) => sum + p.estimatedPayoutSol, 0)
   const settleablePositions = positions.filter(
     (p) => p.status === "claimable" || p.status === "refundable",
   )

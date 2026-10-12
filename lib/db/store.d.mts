@@ -26,19 +26,32 @@ export interface StoreMarketListQuery {
 export function upsertUser(walletAddress: string): StoreUser
 export function getUserByWallet(walletAddress: string): StoreUser | null
 
-export function upsertMarket(doc: Record<string, unknown>): Record<string, unknown>
+export function upsertMarket(
+  doc: Record<string, unknown>,
+): Record<string, unknown>
 export function listMarkets(query: StoreMarketListQuery): {
   markets: Array<Record<string, unknown>>
   total: number
   limit: number
   offset: number
 }
-export function getMarketByIdOrSlug(idOrSlug: string): Record<string, unknown> | null
+export function getMarketByIdOrSlug(
+  idOrSlug: string,
+): Record<string, unknown> | null
 export function listMarketsByContinent(
   continent: string,
   query?: Partial<StoreMarketListQuery>,
-): { markets: Array<Record<string, unknown>>; total: number; limit: number; offset: number }
-export function updateMarketStatus(marketDocId: string, status: string, outcome?: string): void
+): {
+  markets: Array<Record<string, unknown>>
+  total: number
+  limit: number
+  offset: number
+}
+export function updateMarketStatus(
+  marketDocId: string,
+  status: string,
+  outcome?: string,
+): void
 export function updateMarketPools(
   marketDocId: string,
   pools: {
@@ -59,7 +72,10 @@ export function appendRecentTrades(
   marketDocId: string,
   trades: Array<Record<string, unknown>>,
 ): void
-export function appendHistoryPoint(marketDocId: string, point: MarketHistoryPoint): void
+export function appendHistoryPoint(
+  marketDocId: string,
+  point: MarketHistoryPoint,
+): void
 export function incrementActivity(
   marketDocId: string,
   amountSol: number,
@@ -68,15 +84,26 @@ export function incrementActivity(
 export function seedParticipants(marketDocId: string, wallets: string[]): number
 export function getRowIdByMarketId(marketDocId: string): number | null
 export function existingMarketIds(marketDocIds: string[]): string[]
+export function marketPoolsByDocIds(
+  marketDocIds: string[],
+): Map<string, { yesLiquidity: number; noLiquidity: number }>
 export function countOpenMarkets(): number
 export function maxOnchainMarketId(): number | null
 export function dueToClose(nowIso: string): Array<Record<string, unknown>>
 export function dueToResolve(nowIso: string): Array<Record<string, unknown>>
 
-export function insertPosition(params: Record<string, unknown>): Record<string, unknown>
+export function insertPosition(
+  params: Record<string, unknown>,
+): Record<string, unknown>
 export function getPositionById(id: string): Record<string, unknown> | null
-export function listPositionsByWallet(walletAddress: string): Array<Record<string, unknown>>
-export function updatePositionStatusById(id: string, status: string, txSignature?: string): void
+export function listPositionsByWallet(
+  walletAddress: string,
+): Array<Record<string, unknown>>
+export function updatePositionStatusById(
+  id: string,
+  status: string,
+  txSignature?: string,
+): void
 export function settlePositionsByMarket(
   marketDocId: string,
   winningSide: string,
@@ -86,23 +113,40 @@ export function insertTransaction(params: Record<string, unknown>): {
   doc: Record<string, unknown>
   inserted: boolean
 }
-export function findTransactionBySignature(txSignature: string): Record<string, unknown> | null
-export function listActivityByWallet(walletAddress: string): Array<Record<string, unknown>>
+export function findTransactionBySignature(
+  txSignature: string,
+): Record<string, unknown> | null
+export function listActivityByWallet(
+  walletAddress: string,
+): Array<Record<string, unknown>>
 
 export function insertPriceSnapshot(params: Record<string, unknown>): number
-export function replaceHistory(marketDocId: string, points: MarketHistoryPoint[]): void
-export function replaceCreationSnapshots(marketDocId: string, points: MarketHistoryPoint[]): void
-export function listPriceSnapshots(marketRowId: number): Array<Record<string, unknown>>
+export function replaceHistory(
+  marketDocId: string,
+  points: MarketHistoryPoint[],
+): void
+export function replaceCreationSnapshots(
+  marketDocId: string,
+  points: MarketHistoryPoint[],
+): void
+export function listPriceSnapshots(
+  marketRowId: number,
+): Array<Record<string, unknown>>
 export function deleteCreationSnapshots(marketRowId: number): void
 
-export function insertResolution(params: Record<string, unknown>): Record<string, unknown>
+export function insertResolution(
+  params: Record<string, unknown>,
+): Record<string, unknown>
 
 export function insertChallenge(
   walletAddress: string,
   nonce: string,
   ttlMs: number,
 ): Record<string, unknown>
-export function getChallenge(walletAddress: string, nonce: string): Record<string, unknown> | null
+export function getChallenge(
+  walletAddress: string,
+  nonce: string,
+): Record<string, unknown> | null
 export function markChallengeUsed(id: string): void
 export function sweepExpiredChallenges(): void
 

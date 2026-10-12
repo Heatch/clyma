@@ -126,10 +126,17 @@ only in code, env vars, and this doc.
   a CSS transition and the projection follows the viewport each frame. The
   globe therefore never runs an animation that can race the viewport (that
   race is what flashed a stretched frame).
-- `MarketBrowser` is the drawer’s only list view: text search, multi-select
+- `MarketBrowser` is the drawer’s only list view: token AND-search
+  (`lib/markets/search.ts` — every token must match somewhere across
+  question/description/region/country/continent/category/label, quoted phrases
+  stay literal; relevance ranks question/region/category hits above
+  description-only when a query is active), multi-select
   market-type and region dropdowns, sorting with a naked direction toggle, and
   an exact cluster scope when a globe cluster was clicked. Region clicks preset
   the region filter; cluster clicks preset an exact market-ID scope.
+- The drawer panel itself is the mobile scroll container: the aside is the
+  flex column (`flex flex-col` + `max-h-[88dvh]`) so the body region scrolls
+  on small screens; desktop is unchanged (`md:inset-y-0` gives it full height).
 - Opening a market spotlights its globe marker: a full-layer vignette leaves a
   circular opening around the selection while dimming the rest of the globe.
 - Clicking map space outside every marker and continent region closes the
@@ -252,7 +259,10 @@ outcome, total_yes/no/pool/paid_amount`); `vault` (native SOL,
   `participants` is always `COUNT(*)` — no counter drift by construction.
 - **Live trade writes:** `POST /api/index-transaction` writes the tx, position,
   price snapshot, capped history point, and counters — idempotent per
-  signature, so retries and duplicate client POSTs are safe. The chart reads
+  signature, so retries and duplicate client POSTs are safe. The position's
+  payout is computed server-side (pro-rata at post-trade pools, never stored
+  as 0), and position reads recompute the live estimate from current pools
+  for unsettled rows (`marketPoolsByDocIds`). The chart reads
   embedded history; `getMarketHistory` additionally merges `market_prices`.
 
 ## Model market generation (GPT Luna via Backboard)
@@ -330,7 +340,7 @@ forwards `--experimental-sqlite` to all npm scripts).
 
 - `npm test` → `vitest run`, jsdom, `tests/setup.ts` shims. Includes
   `tests/*.test.tsx` (account-dock, api-routes, brand-assets, globe-drawer,
-  market-chart, market-provider, multi-select, portfolio-panel,
+  market-chart, market-provider, market-search, multi-select, portfolio-panel,
   prediction-form, regions, store, tape, lifecycle, market-history) +
   co-located `lib/solana/*.test.ts` (accounts, encoding, errors,
   instructions). Store tests run against real in-memory SQLite (`:memory:`).

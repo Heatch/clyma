@@ -17,6 +17,7 @@ import {
   listOpenMarketPools,
   listPositionsByWallet,
   listPriceSnapshots,
+  marketPoolsByDocIds,
   openStore,
   resetMarketData,
   seedParticipants,
@@ -238,6 +239,23 @@ describe("sqlite store", () => {
     const positions = listPositionsByWallet("w1")
     expect(positions.find((p) => p.side === "yes")?.status).toBe("won")
     expect(positions.find((p) => p.side === "no")?.status).toBe("lost")
+  })
+
+  it("reads pool balances by market id", () => {
+    upsertMarket(marketInput("m1", { yesLiquidity: 6, noLiquidity: 4 }))
+    upsertMarket(
+      marketInput("m2", {
+        onchainMarketId: 3002,
+        slug: "m2-slug",
+        yesLiquidity: 1,
+        noLiquidity: 3,
+      }),
+    )
+    const pools = marketPoolsByDocIds(["m1", "m2", "missing"])
+    expect(pools.get("m1")).toEqual({ yesLiquidity: 6, noLiquidity: 4 })
+    expect(pools.get("m2")).toEqual({ yesLiquidity: 1, noLiquidity: 3 })
+    expect(pools.has("missing")).toBe(false)
+    expect(marketPoolsByDocIds([]).size).toBe(0)
   })
 
   it("stores price snapshots and resolutions", () => {
