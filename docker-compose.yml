@@ -24,17 +24,12 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  caddy:
-    image: caddy:2
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    env_file: .env.tunnel
     restart: unless-stopped
     mem_limit: 128m
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
     depends_on:
       - app
     logging:
@@ -42,7 +37,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  caddy-data:
-  caddy-config:
