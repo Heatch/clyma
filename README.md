@@ -47,8 +47,9 @@ node scripts/preflight.mjs
 | Wallet          | Phantom browser extension                                          |
 | Solana client   | `@solana/web3.js`, Anchor instruction encoding, deterministic PDAs |
 | Program         | Anchor 0.30.1 Rust program (`programs/climate_market`)             |
-| Database        | SQLite (`node:sqlite`) via `lib/db/store.mjs`                      |
-| Market data     | Model-generated markets, seeded to SQLite + Devnet                 |
+| Database        | Cloudflare D1 in production, `node:sqlite` locally                 |
+| Hosting         | Cloudflare Workers via `@opennextjs/cloudflare`                    |
+| Market data     | Model-generated markets, seeded to D1/SQLite + Devnet              |
 | Validation      | Zod schemas                                                        |
 | Tests           | Vitest + Testing Library + Anchor local-validator                  |
 
@@ -61,9 +62,9 @@ components/providers/     Market, wallet, position, globe state
 hooks/                    AI forecasts, market program hooks
 lib/markets/              Types, calculations, generation, fixtures
 lib/solana/               Config, encoding, PDAs, IDL, instructions
-lib/db/                   SQLite store, typed repositories
+lib/db/                   Store (node:sqlite + D1 drivers), typed repositories
 programs/climate_market/  Anchor program
-scripts/                  DB seeding, on-chain market setup
+scripts/                  DB seeding, on-chain market setup, D1 export
 ```
 
 ## Pooled binary market model
@@ -124,19 +125,87 @@ BACKBOARD_API_KEY=
 LLM_MODEL=gpt-5.6-luna
 ```
 
-| Variable                     | Purpose                                             |
-| ---------------------------- | --------------------------------------------------- |
-| `NEXT_PUBLIC_SOLANA_NETWORK` | Must be `devnet`                                    |
-| `NEXT_PUBLIC_SOLANA_RPC_URL` | Optional; defaults to public Devnet endpoint        |
-| `NEXT_PUBLIC_PROGRAM_ID`     | Deployed Solana program address                     |
-| `SQLITE_PATH`                | App database file (default `./data/clyma.db`)       |
-| `BACKBOARD_API_KEY`          | Backboard key for GPT Luna (generation + forecasts) |
-| `LLM_MODEL`                  | Model id (default: `gpt-5.6-luna`)                  |
+| Variable                     | Purpose                                                                                       |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SOLANA_NETWORK` | Must be `devnet`                                                                              |
+| `NEXT_PUBLIC_SOLANA_RPC_URL` | Optional; defaults to public Devnet endpoint                                                  |
+| `NEXT_PUBLIC_PROGRAM_ID`     | Deployed Solana program address                                                               |
+| `SQLITE_PATH`                | Local DB file (default `./data/clyma.db`); unused on Workers — production uses the D1 binding |
+| `BACKBOARD_API_KEY`          | Backboard key for GPT Luna (generation + forecasts)                                           |
+| `LLM_MODEL`                  | Model id (default: `gpt-5.6-luna`)                                                            |
+| `CLOUDFLARE_*`               | Scripts only: point `lifecycle.mjs` at the deployed D1 database                               |
 
-Serving markets requires `BACKBOARD_API_KEY` (generation + forecasts). The
-database is a local SQLite file — no DB server needed. Bare `node scripts/*`
+Serving markets requires `BACKBOARD_API_KEY` (generation + forecasts). Locally
+the database is a SQLite file — no DB server needed. Bare `node scripts/*`
 invocations need `NODE_OPTIONS=--experimental-sqlite` (npm scripts and
 `start-app.bat` set this automatically).
+
+## Cloudflare deployment (production)
+
+Production runs on the Cloudflare free tier: the Next.js app as a Worker
+(`@opennextjs/cloudflare`) with data in D1. The local SQLite path stays for
+`npm run dev`, tests, and offline scripts.
+
+One-time setup (already done for `clyma`):
+
+```bash
+npx wrangler login
+npx wrangler d1 create clyma          # paste database_id into wrangler.jsonc
+npx wrangler secret put JWT_SECRET    # and BACKBOARD_API_KEY
+node --experimental-sqlite scripts/export-d1-sql.mjs
+npx wrangler d1 execute clyma --remote --file data/d1-import.sql --yes
+```
+
+Deploy and preview:
+
+```bash
+npm run cf:build     # next build + Worker bundle (no deploy)
+npm run cf:preview   # build + run the Worker locally (workerd + local D1)
+npm run cf:deploy    # build + deploy to Cloudflare
+```
+
+Local preview secrets live in `.dev.vars` (gitignored, `KEY=value` lines);
+production secrets live in the Worker. Runtime configuration (model id,
+predict guards) is in `wrangler.jsonc` `vars`; `NEXT_PUBLIC_*` values are
+inlined at build time, so changing the RPC or program id needs a redeploy.
+
+`clyma.xyz` is attached as a custom domain (Cloudflare dashboard → Workers
+& Pages → clyma → Settings → Domains & Routes). The Worker also stays
+reachable at `https://clyma.<account>.workers.dev` as a fallback.
+
+To verify a deployment:
+
+```bash
+curl -s https://clyma.xyz/api/markets?limit=1        # 200, total = market count
+curl -s https://clyma.xyz/api/markets/<id>/history    # merged tape + snapshots
+curl -s -X POST https://clyma.xyz/api/auth/challenge \
+  -H "content-type: application/json" \
+  -d '{"walletAddress":"8qFS3dgQGZ614c2owwobfT5qjZnSxMgb6Wg2abh7b75i"}'  # 64-char nonce (D1 write)
+npx wrangler tail clyma                               # live requests + CPU/errors
+```
+
+`www.clyma.xyz` has no DNS record; add a `www` record plus a Redirect Rule
+to the apex in the dashboard if you want it to answer.
+
+Docker (`Dockerfile`, `docker-compose.yml`, the `cloudflared` tunnel) is no
+longer used in production — it remains as a self-hosted fallback and uses
+the local SQLite file.
+
+### Lifecycle scripts against D1
+
+Scripts run from any machine with a funded Devnet wallet; with these
+variables set they read/write the deployed database instead of the local
+file (otherwise they use `SQLITE_PATH`):
+
+```env
+CLOUDFLARE_ACCOUNT_ID=...
+CLOUDFLARE_D1_DATABASE_ID=...
+CLOUDFLARE_API_TOKEN=...   # D1 edit permission
+```
+
+Then `node scripts/lifecycle.mjs close|resolve|roll|boost` operates on
+production. Keep a Devnet wallet at `~/.config/solana/id.json` for the
+on-chain side.
 
 ## Checks
 
@@ -146,6 +215,7 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run cf:build   # Worker bundle (production shape)
 ```
 
 Or run all:

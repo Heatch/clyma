@@ -16,21 +16,21 @@ export async function insertPriceSnapshot(params: {
   noLiquidity?: number
   totalVolume?: number
 }): Promise<void> {
-  const marketRowId = getRowIdByMarketId(params.marketDocId)
-  storeInsertSnapshot({ ...params, marketRowId })
+  const marketRowId = await getRowIdByMarketId(params.marketDocId)
+  await storeInsertSnapshot({ ...params, marketRowId })
 }
 
 export async function getPriceSnapshots(
   marketDocId: string,
 ): Promise<MarketPriceDoc[]> {
-  const marketRowId = getRowIdByMarketId(marketDocId)
+  const marketRowId = await getRowIdByMarketId(marketDocId)
   if (marketRowId === null) return []
-  return listPriceSnapshots(marketRowId) as unknown as MarketPriceDoc[]
+  return (await listPriceSnapshots(marketRowId)) as unknown as MarketPriceDoc[]
 }
 
 export async function clearCreationSnapshots(
   marketDocId: string,
 ): Promise<void> {
-  const marketRowId = getRowIdByMarketId(marketDocId)
-  if (marketRowId !== null) deleteCreationSnapshots(marketRowId)
+  const marketRowId = await getRowIdByMarketId(marketDocId)
+  if (marketRowId !== null) await deleteCreationSnapshots(marketRowId)
 }

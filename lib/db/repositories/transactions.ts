@@ -42,24 +42,27 @@ export async function insertTransaction(params: {
   onchainMarketId?: number
   failureReason?: string
 }): Promise<TransactionDoc> {
-  return storeInsertTransaction(params).doc as unknown as TransactionDoc
+  const { doc } = await storeInsertTransaction(params)
+  return doc as unknown as TransactionDoc
 }
 
 export async function findTransactionBySignature(
   txSignature: string,
 ): Promise<TransactionDoc | null> {
-  const doc = storeFindBySignature(txSignature)
+  const doc = await storeFindBySignature(txSignature)
   return (doc as unknown as TransactionDoc | null) ?? null
 }
 
 export async function getActivityByWallet(
   walletAddress: string,
 ): Promise<UserActivity[]> {
-  const docs = storeListActivity(walletAddress) as unknown as TransactionDoc[]
+  const docs = (await storeListActivity(
+    walletAddress,
+  )) as unknown as TransactionDoc[]
   // Drop rows pointing at markets that no longer exist. Rows without a
   // market reference are kept (absence proves nothing).
   const alive = new Set(
-    existingMarketIds(
+    await existingMarketIds(
       docs.map((doc) => doc.marketDocId).filter((id): id is string => !!id),
     ),
   )

@@ -8,5 +8,5 @@ export async function insertResolution(params: {
   resolverWallet: string
   proofUrl?: string
 }): Promise<ResolutionDoc> {
-  return storeInsertResolution(params) as unknown as ResolutionDoc
+  return (await storeInsertResolution(params)) as unknown as ResolutionDoc
 }

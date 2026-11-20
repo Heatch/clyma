@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server"
-import { PublicKey } from "@solana/web3.js"
 import nacl from "tweetnacl"
 import bs58 from "bs58"
 import { getChallenge, markChallengeUsed } from "@/lib/db/store.mjs"
 import { upsertUser } from "@/lib/db/repositories/users"
 import { signJwt } from "@/lib/auth"
+
+/** Hex string -> bytes without Node's Buffer (Workers-safe). */
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < out.length; i += 1) {
+    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16)
+  }
+  return out
+}
 
 export async function POST(request: Request) {
   let body: { walletAddress?: string; signature?: string; nonce?: string }
@@ -47,7 +55,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const challenge = getChallenge(walletAddress, nonce) as {
+  const challenge = (await getChallenge(walletAddress, nonce)) as {
     _id: string
     expiresAt: Date
     used: boolean
@@ -82,8 +90,8 @@ export async function POST(request: Request) {
     if (signature.startsWith("0x")) {
       const sigHex = signature.slice(2)
       if (sigHex.length === 128) {
-        const sigBytes = Buffer.from(sigHex, "hex")
-        const pubKeyBytes = new PublicKey(walletAddress).toBytes()
+        const sigBytes = hexToBytes(sigHex)
+        const pubKeyBytes = bs58.decode(walletAddress)
         verified = nacl.sign.detached.verify(
           messageBytes,
           sigBytes,
@@ -92,7 +100,7 @@ export async function POST(request: Request) {
       }
     } else {
       const sigBytes = bs58.decode(signature)
-      const pubKeyBytes = new PublicKey(walletAddress).toBytes()
+      const pubKeyBytes = bs58.decode(walletAddress)
       verified = nacl.sign.detached.verify(messageBytes, sigBytes, pubKeyBytes)
     }
   } catch {
@@ -111,7 +119,7 @@ export async function POST(request: Request) {
     )
   }
 
-  markChallengeUsed(challenge._id)
+  await markChallengeUsed(challenge._id)
 
   await upsertUser(walletAddress)
 

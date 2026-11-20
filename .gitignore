@@ -22,3 +22,8 @@ data/
 fake_modules/
 backboard.md
 docs/
+
+# Cloudflare Workers / OpenNext build output + local bindings
+.open-next/
+.wrangler/
+.dev.vars

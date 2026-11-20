@@ -63,11 +63,11 @@ const TAPE_HISTORY = [
   },
 ]
 
-beforeEach(() => {
-  __resetStoreForTests()
-  openStore(":memory:")
-  upsertMarket(marketInput("m1"))
-  replaceHistory("m1", TAPE_HISTORY)
+beforeEach(async () => {
+  await __resetStoreForTests()
+  await openStore(":memory:")
+  await upsertMarket(marketInput("m1"))
+  await replaceHistory("m1", TAPE_HISTORY)
 })
 
 describe("getMarketHistory merge", () => {
@@ -78,7 +78,7 @@ describe("getMarketHistory merge", () => {
   })
 
   it("merges live snapshots in chronological order", async () => {
-    insertPriceSnapshot({
+    await insertPriceSnapshot({
       marketDocId: "m1",
       timestamp: "2026-01-02T00:00:00.000Z",
       yesPrice: 0.55,
@@ -99,7 +99,7 @@ describe("getMarketHistory merge", () => {
   })
 
   it("prefers tape points on timestamp ties", async () => {
-    insertPriceSnapshot({
+    await insertPriceSnapshot({
       marketDocId: "m1",
       timestamp: "2026-01-03T00:00:00.000Z",
       yesPrice: 0.99,

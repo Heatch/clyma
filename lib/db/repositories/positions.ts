@@ -118,13 +118,13 @@ export async function insertPosition(params: {
   estimatedPayoutLamports: string
   txSignature?: string
 }): Promise<PositionDoc> {
-  return storeInsertPosition(params) as unknown as PositionDoc
+  return (await storeInsertPosition(params)) as unknown as PositionDoc
 }
 
 export async function getPositionsByWallet(
   walletAddress: string,
 ): Promise<PositionDoc[]> {
-  return storeListByWallet(walletAddress) as unknown as PositionDoc[]
+  return (await storeListByWallet(walletAddress)) as unknown as PositionDoc[]
 }
 
 export async function getPositionsByWalletForApi(
@@ -133,9 +133,11 @@ export async function getPositionsByWalletForApi(
   const docs = await getPositionsByWallet(walletAddress)
   // Drop rows pointing at markets that no longer exist (e.g. recorded
   // before a reseed replaced the catalog).
-  const alive = new Set(existingMarketIds(docs.map((doc) => doc.marketDocId)))
+  const alive = new Set(
+    await existingMarketIds(docs.map((doc) => doc.marketDocId)),
+  )
   const live = docs.filter((doc) => alive.has(doc.marketDocId))
-  const pools = marketPoolsByDocIds(live.map((doc) => doc.marketDocId))
+  const pools = await marketPoolsByDocIds(live.map((doc) => doc.marketDocId))
   return live.map((doc) =>
     positionDocToUserPosition(doc, pools.get(doc.marketDocId)),
   )
@@ -146,5 +148,5 @@ export async function updatePositionStatus(
   status: PositionDoc["status"],
   txSignature?: string,
 ): Promise<void> {
-  updatePositionStatusById(positionId, status, txSignature)
+  await updatePositionStatusById(positionId, status, txSignature)
 }

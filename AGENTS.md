@@ -82,7 +82,9 @@ hooks/                        useMarketProgram (Anchor client)
 lib/
   markets/                    types, calculations, generation, data (fixtures), openingPrice
   solana/                     config, pdas, accounts, instructions, encoding, errors, idl
-  db/                         store.mjs (+ .d.mts), types, init, repositories/
+  db/                         store.mjs (+ .d.mts) — async, driver-agnostic; drivers/
+                              (node:sqlite, D1 binding, D1 HTTP), schema.mjs, types,
+                              init, repositories/
   auth/ geo/ utils/ validation/
 programs/climate_market/      Anchor Rust program (instructions, state, errors, events)
 scripts/                      lifecycle.mjs (seed/close/resolve/roll/boost),
@@ -238,20 +240,33 @@ outcome, total_yes/no/pool/paid_amount`); `vault` (native SOL,
   executability/owner, protocol PDA discriminator (validates the deployed
   program matches this repo's account layout), and wallet balance.
 
-## Database (`lib/db/`, SQLite `./data/clyma.db`)
+## Database (`lib/db/` — D1 in production, SQLite locally)
 
 - `store.mjs` (+ `store.d.mts`): the single data layer, imported by both the
-  TS repositories and `scripts/*.mjs`. Opens the DB (WAL, foreign keys,
-  busy timeout), runs `user_version`-gated migrations, exposes table
-  functions. Requires `node:sqlite` — flag-gated on Node 22.5.x, see
-  `.npmrc` (`node-options`) for npm scripts, `start-app.bat`, and the
-  `NODE_OPTIONS=--experimental-sqlite` prefix for bare `node scripts/*`.
-  No MongoDB anywhere: the `mongodb` dependency is uninstalled.
+  TS repositories and `scripts/*.mjs`. **Async and driver-agnostic**: every
+  table function returns a Promise, and the SQL runs unchanged on three
+  drivers (`drivers/`): `node:sqlite` (local dev, vitest, offline scripts),
+  the **D1 binding** (Workers), and **D1 over HTTP** (scripts against
+  production). `init.ts` picks the binding via `getCloudflareContext()` and
+  falls back to the SQLite file when there is none.
+- `schema.mjs`: shared DDL + `HISTORY_CAP`. Migrations: `PRAGMA
+user_version` on SQLite, `sqlite_master` table check on D1.
+- Why this matters: `node:sqlite` is a **non-functional stub on Workers** —
+  it imports but every call throws. Any code that reintroduces it into a
+  request path breaks the deployment; go through the store.
+- D1 limits shape the queries: `IN (...)` lists are chunked at 90 bound
+  params, and market hydration (`listMarkets`) uses two chunked `batch`
+  queries instead of two queries per market (N+1 would burn D1 rows and CPU).
+- `store.d.mts` is hand-maintained — keep it in sync when adding functions.
 - `types.ts`: doc types with string ids (positions use natural keys
   `market:side:txSignature`).
-- Repositories: thin wrappers preserving signatures (`markets`, `positions`,
-  `transactions`, `marketPrices`, `resolutions`, `users`). `init.ts: initDb()`
-  just opens the store (migrations run inside).
+- Repositories: thin async wrappers (`markets`, `positions`, `transactions`,
+  `marketPrices`, `resolutions`, `users`). `init.ts: initDb()` opens the store
+  once per runtime instance (a shared promise).
+- Requires `node:sqlite` locally — flag-gated on Node 22.5.x, see `.npmrc`
+  (`node-options`) for npm scripts, `start-app.bat`, and the
+  `NODE_OPTIONS=--experimental-sqlite` prefix for bare `node scripts/*`.
+  No MongoDB anywhere: the `mongodb` dependency is uninstalled.
 - Schema: normalized where queried (`markets`, `market_history` capped at
   500 rows, `market_participants`, `market_prices`, `positions`,
   `transactions`, `resolutions`, `users`, `auth_challenges` with lazy expiry
@@ -310,31 +325,62 @@ decision.
   lamport pools. Tested in `tests/tape.test.ts` (vitest imports the .mjs via
   the `@` alias; types in `scripts/lib/tape.d.mts`).
 - `scripts/lib/env.mjs` — shared script config: `.env` loader,
-  `requireProgramId()`, `resolveRpcUrl()`. All scripts read the program id
-  through here.
+  `requireProgramId()`, `resolveRpcUrl()`, and `openScriptStore()` (D1 HTTP
+  when `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_D1_DATABASE_ID`/`CLOUDFLARE_API_TOKEN`
+  are set, local SQLite otherwise). All scripts read the program id here.
+- `scripts/export-d1-sql.mjs` — dumps the local SQLite file to
+  `data/d1-import.sql` (schema + rows, FK-safe order) for
+  `wrangler d1 execute --remote --file`.
+
+## Hosting (Cloudflare Workers + D1, free tier)
+
+- `wrangler.jsonc`: Worker `clyma`, `main: .open-next/worker.js`, static
+  assets from `.open-next/assets`, D1 binding `DB`, runtime vars. Secrets
+  (`JWT_SECRET`, `BACKBOARD_API_KEY`) live in the Worker, not in the file.
+- `open-next.config.ts`: `@opennextjs/cloudflare` defaults (no ISR cache).
+- Build/deploy: `npm run cf:build` / `cf:preview` / `cf:deploy`. The plain
+  `npm run build` + Docker path still works (it uses local SQLite).
+- `next.config.mjs` is unchanged; the adapter handles App Router routes and
+  `force-dynamic` pages. There is no middleware.
+- Free-tier ceilings to keep in mind: 100k Worker requests/day, 10ms CPU per
+  invocation, D1 5M rows read/day and **100k rows written/day (hard-fail
+  since Sep 2026)**. The catalogue page reads every market + history, so
+  wide crawls are the fastest way to burn row reads.
+- Production URLs: `https://clyma.xyz` (custom domain attached to the
+  Worker) and `https://clyma.hiteshguptacad.workers.dev` (fallback).
+  Verify with `curl https://clyma.xyz/api/markets?limit=1` and
+  `npx wrangler tail clyma`.
+- `production` no longer needs a VPS: `Dockerfile`, `docker-compose.yml` and
+  the `cloudflared` tunnel are local/self-host fallbacks. The public site is
+  served by the Worker only.
 
 ## Environment (`.env.example`)
 
-| Variable                        | Purpose                                                                |
-| ------------------------------- | ---------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SOLANA_NETWORK`    | Must be `devnet`                                                       |
-| `NEXT_PUBLIC_SOLANA_RPC_URL`    | Dedicated Devnet RPC (Helius/QuickNode/Triton); public default 429s    |
-| `NEXT_PUBLIC_PROGRAM_ID`        | Program address; unset → trading blocked ("program is not configured") |
-| `NEXT_PUBLIC_APP_URL`           | Public base URL (set before `npm run build`; inlined at build time)    |
-| `APP_URL`                       | Server-only override for the app base URL (optional)                   |
-| `JWT_SECRET`                    | Required in production; server refuses to start without it             |
-| `ENABLE_MARKET_CREATE`          | `true` to enable `POST /api/markets/create` (disabled for launch)      |
-| `PREDICT_CACHE_TTL_MS`          | `/api/predict` cache TTL (default 900000)                              |
-| `PREDICT_RATE_LIMIT_PER_MINUTE` | `/api/predict` per-IP rate limit (default 20)                          |
-| `SQLITE_PATH`                   | App database file (default `./data/clyma.db`)                          |
-| `BACKBOARD_API_KEY`             | Backboard key for GPT Luna (generation + forecasts)                    |
-| `BACKBOARD_BASE_URL`            | Optional override (default `https://app.backboard.io/api`)             |
-| `BACKBOARD_LLM_PROVIDER`        | Optional override (default `openai`)                                   |
-| `LLM_MODEL`                     | Model id (default `gpt-5.6-luna`)                                      |
+| Variable                        | Purpose                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SOLANA_NETWORK`    | Must be `devnet`                                                          |
+| `NEXT_PUBLIC_SOLANA_RPC_URL`    | Dedicated Devnet RPC (Helius/QuickNode/Triton); public default 429s       |
+| `NEXT_PUBLIC_PROGRAM_ID`        | Program address; unset → trading blocked ("program is not configured")    |
+| `NEXT_PUBLIC_APP_URL`           | Public base URL (set before `npm run build`; inlined at build time)       |
+| `APP_URL`                       | Server-only override for the app base URL (optional)                      |
+| `JWT_SECRET`                    | Required in production; server refuses to start without it                |
+| `ENABLE_MARKET_CREATE`          | `true` to enable `POST /api/markets/create` (disabled for launch)         |
+| `PREDICT_CACHE_TTL_MS`          | `/api/predict` cache TTL (default 900000)                                 |
+| `PREDICT_RATE_LIMIT_PER_MINUTE` | `/api/predict` per-IP rate limit (default 20)                             |
+| `SQLITE_PATH`                   | Local DB file (default `./data/clyma.db`); unused on Workers (D1 binding) |
+| `CLOUDFLARE_ACCOUNT_ID`         | Scripts only: D1 HTTP target (with the two below)                         |
+| `CLOUDFLARE_D1_DATABASE_ID`     | Scripts only: deployed D1 database id                                     |
+| `CLOUDFLARE_API_TOKEN`          | Scripts only: token with D1 edit permission                               |
+| `BACKBOARD_API_KEY`             | Backboard key for GPT Luna (generation + forecasts)                       |
+| `BACKBOARD_BASE_URL`            | Optional override (default `https://app.backboard.io/api`)                |
+| `BACKBOARD_LLM_PROVIDER`        | Optional override (default `openai`)                                      |
+| `LLM_MODEL`                     | Model id (default `gpt-5.6-luna`)                                         |
 
-Serving markets requires `BACKBOARD_API_KEY` (generation + forecasts). No DB
-server: SQLite file via `node:sqlite` (flag-gated on Node 22.5.x — `.npmrc`
-forwards `--experimental-sqlite` to all npm scripts).
+Serving markets requires `BACKBOARD_API_KEY` (generation + forecasts).
+Production reads it from a Worker secret; local dev reads `.env`. The local
+database is a SQLite file via `node:sqlite` (flag-gated on Node 22.5.x —
+`.npmrc` forwards `--experimental-sqlite` to all npm scripts); production uses
+the D1 binding declared in `wrangler.jsonc`.
 
 ## Testing
 
@@ -394,3 +440,13 @@ forwards `--experimental-sqlite` to all npm scripts).
 6. Never commit `.env` (gitignored) or API keys. A previous commit leaked
    Freesolo/MiniMax/Tavily keys — treat those as rotated/compromised, do not
    reintroduce them.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

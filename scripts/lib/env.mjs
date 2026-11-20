@@ -55,3 +55,30 @@ export function requireProgramId() {
 export function resolveRpcUrl() {
   return process.env.NEXT_PUBLIC_SOLANA_RPC_URL?.trim() || DEFAULT_RPC_URL
 }
+
+/**
+ * Opens the data layer for CLI scripts.
+ *
+ * With CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_D1_DATABASE_ID +
+ * CLOUDFLARE_API_TOKEN set, scripts read/write the deployed D1 database
+ * (one data path with production). Otherwise they use the local SQLite
+ * file exactly as before, which keeps offline/`--dry-run` work possible.
+ */
+export async function openScriptStore() {
+  // Callers may open the store before their command loads .env; load it here
+  // so CLOUDFLARE_* / SQLITE_PATH from the file are honored either way.
+  loadEnv()
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
+  const databaseId = process.env.CLOUDFLARE_D1_DATABASE_ID?.trim()
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim()
+
+  if (accountId && databaseId && apiToken) {
+    const { openHttpStore } = await import("../../lib/db/store.mjs")
+    await openHttpStore({ accountId, databaseId, apiToken })
+    return "d1"
+  }
+
+  const { openStore } = await import("../../lib/db/store.mjs")
+  await openStore()
+  return "sqlite"
+}

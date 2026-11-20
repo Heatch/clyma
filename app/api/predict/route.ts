@@ -31,6 +31,10 @@ interface PredictBody {
 }
 
 function clientIp(request: NextRequest): string {
+  // Cloudflare always sets cf-connecting-ip; x-forwarded-for is the
+  // compatible fallback for local/proxied deployments.
+  const direct = request.headers.get("cf-connecting-ip")?.trim()
+  if (direct) return direct
   const forwarded = request.headers.get("x-forwarded-for")
   const first = forwarded?.split(",")[0]?.trim()
   return first || "unknown"

@@ -9,7 +9,13 @@ import {
   updateMarketStatus,
 } from "@/lib/db/store.mjs"
 import type { MarketDoc } from "@/lib/db/types"
-import type { ClimateMarket, MarketListQuery, MarketListResult, MarketHistoryPoint, MarketHistoryResult } from "@/lib/markets/types"
+import type {
+  ClimateMarket,
+  MarketListQuery,
+  MarketListResult,
+  MarketHistoryPoint,
+  MarketHistoryResult,
+} from "@/lib/markets/types"
 
 function marketDocToClimateMarket(doc: MarketDoc): ClimateMarket {
   return {
@@ -50,8 +56,10 @@ function marketDocToClimateMarket(doc: MarketDoc): ClimateMarket {
   }
 }
 
-export async function queryMarkets(query: MarketListQuery): Promise<MarketListResult> {
-  const result = storeListMarkets(query) as unknown as {
+export async function queryMarkets(
+  query: MarketListQuery,
+): Promise<MarketListResult> {
+  const result = (await storeListMarkets(query)) as unknown as {
     markets: MarketDoc[]
     total: number
     limit: number
@@ -68,7 +76,9 @@ export async function queryMarkets(query: MarketListQuery): Promise<MarketListRe
 export async function getMarketById(
   idOrSlug: string,
 ): Promise<ClimateMarket | null> {
-  const doc = getMarketByIdOrSlug(idOrSlug) as unknown as MarketDoc | null
+  const doc = (await getMarketByIdOrSlug(
+    idOrSlug,
+  )) as unknown as MarketDoc | null
   return doc ? marketDocToClimateMarket(doc) : null
 }
 
@@ -76,7 +86,7 @@ export async function getMarketsByContinent(
   continent: string,
   query: Partial<MarketListQuery> = {},
 ): Promise<MarketListResult> {
-  const result = storeListByContinent(continent, query) as unknown as {
+  const result = (await storeListByContinent(continent, query)) as unknown as {
     markets: MarketDoc[]
     total: number
     limit: number
@@ -104,9 +114,9 @@ export async function getMarketHistory(
     byTime.set(point.timestamp, point)
   }
   try {
-    const rowId = getRowIdByMarketId(market.id)
+    const rowId = await getRowIdByMarketId(market.id)
     if (rowId !== null) {
-      for (const snap of listPriceSnapshots(rowId)) {
+      for (const snap of await listPriceSnapshots(rowId)) {
         const s = snap as unknown as {
           timestamp: string
           yesPrice: number
@@ -145,7 +155,7 @@ export async function getMarketHistory(
 export async function getMarketDocIdByMarketId(
   marketId: string,
 ): Promise<number | null> {
-  return getRowIdByMarketId(marketId)
+  return await getRowIdByMarketId(marketId)
 }
 
 export async function setMarketStatus(
@@ -153,7 +163,7 @@ export async function setMarketStatus(
   status: MarketDoc["status"],
   outcome?: MarketDoc["outcome"],
 ): Promise<void> {
-  updateMarketStatus(marketDocId, status, outcome)
+  await updateMarketStatus(marketDocId, status, outcome)
 }
 
 export async function incrementMarketActivity(params: {
@@ -161,12 +171,16 @@ export async function incrementMarketActivity(params: {
   amountSol: number
   walletAddress: string
 }): Promise<void> {
-  storeIncrementActivity(params.marketDocId, params.amountSol, params.walletAddress)
+  await storeIncrementActivity(
+    params.marketDocId,
+    params.amountSol,
+    params.walletAddress,
+  )
 }
 
 export async function appendMarketHistoryPoint(
   marketDocId: string,
   point: MarketHistoryPoint,
 ): Promise<void> {
-  storeAppendHistoryPoint(marketDocId, point)
+  await storeAppendHistoryPoint(marketDocId, point)
 }

@@ -41,7 +41,12 @@ import { homedir, tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { loadEnv, requireProgramId, resolveRpcUrl } from "./lib/env.mjs"
+import {
+  loadEnv,
+  openScriptStore,
+  requireProgramId,
+  resolveRpcUrl,
+} from "./lib/env.mjs"
 import { buildTape, LAMPORTS_PER_SOL } from "./lib/tape.mjs"
 import {
   appendHistoryPoint,
@@ -876,12 +881,12 @@ async function fundAndIndex(markets, { wallet, indexDb, reset }) {
   if (indexDb) {
     console.log("Indexing to SQLite...")
     if (reset) {
-      resetMarketData()
+      await resetMarketData()
       console.log("  Reset: dropped market data (schema + indexes persist)")
     }
     for (const m of markets) {
       const d = m.doc
-      upsertMarket({
+      await upsertMarket({
         marketId: d.id,
         onchainMarketId: d.onchainMarketId,
         title: d.question,
@@ -914,9 +919,11 @@ async function fundAndIndex(markets, { wallet, indexDb, reset }) {
         closeTime: d.closeTime,
         resolutionTime: d.resolutionTime,
       })
-      replaceHistory(d.id, d.history)
-      seedParticipants(d.id, [...new Set(m.tape.trades.map((t) => t.wallet))])
-      replaceCreationSnapshots(d.id, d.history)
+      await replaceHistory(d.id, d.history)
+      await seedParticipants(d.id, [
+        ...new Set(m.tape.trades.map((t) => t.wallet)),
+      ])
+      await replaceCreationSnapshots(d.id, d.history)
     }
     console.log(`  SQLite: indexed ${markets.length} markets`)
   }
@@ -929,7 +936,7 @@ async function fundAndIndex(markets, { wallet, indexDb, reset }) {
  */
 async function closeDueMarkets(wallet, dry = false) {
   const now = new Date().toISOString()
-  const due = dueToClose(now)
+  const due = await dueToClose(now)
   if (dry) {
     for (const doc of due) {
       console.log(
@@ -953,7 +960,7 @@ async function closeDueMarkets(wallet, dry = false) {
         )
         await sleep(1500)
       }
-      updateMarketStatus(doc.market_id, "closed")
+      await updateMarketStatus(doc.market_id, "closed")
       closed.push(doc.market_id)
       console.log(
         `  closed ${doc.onchain_market_id}: ${doc.question?.slice(0, 60)}...`,
@@ -974,7 +981,7 @@ async function closeDueMarkets(wallet, dry = false) {
  */
 async function resolveDueMarkets(wallet, dry = false) {
   const now = new Date().toISOString()
-  const due = dueToResolve(now)
+  const due = await dueToResolve(now)
   if (dry) {
     for (const doc of due) {
       const outcome = resolveDraw(doc.marketId, modelOddsOf(doc))
@@ -1002,8 +1009,8 @@ async function resolveDueMarkets(wallet, dry = false) {
         )
         await sleep(1500)
       }
-      updateMarketStatus(doc.marketId, "resolved", outcome)
-      insertResolution({
+      await updateMarketStatus(doc.marketId, "resolved", outcome)
+      await insertResolution({
         marketDocId: doc.marketId,
         resolvedOutcome: outcome,
         resolverType: "automated",
@@ -1012,9 +1019,9 @@ async function resolveDueMarkets(wallet, dry = false) {
           ? `https://explorer.solana.com/tx/${signature}?cluster=devnet`
           : undefined,
       })
-      const { won, lost } = settlePositionsByMarket(doc.marketId, outcome)
+      const { won, lost } = await settlePositionsByMarket(doc.marketId, outcome)
       if (signature) {
-        insertTransaction({
+        await insertTransaction({
           walletAddress: wallet.publicKey.toBase58(),
           type: "market_resolved",
           txSignature: signature,
@@ -1162,7 +1169,7 @@ async function rollCommand(args) {
   console.log("Step 2: resolving due markets...")
   const resolved = await resolveDueMarkets(wallet, args.dryRun)
 
-  const openCount = countOpenMarkets()
+  const openCount = await countOpenMarkets()
   const needed = target - openCount
   console.log(
     `Open markets: ${openCount}, target: ${target}, needed: ${Math.max(0, needed)}`,
@@ -1185,7 +1192,7 @@ async function rollCommand(args) {
     process.exit(1)
   }
 
-  const maxOnchain = maxOnchainMarketId()
+  const maxOnchain = await maxOnchainMarketId()
   const baseId = (maxOnchain ?? args.baseId - 1) + 1
   // Pro-rate the pool budget to the markets actually created.
   const budgetTotal = args.budgetExplicit
@@ -1352,7 +1359,7 @@ async function boostCommand(args) {
   const { targetTotal, minDepth, maxDepth, boostSeed } = args
 
   // --- Step 1: chain pools (source of truth) + DB rows ---
-  const dbRows = listOpenMarketPools()
+  const dbRows = await listOpenMarketPools()
   if (dbRows.length === 0) {
     console.error("No open markets in the DB — nothing to boost")
     process.exit(1)
@@ -1499,17 +1506,17 @@ async function boostCommand(args) {
     })
   }
   const timestamp = new Date().toISOString()
-  const writePlan = (p, finalYes, finalNo) => {
+  const writePlan = async (p, finalYes, finalNo) => {
     const total = finalYes + finalNo
     const yesPrice = total > 0 ? finalYes / total : 0.5
-    updateMarketPools(p.marketDocId, {
+    await updateMarketPools(p.marketDocId, {
       yesPrice: round(yesPrice, 4),
       noPrice: round(1 - yesPrice, 4),
       yesLiquidity: round(finalYes, 4),
       noLiquidity: round(finalNo, 4),
       totalVolume: round(total, 4),
     })
-    appendHistoryPoint(p.marketDocId, {
+    await appendHistoryPoint(p.marketDocId, {
       timestamp,
       yesProbability: round(yesPrice, 4),
       noProbability: round(1 - yesPrice, 4),
@@ -1517,7 +1524,7 @@ async function boostCommand(args) {
       yesLiquidity: round(finalYes, 4),
       noLiquidity: round(finalNo, 4),
     })
-    insertPriceSnapshot({
+    await insertPriceSnapshot({
       marketDocId: p.marketDocId,
       timestamp,
       yesPrice: round(yesPrice, 4),
@@ -1528,7 +1535,7 @@ async function boostCommand(args) {
       noLiquidity: round(finalNo, 4),
       totalVolume: round(total, 4),
     })
-    seedParticipants(p.marketDocId, [funder])
+    await seedParticipants(p.marketDocId, [funder])
   }
   let historyPoints = 0
   // Mirrors the tape's payout convention (amount / probability, 4dp).
@@ -1538,7 +1545,7 @@ async function boostCommand(args) {
         10_000,
     ) / 10_000
   for (const p of funded) {
-    writePlan(p, p.finalYes, p.finalNo)
+    await writePlan(p, p.finalYes, p.finalNo)
     historyPoints++
     if (p.addYes > 0 || p.addNo > 0) {
       const legs = []
@@ -1570,7 +1577,7 @@ async function boostCommand(args) {
           timestamp,
         })
       }
-      appendRecentTrades(p.marketDocId, legs)
+      await appendRecentTrades(p.marketDocId, legs)
     }
   }
   // Drift-only markets: repair DB pools (no funding, still chart the fix).
@@ -1578,7 +1585,7 @@ async function boostCommand(args) {
   for (const p of plan) {
     if (p.addTotal > 0 || p.driftSol <= BOOST_DRIFT_TOL_SOL) continue
     if (failed.includes(p.onchainMarketId)) continue
-    writePlan(p, p.curYes / LAMPORTS_PER_SOL, p.curNo / LAMPORTS_PER_SOL)
+    await writePlan(p, p.curYes / LAMPORTS_PER_SOL, p.curNo / LAMPORTS_PER_SOL)
     historyPoints++
     repaired++
   }
@@ -1628,6 +1635,12 @@ const USAGE = `Usage:
 
 async function main() {
   const args = parseArgs(process.argv.slice(2))
+  if (!args.command) {
+    console.error(USAGE)
+    process.exit(1)
+  }
+  const storeTarget = await openScriptStore()
+  if (storeTarget === "d1") console.log("DB: Cloudflare D1 (remote)")
   if (args.command === "close") {
     await closeCommand(args)
     return

@@ -45,13 +45,13 @@ function marketInput(id: string) {
   }
 }
 
-beforeEach(() => {
-  __resetStoreForTests()
-  openStore(":memory:")
-  upsertMarket(marketInput("m1"))
+beforeEach(async () => {
+  await __resetStoreForTests()
+  await openStore(":memory:")
+  await upsertMarket(marketInput("m1"))
 
   // Current-market rows.
-  insertPosition({
+  await insertPosition({
     walletAddress: "w1",
     marketDocId: "m1",
     onchainMarketId: 3001,
@@ -63,7 +63,7 @@ beforeEach(() => {
     estimatedPayoutLamports: "2000000000",
     txSignature: "sig-current",
   })
-  insertTransaction({
+  await insertTransaction({
     walletAddress: "w1",
     type: "purchase_yes",
     amountSol: 1,
@@ -75,7 +75,7 @@ beforeEach(() => {
   })
 
   // Stale rows: market deleted by a reseed.
-  insertPosition({
+  await insertPosition({
     walletAddress: "w1",
     marketDocId: "ghost-market",
     onchainMarketId: 1001,
@@ -87,7 +87,7 @@ beforeEach(() => {
     estimatedPayoutLamports: "3000000000",
     txSignature: "sig-stale",
   })
-  insertTransaction({
+  await insertTransaction({
     walletAddress: "w1",
     type: "purchase_no",
     amountSol: 2,
@@ -100,9 +100,9 @@ beforeEach(() => {
 })
 
 describe("stale market filtering", () => {
-  it("resolves only ids present in the markets table", () => {
-    expect(existingMarketIds(["m1", "ghost-market", ""])).toEqual(["m1"])
-    expect(existingMarketIds([])).toEqual([])
+  it("resolves only ids present in the markets table", async () => {
+    expect(await existingMarketIds(["m1", "ghost-market", ""])).toEqual(["m1"])
+    expect(await existingMarketIds([])).toEqual([])
   })
 
   it("hides positions whose market is gone", async () => {
@@ -112,7 +112,7 @@ describe("stale market filtering", () => {
   })
 
   it("hides activity whose market is gone, keeps market-less rows", async () => {
-    insertTransaction({
+    await insertTransaction({
       walletAddress: "w1",
       type: "claim",
       txSignature: "sig-marketless",
